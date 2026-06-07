@@ -29,9 +29,30 @@ def write_rule_page(wiki_root: Path, org_id: str, rule: dict) -> str:
     return f"glossary/{slug}.md"
 
 
+def _clean_attrs(raw: dict) -> dict:
+    """Remove placeholder/empty values the LLM returns when it can't find data."""
+    result = {}
+    for k, v in raw.items():
+        if v is None or v == {} or v == [] or str(v).strip() in ("", "{}", "[]", "null", "N/A", "无", "—"):
+            continue
+        result[k] = v
+    return result
+
+
 def _entity_md(e: dict) -> str:
-    attrs = e.get("attributes", {})
-    attr_rows = "\n".join(f"| {k} | {v} |" for k, v in attrs.items()) if attrs else "_暂无_"
+    attrs = _clean_attrs(e.get("attributes", {}))
+    attr_section = (
+        "| 属性 | 值 |\n|------|-----|\n"
+        + "\n".join(f"| {k} | {v} |" for k, v in attrs.items())
+        if attrs else "_暂无_"
+    )
+
+    relations = e.get("relations", [])
+    rel_lines = "\n".join(
+        f"- [{r['target']}](../entities/{r['target'].replace('/', '-')}.md) · {r['type']}"
+        for r in relations
+    ) if relations else "_暂无_"
+
     return f"""# {e['name']}
 
 **类型：** {e['type']}
@@ -43,13 +64,11 @@ def _entity_md(e: dict) -> str:
 
 ## 属性
 
-| 属性 | 值 |
-|------|-----|
-{attr_rows}
+{attr_section}
 
 ## 关联实体
 
-<!-- 由 linker 自动填充 -->
+{rel_lines}
 """
 
 
@@ -57,15 +76,27 @@ def _workflow_md(wf: dict) -> str:
     steps = "\n".join(f"{i+1}. {s}" for i, s in enumerate(wf.get("steps", [])))
     conditions = "\n".join(f"- {c}" for c in wf.get("conditions", [])) or "_无_"
     participants = "、".join(wf.get("participants", [])) or "_未指定_"
+    trigger = wf.get("trigger", "")
+    duration = wf.get("duration", "")
+    output = wf.get("output", "")
+
+    extra = ""
+    if trigger:
+        extra += f"\n**触发事件：** {trigger}\n"
+    if duration:
+        extra += f"\n**时限要求：** {duration}\n"
+    if output:
+        extra += f"\n**产出物：** {output}\n"
+
     return f"""# {wf['name']}
 
 **更新时间：** {datetime.utcnow().strftime('%Y-%m-%d')}
-
+{extra}
 ## 流程步骤
 
 {steps}
 
-## 规则与条件
+## 前提条件
 
 {conditions}
 
@@ -76,9 +107,15 @@ def _workflow_md(wf: dict) -> str:
 
 
 def _rule_md(rule: dict) -> str:
+    source = rule.get("source", "")
+    penalty = rule.get("penalty", "")
+
+    source_line = f"\n**规则来源：** {source}" if source else ""
+    penalty_section = f"\n## 违规后果\n\n{penalty}" if penalty else ""
+
     return f"""# {rule['name']}
 
-**更新时间：** {datetime.utcnow().strftime('%Y-%m-%d')}
+**更新时间：** {datetime.utcnow().strftime('%Y-%m-%d')}{source_line}
 
 ## 触发条件
 
@@ -87,4 +124,5 @@ def _rule_md(rule: dict) -> str:
 ## 执行动作
 
 {rule.get('action', '')}
+{penalty_section}
 """

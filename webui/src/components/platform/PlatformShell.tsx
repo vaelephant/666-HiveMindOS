@@ -118,65 +118,56 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         </div>
 
         {/* Nav items */}
-        <nav className="custom-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-          {PRIMARY_NAV.map((item) => {
+        <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-3">
+          {PRIMARY_NAV.flatMap((item, idx) => {
+            const prev = PRIMARY_NAV[idx - 1];
+            const prefix: React.ReactNode[] = [];
+
+            // Section label above first HiveMind item
+            if (!navCollapsed && item.factory === 'hivemind' && prev?.factory !== 'hivemind') {
+              prefix.push(
+                <p key={`label-hivemind`} className="mb-1 mt-1 px-3 text-[9px] font-semibold uppercase tracking-widest text-brand-bright/40">
+                  HiveMind
+                </p>
+              );
+            }
+            // Divider between factory groups
+            if (prev && prev.factory !== item.factory) {
+              prefix.push(
+                <div key={`div-${item.navKey}`} className="my-2 border-t border-shell-border-dim" />
+              );
+            }
+
+            let el: React.ReactNode;
+
             if (isAnnotationItem(item)) {
               const annotationActive = pathname.startsWith('/annotation');
-              if (navCollapsed) {
-                return (
-                  <Link
-                    key={item.navKey}
-                    href="/annotation/overview"
-                    title={item.label}
-                    className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${
-                      annotationActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
-                  >
-                    <item.icon className="h-[18px] w-[18px] shrink-0" />
-                  </Link>
-                );
-              }
-              return (
+              el = navCollapsed ? (
+                <Link
+                  key={item.navKey}
+                  href="/annotation/overview"
+                  title={item.label}
+                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${annotationActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                </Link>
+              ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setAnnotationOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                      annotationActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
+                  <button type="button" onClick={() => setAnnotationOpen((o) => !o)}
+                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${annotationActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
                   >
                     <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${annotationOpen ? 'rotate-0' : '-rotate-90'}`}
-                    />
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${annotationOpen ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                   <AnimatePresence initial={false}>
                     {annotationOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
                           {ANNOTATION_CHILDREN.map((child) => {
                             const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (
-                              <Link
-                                key={child.navKey}
-                                href={child.href}
-                                className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${
-                                  active
-                                    ? 'bg-brand-primary/10 text-brand-bright'
-                                    : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                                }`}
-                              >
+                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
                                 <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
@@ -188,65 +179,31 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   </AnimatePresence>
                 </div>
               );
-            }
-
-            if (isIpfsMonitorItem(item)) {
+            } else if (isIpfsMonitorItem(item)) {
               const ipfsActive = pathname.startsWith(IPFS_MONITOR_BASE_PATH);
-              if (navCollapsed) {
-                return (
-                  <Link
-                    key={item.navKey}
-                    href={IPFS_MONITOR_BASE_PATH}
-                    title={item.label}
-                    className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${
-                      ipfsActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
-                  >
-                    <item.icon className="h-[18px] w-[18px] shrink-0" />
-                  </Link>
-                );
-              }
-              return (
+              el = navCollapsed ? (
+                <Link key={item.navKey} href={IPFS_MONITOR_BASE_PATH} title={item.label}
+                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${ipfsActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                </Link>
+              ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setIpfsMonitorOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                      ipfsActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
+                  <button type="button" onClick={() => setIpfsMonitorOpen((o) => !o)}
+                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${ipfsActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
                   >
                     <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${ipfsMonitorOpen ? 'rotate-0' : '-rotate-90'}`}
-                    />
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${ipfsMonitorOpen ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                   <AnimatePresence initial={false}>
                     {ipfsMonitorOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
                           {IPFS_MONITOR_CHILDREN.map((child) => {
                             const active = isIpfsMonitorChildActive(child, pathname);
                             return (
-                              <Link
-                                key={child.navKey}
-                                href={child.href}
-                                className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${
-                                  active
-                                    ? 'bg-brand-primary/10 text-brand-bright'
-                                    : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                                }`}
-                              >
+                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
                                 <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
@@ -258,65 +215,31 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   </AnimatePresence>
                 </div>
               );
-            }
-
-            if (isKnowledgeBaseItem(item)) {
+            } else if (isKnowledgeBaseItem(item)) {
               const kbActive = pathname.startsWith(KB_BASE_PATH);
-              if (navCollapsed) {
-                return (
-                  <Link
-                    key={item.navKey}
-                    href={`${KB_BASE_PATH}/overview`}
-                    title={item.label}
-                    className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${
-                      kbActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
-                  >
-                    <item.icon className="h-[18px] w-[18px] shrink-0" />
-                  </Link>
-                );
-              }
-              return (
+              el = navCollapsed ? (
+                <Link key={item.navKey} href={`${KB_BASE_PATH}/overview`} title={item.label}
+                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${kbActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                </Link>
+              ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setKnowledgeBaseOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${
-                      kbActive
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                    }`}
+                  <button type="button" onClick={() => setKnowledgeBaseOpen((o) => !o)}
+                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${kbActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
                   >
                     <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${knowledgeBaseOpen ? 'rotate-0' : '-rotate-90'}`}
-                    />
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${knowledgeBaseOpen ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                   <AnimatePresence initial={false}>
                     {knowledgeBaseOpen && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="overflow-hidden"
-                      >
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
                         <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
                           {KNOWLEDGE_BASE_CHILDREN.map((child) => {
                             const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (
-                              <Link
-                                key={child.navKey}
-                                href={child.href}
-                                className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${
-                                  active
-                                    ? 'bg-brand-primary/10 text-brand-bright'
-                                    : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                                }`}
-                              >
+                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
                                 <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
@@ -328,28 +251,30 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   </AnimatePresence>
                 </div>
               );
+            } else {
+              const active = navItemActive(item.href, pathname);
+              el = (
+                <Link
+                  key={item.navKey}
+                  href={item.href}
+                  title={item.label}
+                  className={`flex w-full items-center rounded-lg py-2.5 text-[13px] font-medium transition-all duration-150 ${
+                    navCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'
+                  } ${
+                    active
+                      ? navCollapsed
+                        ? 'bg-brand-primary/10 text-brand-bright'
+                        : 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[10px] text-brand-bright'
+                      : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
+                  }`}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                  {!navCollapsed && <span className="truncate">{item.label}</span>}
+                </Link>
+              );
             }
 
-            const active = navItemActive(item.href, pathname);
-            return (
-              <Link
-                key={item.navKey}
-                href={item.href}
-                title={item.label}
-                className={`flex w-full items-center rounded-lg py-2.5 text-[13px] font-medium transition-all duration-150 ${
-                  navCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'
-                } ${
-                  active
-                    ? navCollapsed
-                      ? 'bg-brand-primary/10 text-brand-bright'
-                      : 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[10px] text-brand-bright'
-                    : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                }`}
-              >
-                <item.icon className="h-[18px] w-[18px] shrink-0" />
-                {!navCollapsed && <span className="truncate">{item.label}</span>}
-              </Link>
-            );
+            return [...prefix, el];
           })}
         </nav>
 

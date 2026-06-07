@@ -62,7 +62,8 @@ class MemoryGraph:
     def get_entity(self, org_id: str, name: str) -> Optional[dict]:
         with self._conn() as conn:
             row = conn.execute(
-                "SELECT * FROM entities WHERE org_id=? AND name=?", (org_id, name)
+                "SELECT * FROM entities WHERE org_id=? AND name=? ORDER BY ROWID DESC LIMIT 1",
+                (org_id, name),
             ).fetchone()
             return _row_to_dict(row) if row else None
 
@@ -103,6 +104,68 @@ class MemoryGraph:
                 (entity_id, entity_id, org_id, entity_id),
             ).fetchall()
             return [_row_to_dict(r) for r in rows]
+
+    def get_entity_relations(self, entity_id: str, org_id: str) -> list[dict]:
+        """Relations involving entity, with neighbor info and direction."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """SELECT r.id, r.relation_type, r.source_entity_id, r.target_entity_id,
+                          src.name AS source_name, tgt.name AS target_name,
+                          src.entity_type AS source_type, tgt.entity_type AS target_type,
+                          CASE WHEN r.source_entity_id = ? THEN tgt.wiki_path ELSE src.wiki_path END AS neighbor_wiki_path,
+                          CASE WHEN r.source_entity_id = ? THEN tgt.name ELSE src.name END AS neighbor_name,
+                          CASE WHEN r.source_entity_id = ? THEN tgt.entity_type ELSE src.entity_type END AS neighbor_type,
+                          CASE WHEN r.source_entity_id = ? THEN 'outgoing' ELSE 'incoming' END AS direction
+                   FROM relations r
+                   JOIN entities src ON src.id = r.source_entity_id
+                   JOIN entities tgt ON tgt.id = r.target_entity_id
+                   WHERE r.org_id = ? AND (r.source_entity_id = ? OR r.target_entity_id = ?)""",
+                (entity_id, entity_id, entity_id, entity_id, org_id, entity_id, entity_id),
+            ).fetchall()
+        return [_row_to_dict(row) for row in rows]
+
+    def get_snapshot(self, org_id: str) -> dict:
+        entities = self.list_entities(org_id)
+        id_map = {e["id"]: e for e in entities}
+        with self._conn() as conn:
+            rows = conn.execute(
+                "SELECT * FROM relations WHERE org_id = ?", (org_id,)
+            ).fetchall()
+        edges = []
+        for row in rows:
+            rel = _row_to_dict(row)
+            src = id_map.get(rel["source_entity_id"])
+            tgt = id_map.get(rel["target_entity_id"])
+            if not src or not tgt:
+                continue
+            edges.append(
+                {
+                    "id": rel["id"],
+                    "source_id": rel["source_entity_id"],
+                    "target_id": rel["target_entity_id"],
+                    "source_name": src["name"],
+                    "target_name": tgt["name"],
+                    "relation_type": rel["relation_type"],
+                    "weight": rel.get("weight", 1.0),
+                }
+            )
+        nodes = [
+            {
+                "id": e["id"],
+                "name": e["name"],
+                "entity_type": e["entity_type"],
+                "wiki_path": e.get("wiki_path") or "",
+            }
+            for e in entities
+        ]
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "stats": {
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+            },
+        }
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:

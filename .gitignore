@@ -63,4 +63,4 @@ memory_layer/knowledge_base/storage/registry.db
 # ── memory_demo local state ─────────────────────────
 memory_demo/session.db
 memory_demo/session.json
-memory_demo/test_session.json
+.gitignore

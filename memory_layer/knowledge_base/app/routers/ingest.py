@@ -3,12 +3,14 @@ from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.agents.ingest_agent import IngestAgent
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRecord, SourceRegistry
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
+from memory_layer.knowledge_base.core.wiki import wiki_meta
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 
 router = APIRouter()
@@ -17,6 +19,13 @@ log = get_logger("hivemind.ingest")
 _SUFFIX_TO_TYPE = {
     ".pdf": "pdf", ".docx": "word", ".doc": "word",
     ".xlsx": "excel", ".xls": "excel", ".txt": "text",
+}
+
+_MEDIA = {
+    "pdf": "application/pdf",
+    "word": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text": "text/plain",
 }
 
 _registry = SourceRegistry(config.REGISTRY_DB)
@@ -71,6 +80,38 @@ def list_sources(org_id: str):
     return {"sources": [asdict(r) for r in _registry.list(org_id)]}
 
 
+# ── Delete source ─────────────────────────────────────────────────────────────
+
+@router.delete("/orgs/{org_id}/sources/{source_id}")
+def delete_source(org_id: str, source_id: str):
+    """Delete a source: remove wiki pages, raw file, and registry record."""
+    record = _registry.get(source_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    # 删除关联的 Wiki 文件
+    wiki_root = config.WIKI_ROOT / org_id
+    deleted_pages = 0
+    for rel_path in record.wiki_pages or []:
+        p = wiki_root / rel_path
+        if p.exists():
+            p.unlink()
+            deleted_pages += 1
+        wiki_meta.delete_meta(config.WIKI_ROOT, org_id, rel_path)
+
+    # 删除原始文件
+    raw_path = Path(record.file_path)
+    if raw_path.exists():
+        raw_path.unlink()
+
+    # 删除 registry 记录
+    _registry.delete(source_id)
+
+    log.info("[delete] org=%s  source=%s  file=%s  wiki_pages_removed=%d",
+             org_id, source_id[:8], record.filename, deleted_pages)
+    return {"deleted": source_id}
+
+
 # ── Step 2: Compile ──────────────────────────────────────────────────────────
 
 @router.post("/orgs/{org_id}/sources/{source_id}/compile")
@@ -84,11 +125,24 @@ def compile_source(org_id: str, source_id: str):
     if record.status == "compiling":
         raise HTTPException(status_code=409, detail="正在编译中，请稍候")
 
+    # 删除上次编译生成的旧 Wiki 文件
+    old_pages = record.wiki_pages or []
+    if old_pages:
+        wiki_root = config.WIKI_ROOT / org_id
+        deleted = 0
+        for rel_path in old_pages:
+            p = wiki_root / rel_path
+            if p.exists():
+                p.unlink()
+                deleted += 1
+            wiki_meta.delete_meta(config.WIKI_ROOT, org_id, rel_path)
+        log.info("[compile] cleaned %d old wiki pages for source=%s", deleted, source_id[:8])
+
     _registry.update(source_id, status="compiling")
     log.info("[compile] start  org=%s  source=%s  file=%s", org_id, source_id[:8], record.filename)
     try:
         result = _make_agent(org_id).run(
-            Path(record.file_path), org_id, record.source_type
+            Path(record.file_path), org_id, record.source_type, source_id=source_id
         )
         _registry.update(
             source_id,
@@ -96,15 +150,36 @@ def compile_source(org_id: str, source_id: str):
             entities_extracted=result["entities_extracted"],
             workflows_extracted=result["workflows_extracted"],
             wiki_pages_created=result["wiki_pages_created"],
+            wiki_pages=result["pages"],
         )
-        log.info("[compile] done   org=%s  source=%s  entities=%d  workflows=%d  pages=%d",
-                 org_id, source_id[:8],
-                 result["entities_extracted"],
-                 result["workflows_extracted"],
-                 result["wiki_pages_created"])
+        log.info(
+            "[compile] done   org=%s  source=%s  "
+            "entities=%d(new=%d merged=%d) conflicts=%d  workflows=%d  pages=%d",
+            org_id, source_id[:8],
+            result["entities_extracted"],
+            result.get("entities_new", 0),
+            result.get("entities_merged", 0),
+            result.get("conflicts_detected", 0),
+            result["workflows_extracted"],
+            result["wiki_pages_created"],
+        )
     except Exception as exc:
         _registry.update(source_id, status="error", error=str(exc))
         log.error("[compile] error  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
     return asdict(_registry.get(source_id))
+
+
+@router.get("/orgs/{org_id}/sources/{source_id}/file")
+def download_source_file(org_id: str, source_id: str):
+    """Download original uploaded file for preview."""
+    record = _registry.get(source_id)
+    if not record or record.org_id != org_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+    path = Path(record.file_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="原始文件不存在")
+    media = _MEDIA.get(record.source_type, "application/octet-stream")
+    return FileResponse(path, media_type=media, filename=record.filename)
+

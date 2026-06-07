@@ -1,9 +1,15 @@
 import type {
+  AgentTask,
   EntityDetail,
+  GraphSnapshot,
   IngestResult,
+  OverviewData,
   QueryResult,
   SourceRecord,
+  WikiCategory,
   WikiPage,
+  WikiPageDetail,
+  WikiPageResponse,
 } from '@/lib/kb-types';
 
 export const DEFAULT_ORG = process.env.NEXT_PUBLIC_KB_DEFAULT_ORG ?? 'demo';
@@ -34,6 +40,10 @@ export async function compileSource(sourceId: string, orgId = DEFAULT_ORG): Prom
   return req(`${base(orgId)}/sources/${sourceId}/compile`, { method: 'POST' });
 }
 
+export async function deleteSource(sourceId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/sources/${sourceId}`, { method: 'DELETE' });
+}
+
 export async function ingestFile(file: File, orgId = DEFAULT_ORG): Promise<IngestResult> {
   const form = new FormData();
   form.append('file', file);
@@ -48,6 +58,46 @@ export async function queryKnowledge(question: string, orgId = DEFAULT_ORG): Pro
   });
 }
 
+export async function createTask(input: string, orgId = DEFAULT_ORG): Promise<AgentTask> {
+  return req(`${base(orgId)}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input }),
+  });
+}
+
+export async function listTasks(orgId = DEFAULT_ORG): Promise<AgentTask[]> {
+  const data = await req<{ tasks: AgentTask[] }>(`${base(orgId)}/tasks`);
+  return data.tasks;
+}
+
+export async function getTask(taskId: string, orgId = DEFAULT_ORG): Promise<AgentTask> {
+  return req(`${base(orgId)}/tasks/${taskId}`);
+}
+
+export async function deleteTask(taskId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/tasks/${taskId}`, { method: 'DELETE' });
+}
+
+export async function getOverviewData(orgId = DEFAULT_ORG): Promise<OverviewData> {
+  return req(`${base(orgId)}/overview`);
+}
+
+export async function migrateWiki(orgId = DEFAULT_ORG, force = false): Promise<{ migrated: number; skipped: number; total: number }> {
+  const url = new URL(`${base(orgId)}/wiki/migrate`, window.location.origin);
+  if (force) url.searchParams.set('force', 'true');
+  return req(url.toString(), { method: 'POST' });
+}
+
+export function sourceFileUrl(sourceId: string, orgId = DEFAULT_ORG): string {
+  return `${base(orgId)}/sources/${sourceId}/file`;
+}
+
+export async function listWikiCategories(orgId = DEFAULT_ORG): Promise<WikiCategory[]> {
+  const data = await req<{ categories: WikiCategory[] }>(`${base(orgId)}/wiki/categories`);
+  return data.categories;
+}
+
 export async function listWikiPages(orgId = DEFAULT_ORG, category?: string): Promise<WikiPage[]> {
   const url = new URL(`${base(orgId)}/wiki`, window.location.origin);
   if (category) url.searchParams.set('category', category);
@@ -58,8 +108,11 @@ export async function listWikiPages(orgId = DEFAULT_ORG, category?: string): Pro
 export async function getWikiPage(
   path: string,
   orgId = DEFAULT_ORG,
-): Promise<{ path: string; content: string }> {
-  return req(`${base(orgId)}/wiki/${path}`);
+  detail = false,
+): Promise<WikiPageResponse> {
+  const url = new URL(`${base(orgId)}/wiki/${path}`, window.location.origin);
+  if (detail) url.searchParams.set('detail', 'true');
+  return req(url.toString());
 }
 
 export async function listEntities(
@@ -77,4 +130,8 @@ export async function getEntityDetail(
   orgId = DEFAULT_ORG,
 ): Promise<EntityDetail> {
   return req(`${base(orgId)}/graph/entity/${encodeURIComponent(name)}`);
+}
+
+export async function getGraphSnapshot(orgId = DEFAULT_ORG): Promise<GraphSnapshot> {
+  return req(`${base(orgId)}/graph/snapshot`);
 }

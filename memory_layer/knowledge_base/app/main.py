@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from memory_layer.knowledge_base.app.logging_config import setup_logging, get_logger
-from memory_layer.knowledge_base.app.routers import ingest, query, wiki
+from memory_layer.knowledge_base.app.routers import ingest, overview, query, tasks, wiki
 from memory_layer.knowledge_base import config
 
 
@@ -39,9 +39,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
-app.include_router(query.router,  prefix="/api/v1", tags=["query"])
-app.include_router(wiki.router,   prefix="/api/v1", tags=["wiki"])
+app.include_router(ingest.router,   prefix="/api/v1", tags=["ingest"])
+app.include_router(overview.router, prefix="/api/v1", tags=["overview"])
+app.include_router(query.router,    prefix="/api/v1", tags=["query"])
+app.include_router(tasks.router,    prefix="/api/v1", tags=["tasks"])
+app.include_router(wiki.router,     prefix="/api/v1", tags=["wiki"])
 
 
 @app.get("/health")

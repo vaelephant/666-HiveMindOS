@@ -15,10 +15,11 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { uploadSource, listSources, compileSource } from '@/lib/kb-api';
+import { uploadSource, listSources, compileSource, deleteSource } from '@/lib/kb-api';
 import type { SourceRecord } from '@/lib/kb-types';
 import { cn } from '@/lib/utils';
 
@@ -72,6 +73,13 @@ function StatusDot({ status }: { status: SourceRecord['status'] }) {
   );
 }
 
+function wikiLinkFromSource(source: SourceRecord): string {
+  const first = source.wiki_pages?.[0];
+  if (!first) return '/knowledge-base/wiki';
+  const category = first.split('/')[0];
+  return `/knowledge-base/wiki?category=${encodeURIComponent(category)}&page=${encodeURIComponent(first)}`;
+}
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleString('zh-CN', {
@@ -96,9 +104,11 @@ function truncateError(msg: string, max = 72) {
 function SourceRow({
   source,
   onCompile,
+  onDelete,
 }: {
   source: SourceRecord;
   onCompile: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasLongError = source.status === 'error' && source.error && source.error.length > 72;
@@ -155,18 +165,29 @@ function SourceRow({
             </Button>
           )}
           {source.status === 'error' && (
-            <Button variant="destructive" size="sm" onClick={() => onCompile(source.id)}>
+            <Button variant="outline" size="sm" onClick={() => onCompile(source.id)}>
               重试
             </Button>
           )}
           {source.status === 'done' && (
-            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/knowledge-base/wiki" />}>
+            <Button variant="ghost" size="sm" nativeButton={false} render={<Link href={wikiLinkFromSource(source)} />}>
               Wiki
               <ArrowUpRight data-icon="inline-end" />
             </Button>
           )}
           {source.status === 'compiling' && (
             <span className="px-2 text-[12px] text-shell-muted">处理中</span>
+          )}
+          {source.status !== 'compiling' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onDelete(source.id)}
+              className="text-shell-muted opacity-0 transition-opacity hover:text-status-error group-hover:opacity-100"
+              aria-label="删除"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
           )}
         </div>
 
@@ -255,6 +276,19 @@ export default function IngestPage() {
       }
     }
     setUploading(false);
+  }
+
+  async function handleDelete(sourceId: string) {
+    const source = sources.find((s) => s.id === sourceId);
+    if (!source) return;
+    if (!window.confirm(`确认删除「${source.filename}」？\n关联的 Wiki 页面也会一并移除。`)) return;
+    setSources((prev) => prev.filter((s) => s.id !== sourceId));
+    try {
+      await deleteSource(sourceId);
+    } catch {
+      // 若失败则刷新恢复
+      refresh();
+    }
   }
 
   async function handleCompile(sourceId: string) {
@@ -418,7 +452,7 @@ export default function IngestPage() {
             </div>
             <ul className="divide-y divide-shell-border">
               {filtered.map((s) => (
-                <SourceRow key={s.id} source={s} onCompile={handleCompile} />
+                <SourceRow key={s.id} source={s} onCompile={handleCompile} onDelete={handleDelete} />
               ))}
             </ul>
           </div>

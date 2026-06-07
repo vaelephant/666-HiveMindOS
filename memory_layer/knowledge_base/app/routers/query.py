@@ -27,6 +27,12 @@ def lint(org_id: str):
     return LintAgent(wiki).run(org_id)
 
 
+@router.get("/orgs/{org_id}/graph/snapshot")
+def graph_snapshot(org_id: str):
+    graph = MemoryGraph(config.GRAPH_ROOT / org_id / "graph.db")
+    return graph.get_snapshot(org_id)
+
+
 @router.get("/orgs/{org_id}/graph/entities")
 def list_entities(org_id: str, entity_type: str = None):
     graph = MemoryGraph(config.GRAPH_ROOT / org_id / "graph.db")
@@ -41,4 +47,5 @@ def get_entity(org_id: str, name: str):
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="实体不存在")
     neighbors = graph.get_neighbors(entity["id"], org_id)
-    return {"entity": entity, "neighbors": neighbors}
+    relations = graph.get_entity_relations(entity["id"], org_id)
+    return {"entity": entity, "neighbors": neighbors, "relations": relations}
