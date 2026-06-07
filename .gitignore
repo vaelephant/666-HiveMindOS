@@ -1,0 +1,66 @@
+# ── OS ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Environment & secrets ───────────────────────────
+.env*
+!.env.example
+!**/.env.example
+
+# ── Python ──────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.cover
+
+# ── Node / Next.js ──────────────────────────────────
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+*.tsbuildinfo
+
+# ── Build & test output ─────────────────────────────
+build/
+dist/
+coverage/
+
+# ── Logs ────────────────────────────────────────────
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── IDE ─────────────────────────────────────────────
+.idea/
+*.swp
+*.swo
+
+# ── Knowledge base runtime data (keep .gitkeep) ─────
+memory_layer/knowledge_base/storage/raw/**
+!memory_layer/knowledge_base/storage/raw/.gitkeep
+memory_layer/knowledge_base/storage/wiki/**
+!memory_layer/knowledge_base/storage/wiki/.gitkeep
+memory_layer/knowledge_base/storage/graph/**
+!memory_layer/knowledge_base/storage/graph/.gitkeep
+memory_layer/knowledge_base/storage/registry.db
+
+# Root-level storage (not knowledge_base/storage/)
+/storage/
+
+# ── memory_demo local state ─────────────────────────
+memory_demo/session.db
+memory_demo/session.json
+memory_demo/test_session.json

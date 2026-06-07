@@ -1,1 +1,67 @@
 # HiveMindOS
+
+个人AI操作系统。把企业原始资料编译成持续成长的知识网络，让 AI 成为真正能执行任务的企业员工。
+
+---
+
+## 系统架构
+
+```
+Human Layer          ← 人类控制、审批、反馈
+     ↕
+Audit Layer          ← 全链路日志、成本、合规
+     ↕
+Agent Layer          ← 各类 AI Agent 协作
+     ↕
+Workflow Layer       ← 多步骤流程编排
+     ↕
+Execution Layer      ← 真实动作执行
+     ↕
+Tool Layer           ← 工具能力集合
+     ↕
+Memory Layer         ← 知识与记忆系统
+     ↕
+Model Layer          ← LLM 基础能力
+```
+
+---
+
+## 当前开发：企业执行知识库
+
+> `memory_layer/knowledge_base/`
+
+Phase 1 MVP：销售型企业场景（客户 / 合同 / 报价 / 销售流程）
+
+详细文档见 → [knowledge_base/README.md](memory_layer/knowledge_base/README.md)
+
+---
+
+## 项目结构
+
+```
+HiveMindOS/
+├── model_layer/              # LLM 统一调用层
+├── memory_layer/
+│   └── knowledge_base/       # 企业执行知识库（Phase 1）
+├── tool_layer/               # 原子工具集合
+├── workflow_layer/           # 流程编排
+├── agent_layer/              # AI Agent
+├── execution_layer/          # 执行与权限
+├── audit_layer/              # 审计日志
+├── human_layer/              # 人类控制
+└── docs/                     # 架构文档
+    ├── architecture.md       # 知识库技术架构
+    └── hivemind_architecture.md  # 整体系统规范
+```
+
+---
+
+## 快速开始
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env        # 填入 ANTHROPIC_API_KEY
+uvicorn memory_layer.knowledge_base.app.main:app --reload
+```
+
+API 文档：http://localhost:8000/docs
