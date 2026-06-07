@@ -3,6 +3,9 @@ import uuid
 from pathlib import Path
 
 from memory_layer.knowledge_base import config
+from memory_layer.knowledge_base.app.logging_config import get_logger
+
+log = get_logger("hivemind.agent.ingest")
 from memory_layer.knowledge_base.core.compiler.entity_extractor import extract_entities
 from memory_layer.knowledge_base.core.compiler.workflow_extractor import extract_workflows
 from memory_layer.knowledge_base.core.compiler.markdown_writer import (
@@ -21,11 +24,20 @@ class IngestAgent:
         self.graph = graph
 
     def run(self, file_path: Path, org_id: str, source_type: str = "pdf") -> dict:
+        log.info("extracting text  file=%s  type=%s", file_path.name, source_type)
         content = self._extract_text(file_path, source_type)
         content_hash = hashlib.sha256(content.encode()).hexdigest()
+        log.info("text extracted   chars=%d  hash=%s…", len(content), content_hash[:8])
 
+        log.info("extracting entities via LLM…")
         entities = extract_entities(content)
+        log.info("entities found   count=%d", len(entities))
+
+        log.info("extracting workflows via LLM…")
         workflows_data = extract_workflows(content)
+        log.info("workflows found  count=%d  rules=%d",
+                 len(workflows_data.get("workflows", [])),
+                 len(workflows_data.get("rules", [])))
 
         pages: list[str] = []
 
@@ -48,6 +60,7 @@ class IngestAgent:
             pages.append(write_rule_page(self.wiki.root, org_id, rule))
 
         self.wiki.update_index(org_id)
+        log.info("wiki index updated  org=%s  total_pages=%d", org_id, len(pages))
 
         return {
             "content_hash": content_hash,

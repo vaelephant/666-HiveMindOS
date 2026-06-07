@@ -5,12 +5,14 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from memory_layer.knowledge_base import config
+from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.agents.ingest_agent import IngestAgent
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRecord, SourceRegistry
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 
 router = APIRouter()
+log = get_logger("hivemind.ingest")
 
 _SUFFIX_TO_TYPE = {
     ".pdf": "pdf", ".docx": "word", ".doc": "word",
@@ -57,6 +59,8 @@ async def upload_source(org_id: str, file: UploadFile = File(...)):
         created_at=SourceRegistry.now_iso(),
     )
     _registry.add(record)
+    log.info("[upload] org=%s  file=%s  size=%d bytes  saved=%s",
+             org_id, file.filename, len(content), save_path.name)
     return asdict(record)
 
 
@@ -81,6 +85,7 @@ def compile_source(org_id: str, source_id: str):
         raise HTTPException(status_code=409, detail="正在编译中，请稍候")
 
     _registry.update(source_id, status="compiling")
+    log.info("[compile] start  org=%s  source=%s  file=%s", org_id, source_id[:8], record.filename)
     try:
         result = _make_agent(org_id).run(
             Path(record.file_path), org_id, record.source_type
@@ -92,8 +97,14 @@ def compile_source(org_id: str, source_id: str):
             workflows_extracted=result["workflows_extracted"],
             wiki_pages_created=result["wiki_pages_created"],
         )
+        log.info("[compile] done   org=%s  source=%s  entities=%d  workflows=%d  pages=%d",
+                 org_id, source_id[:8],
+                 result["entities_extracted"],
+                 result["workflows_extracted"],
+                 result["wiki_pages_created"])
     except Exception as exc:
         _registry.update(source_id, status="error", error=str(exc))
+        log.error("[compile] error  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
     return asdict(_registry.get(source_id))
