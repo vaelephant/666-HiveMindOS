@@ -1,6 +1,7 @@
 'use client';
 
 import { History, Plus, Trash2 } from 'lucide-react';
+import { ChatEvolutionPanel } from '@/components/knowledge-base/chat-evolution-panel';
 import type { ChatSessionSummary } from '@/lib/kb-types';
 
 type Props = {
@@ -10,6 +11,7 @@ type Props = {
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  extracting?: boolean;
 };
 
 function HistorySkeleton() {
@@ -33,9 +35,10 @@ export function ChatHistorySidebar({
   onNew,
   onSelect,
   onDelete,
+  extracting = false,
 }: Props) {
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-shell-border bg-shell-panel/50 lg:w-60">
+    <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r border-shell-border bg-shell-panel/50 lg:w-60">
       <div className="p-3">
         <button
           type="button"
@@ -97,6 +100,8 @@ export function ChatHistorySidebar({
           )}
         </ul>
       </div>
+
+      <ChatEvolutionPanel sessionId={activeId} extracting={extracting} />
     </aside>
   );
 }

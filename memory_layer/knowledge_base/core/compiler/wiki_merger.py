@@ -15,6 +15,7 @@ from pathlib import Path
 
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.compiler.entity_resolver import ResolvedEntity
+from memory_layer.knowledge_base.core.domain.wiki_meta import category_folder, folder_to_category
 
 log = get_logger("hivemind.compiler.wiki_merger")
 
@@ -77,6 +78,77 @@ def upsert_workflow_page(wiki_root: Path, org_id: str, workflow: dict, source_fi
         filepath.write_text(_workflow_page(workflow, source_filename), encoding="utf-8")
 
     return f"workflows/{slug}.md"
+
+
+_SEC_BODY = "## 正文"
+_SEC_SUPPLEMENT = "## 补充记录"
+
+
+def upsert_digest_page(
+    wiki_root: Path,
+    org_id: str,
+    *,
+    category: str,
+    title: str,
+    content: str,
+    source_label: str,
+) -> str:
+    """ChatDigestCompiler：将候选知识写成通用 Wiki 页（决策/项目/方法论等）。"""
+    folder = category_folder(category)
+    out_dir = wiki_root / org_id / folder
+    out_dir.mkdir(parents=True, exist_ok=True)
+    slug = _slug(title)
+    filepath = out_dir / f"{slug}.md"
+    rel_path = f"{folder}/{slug}.md"
+
+    if filepath.exists():
+        existing = filepath.read_text(encoding="utf-8")
+        filepath.write_text(
+            _merge_digest_page(existing, title, content, source_label),
+            encoding="utf-8",
+        )
+        log.debug("wiki DIGEST UPDATE  %s", rel_path)
+    else:
+        filepath.write_text(
+            _new_digest_page(title, content, source_label),
+            encoding="utf-8",
+        )
+        log.debug("wiki DIGEST CREATE  %s", rel_path)
+
+    return rel_path
+
+
+def supplement_wiki_page(
+    wiki_root: Path,
+    org_id: str,
+    wiki_path: str,
+    *,
+    title: str,
+    content: str,
+    source_label: str,
+) -> str:
+    """向已有 Wiki 页追加补充段落（Resolver supplement 动作）。"""
+    filepath = wiki_root / org_id / wiki_path
+    if not filepath.exists():
+        parts = wiki_path.split("/")
+        cat = parts[0] if parts else "digests"
+        inner_cat = folder_to_category(cat)
+        return upsert_digest_page(
+            wiki_root, org_id,
+            category=inner_cat,
+            title=title,
+            content=content,
+            source_label=source_label,
+        )
+
+    existing = filepath.read_text(encoding="utf-8")
+    entry = f"\n### {_now()} · {source_label}\n\n**{title}**\n\n{content}\n"
+    updated = _insert_into_section(existing, _SEC_SUPPLEMENT, entry)
+    if _SEC_SUPPLEMENT not in existing:
+        updated = updated.rstrip() + f"\n\n{_SEC_SUPPLEMENT}\n{entry}"
+    filepath.write_text(updated, encoding="utf-8")
+    log.debug("wiki SUPPLEMENT  %s", wiki_path)
+    return wiki_path
 
 
 def upsert_rule_page(wiki_root: Path, org_id: str, rule: dict, source_filename: str) -> str:
@@ -292,6 +364,39 @@ def _workflow_page(wf: dict, source: str) -> str:
 _初始创建_
 
 """
+
+
+def _new_digest_page(title: str, content: str, source: str) -> str:
+    return f"""# {title}
+
+**最后更新：** {_now()}
+**来源：** {source}
+
+{_SEC_BODY}
+
+{content}
+
+{_SEC_LOG}
+
+### {_now()} · {source}
+
+_初始创建_
+
+"""
+
+
+def _merge_digest_page(existing: str, title: str, content: str, source: str) -> str:
+    body = re.sub(
+        r"\*\*(?:最后更新|更新时间)：\*\*.*",
+        f"**最后更新：** {_now()}",
+        existing,
+    )
+    entry = f"\n### {_now()} · {source}\n\n**{title}**\n\n{content}\n"
+    if _SEC_BODY in body:
+        body = _insert_into_section(body, _SEC_BODY, entry)
+    else:
+        body = body.rstrip() + f"\n\n{_SEC_BODY}\n\n{content}\n"
+    return _insert_into_section(body, _SEC_LOG, entry)
 
 
 def _rule_page(rule: dict, source: str) -> str:

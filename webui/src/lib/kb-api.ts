@@ -1,11 +1,18 @@
 import type {
   AgentTask,
+  AutomationJob,
+  AutomationJobUpdate,
+  AutomationRun,
+  CandidateStats,
   ChatSendResponse,
   ChatSession,
   ChatSessionSummary,
+  DeleteSessionResponse,
   EntityDetail,
   GraphSnapshot,
   IngestResult,
+  KnowledgeCandidate,
+  SessionPipeline,
   MemoryEventRecord,
   MemoryRecord,
   MemoryStats,
@@ -85,8 +92,136 @@ export async function deleteTask(taskId: string, orgId = DEFAULT_ORG): Promise<v
   await req(`${base(orgId)}/tasks/${taskId}`, { method: 'DELETE' });
 }
 
+export async function listAutomations(orgId = DEFAULT_ORG): Promise<AutomationJob[]> {
+  const data = await req<{ jobs: AutomationJob[] }>(`${base(orgId)}/automations`);
+  return data.jobs;
+}
+
+export async function listAutomationRuns(
+  jobId?: string,
+  orgId = DEFAULT_ORG,
+  limit = 50,
+): Promise<AutomationRun[]> {
+  const url = new URL(`${base(orgId)}/automations/runs`, window.location.origin);
+  if (jobId) url.searchParams.set('job_id', jobId);
+  url.searchParams.set('limit', String(limit));
+  const data = await req<{ runs: AutomationRun[] }>(url.toString());
+  return data.runs;
+}
+
+export async function runAutomation(
+  jobId: string,
+  params?: Record<string, number>,
+  orgId = DEFAULT_ORG,
+): Promise<{ ok: boolean; run: AutomationRun }> {
+  return req(`${base(orgId)}/automations/${jobId}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ params: params ?? {} }),
+  });
+}
+
+export async function updateAutomation(
+  jobId: string,
+  patch: AutomationJobUpdate,
+  orgId = DEFAULT_ORG,
+): Promise<AutomationJob> {
+  const data = await req<{ job: AutomationJob }>(`${base(orgId)}/automations/${jobId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return data.job;
+}
+
+export async function deleteAutomation(jobId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/automations/${jobId}`, { method: 'DELETE' });
+}
+
+export async function reseedAutomations(orgId = DEFAULT_ORG): Promise<AutomationJob[]> {
+  const data = await req<{ restored: AutomationJob[]; count: number }>(
+    `${base(orgId)}/automations/reseed`,
+    { method: 'POST' },
+  );
+  return data.restored;
+}
+
+export async function restoreAutomation(jobId: string, orgId = DEFAULT_ORG): Promise<AutomationJob> {
+  const data = await req<{ job: AutomationJob }>(`${base(orgId)}/automations/${jobId}/restore`, {
+    method: 'POST',
+  });
+  return data.job;
+}
+
+export async function deleteAutomationRun(runId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/automations/runs/${runId}`, { method: 'DELETE' });
+}
+
 export async function getOverviewData(orgId = DEFAULT_ORG): Promise<OverviewData> {
   return req(`${base(orgId)}/overview`);
+}
+
+export async function listCandidates(
+  status?: string,
+  orgId = DEFAULT_ORG,
+  limit = 100,
+): Promise<KnowledgeCandidate[]> {
+  const url = new URL(`${base(orgId)}/candidates`, window.location.origin);
+  if (status) url.searchParams.set('status', status);
+  url.searchParams.set('limit', String(limit));
+  const data = await req<{ candidates: KnowledgeCandidate[] }>(url.toString());
+  return data.candidates;
+}
+
+export async function getCandidateStats(orgId = DEFAULT_ORG): Promise<CandidateStats> {
+  const data = await req<{ stats: CandidateStats }>(`${base(orgId)}/candidates/stats`);
+  return data.stats;
+}
+
+export async function resolveCandidates(
+  limit = 20,
+  orgId = DEFAULT_ORG,
+): Promise<{ resolved: unknown[]; count: number }> {
+  return req(`${base(orgId)}/candidates/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit }),
+  });
+}
+
+export async function compileCandidates(
+  limit = 20,
+  orgId = DEFAULT_ORG,
+): Promise<{ compiled: unknown[]; count: number }> {
+  return req(`${base(orgId)}/candidates/compile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit }),
+  });
+}
+
+export async function approveCandidate(
+  candidateId: number,
+  reason = '',
+  orgId = DEFAULT_ORG,
+): Promise<void> {
+  await req(`${base(orgId)}/candidates/${candidateId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function rejectCandidate(
+  candidateId: number,
+  reason = '',
+  orgId = DEFAULT_ORG,
+): Promise<void> {
+  await req(`${base(orgId)}/candidates/${candidateId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function migrateWiki(orgId = DEFAULT_ORG, force = false): Promise<{ migrated: number; skipped: number; total: number }> {
@@ -151,8 +286,24 @@ export async function getChatSession(sessionId: string, orgId = DEFAULT_ORG): Pr
   return req(`${base(orgId)}/chat/sessions/${sessionId}`);
 }
 
-export async function deleteChatSession(sessionId: string, orgId = DEFAULT_ORG): Promise<void> {
-  await req(`${base(orgId)}/chat/sessions/${sessionId}`, { method: 'DELETE' });
+export async function getSessionPipeline(
+  sessionId: string,
+  orgId = DEFAULT_ORG,
+): Promise<SessionPipeline> {
+  const data = await req<{ pipeline: SessionPipeline }>(
+    `${base(orgId)}/chat/sessions/${sessionId}/pipeline`,
+  );
+  return data.pipeline;
+}
+
+export async function deleteChatSession(
+  sessionId: string,
+  options?: { recap?: boolean },
+  orgId = DEFAULT_ORG,
+): Promise<DeleteSessionResponse> {
+  const url = new URL(`${base(orgId)}/chat/sessions/${sessionId}`, window.location.origin);
+  if (options?.recap) url.searchParams.set('recap', 'true');
+  return req(url.toString(), { method: 'DELETE' });
 }
 
 export async function listMemories(orgId = DEFAULT_ORG): Promise<MemoryRecord[]> {
@@ -194,4 +345,83 @@ export async function sendChatMessage(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
   });
+}
+
+export type ChatStreamPhase = 'gathering' | 'writing';
+
+export type ChatStreamHandlers = {
+  onStatus?: (phase: ChatStreamPhase) => void;
+  onToken?: (text: string) => void;
+  onSources?: (sources: ChatSendResponse['sources']) => void;
+  onError?: (detail: string) => void;
+};
+
+/** SSE 流式发送 — 检索 status → 回答 token → done */
+export async function sendChatMessageStream(
+  message: string,
+  sessionId: string | null | undefined,
+  handlers: ChatStreamHandlers,
+  orgId = DEFAULT_ORG,
+  signal?: AbortSignal,
+): Promise<ChatSendResponse> {
+  const res = await fetch(`${base(orgId)}/chat/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  if (!res.body) {
+    throw new Error('流式响应不可用');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let donePayload: ChatSendResponse | null = null;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data: ')) continue;
+        const ev = JSON.parse(line.slice(6)) as {
+          type: string;
+          phase?: ChatStreamPhase;
+          text?: string;
+          sources?: ChatSendResponse['sources'];
+          detail?: string;
+        };
+
+        if (ev.type === 'status' && ev.phase) handlers.onStatus?.(ev.phase);
+        if (ev.type === 'token' && ev.text) handlers.onToken?.(ev.text);
+        if (ev.type === 'sources' && ev.sources) handlers.onSources?.(ev.sources);
+        if (ev.type === 'error') {
+          const detail = ev.detail ?? '流式聊天失败';
+          handlers.onError?.(detail);
+          throw new Error(detail);
+        }
+        if (ev.type === 'done') {
+          donePayload = ev as unknown as ChatSendResponse;
+        }
+      }
+    }
+
+    if (!donePayload) {
+      throw new Error('流式响应未完成');
+    }
+    return donePayload;
+  } finally {
+    reader.releaseLock();
+  }
 }

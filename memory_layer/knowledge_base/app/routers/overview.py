@@ -6,6 +6,8 @@ from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRegistry
 from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
 from memory_layer.knowledge_base.core.registry.memory_registry import MemoryRegistry
+from memory_layer.knowledge_base.core.services.candidate_service import get_candidate_stats
+from memory_layer.knowledge_base.core.services.pipeline_service import list_recent_pipeline_activity
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 
@@ -40,6 +42,7 @@ def get_overview(org_id: str):
     # ── 智慧统计 ──────────────────────────────────────────────────────
     memory_stats = _memory.get_stats(org_id)
     recent_memory_events = _memory.list_events(org_id, limit=5)
+    candidate_stats = get_candidate_stats(org_id)
 
     # ── 近期动态（资料编译 + 对话 + 智慧进化，按时间合并） ───────────────
     source_activity = [
@@ -74,8 +77,9 @@ def get_overview(org_id: str):
         }
         for e in recent_memory_events
     ]
+    candidate_activity = list_recent_pipeline_activity(org_id, limit=8)
     recent_activity = sorted(
-        source_activity + chat_activity + memory_activity,
+        source_activity + chat_activity + memory_activity + candidate_activity,
         key=lambda x: _parse_dt(x["created_at"]),
         reverse=True,
     )[:12]
@@ -91,6 +95,8 @@ def get_overview(org_id: str):
             "chat_sessions_week": chat_stats["sessions_week"],
             "memory_count": memory_stats.total,
             "memories_week": memory_stats.memories_this_week,
+            "candidate_pending": candidate_stats["pending"],
+            "candidates_pending_week": candidate_stats["pending_week"],
         },
         "recent_activity": recent_activity,
     }

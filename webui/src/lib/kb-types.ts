@@ -16,6 +16,39 @@ export type AgentTask = {
   completed_at: string | null;
 };
 
+export type AutomationRun = {
+  id: string;
+  org_id: string;
+  job_id: string;
+  status: 'running' | 'done' | 'error';
+  trigger: string;
+  summary: Record<string, unknown> | null;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+};
+
+export type AutomationJob = {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+  category_label: string;
+  cron_hint: string;
+  defaults: Record<string, number>;
+  builtin?: boolean;
+  updated_at?: string | null;
+  last_run: AutomationRun | null;
+};
+
+export type AutomationJobUpdate = {
+  label?: string;
+  description?: string;
+  category?: string;
+  cron_hint?: string;
+  defaults?: Record<string, number>;
+};
+
 export type SourceRecord = {
   id: string;
   org_id: string;
@@ -192,6 +225,38 @@ export type OverviewStats = {
   chat_sessions_week: number;
   memory_count: number;
   memories_week: number;
+  candidate_pending?: number;
+  candidates_pending_week?: number;
+};
+
+export type KnowledgeCandidate = {
+  id: number;
+  org_id: string;
+  user_id: string | null;
+  category: string;
+  title: string;
+  content: string;
+  source_type: string;
+  source_id: string | null;
+  confidence: number;
+  proposed_action: string;
+  status: string;
+  resolver_action: string | null;
+  resolver_note: string | null;
+  target_wiki_path: string | null;
+  memory_id: number | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CandidateStats = {
+  pending: number;
+  approved: number;
+  merged: number;
+  rejected: number;
+  conflict: number;
+  pending_week: number;
 };
 
 export type SourceActivityRecord = {
@@ -219,7 +284,57 @@ export type MemoryActivityRecord = {
   memory_type: string;
 };
 
-export type ActivityRecord = SourceActivityRecord | ChatActivityRecord | MemoryActivityRecord;
+export type CandidateActivityRecord = {
+  kind: 'candidate';
+  created_at: string;
+  title: string;
+  category: string;
+  status: string;
+  source_type: string;
+  target_wiki_path: string | null;
+};
+
+export type ActivityRecord =
+  | SourceActivityRecord
+  | ChatActivityRecord
+  | MemoryActivityRecord
+  | CandidateActivityRecord;
+
+export type PipelineStageStatus = 'idle' | 'active' | 'done';
+
+export type PipelineStage = {
+  id: string;
+  label: string;
+  description: string;
+  status: PipelineStageStatus;
+  hint: string;
+};
+
+export type PipelineRecentItem = {
+  kind: 'memory' | 'candidate';
+  id: number;
+  title: string;
+  detail: string;
+  status: string;
+  created_at: string;
+  memory_type?: string;
+  category?: string;
+  target_wiki_path?: string | null;
+};
+
+export type SessionPipeline = {
+  session_id: string;
+  stats: {
+    message_count: number;
+    memory_count: number;
+    candidate_pending: number;
+    candidate_approved: number;
+    candidate_merged: number;
+    event_count: number;
+  };
+  stages: PipelineStage[];
+  recent: PipelineRecentItem[];
+};
 
 /** @deprecated Use ActivityRecord */
 export type LegacyActivityRecord = SourceActivityRecord;
@@ -304,6 +419,33 @@ export type ChatSessionSummary = {
 
 export type ChatSession = ChatSessionSummary & {
   turns: ChatTurn[];
+};
+
+export type WikiSuggestionBrief = {
+  title: string;
+  reason: string;
+  category: string;
+  content_outline?: string;
+};
+
+export type MemoryConflictBrief = {
+  field: string;
+  description: string;
+  resolution?: string;
+};
+
+export type SessionRecapResult = {
+  session_id?: string;
+  summary: string;
+  memory_ids: number[];
+  archived_ids: number[];
+  conflicts: MemoryConflictBrief[];
+  wiki_suggestions: WikiSuggestionBrief[];
+};
+
+export type DeleteSessionResponse = {
+  deleted: string;
+  recap?: SessionRecapResult;
 };
 
 export type ChatSendResponse = {

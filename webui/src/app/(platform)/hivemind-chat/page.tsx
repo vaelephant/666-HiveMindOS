@@ -4,15 +4,18 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { ChatEmptyState, ChatThread } from '@/components/knowledge-base/chat-conversation';
+import { ChatDeleteSessionDialog } from '@/components/knowledge-base/chat-delete-session-dialog';
 import { ChatHistorySidebar } from '@/components/knowledge-base/chat-history-sidebar';
 import {
-  deleteChatSession,
   getChatSession,
+  getSessionPipeline,
   listChatSessions,
-  sendChatMessage,
+  sendChatMessageStream,
 } from '@/lib/kb-api';
+import type { ChatStreamPhase } from '@/lib/kb-api';
 import { readCachedSessions, writeCachedSessions } from '@/lib/chat-session-cache';
-import type { ChatSessionSummary, ChatTurn } from '@/lib/kb-types';
+import { HIVEMIND_HOME_PATH } from '@/config/navigation';
+import type { ChatSessionSummary, ChatTurn, SessionPipeline } from '@/lib/kb-types';
 
 function ThreadLoading() {
   return (
@@ -37,12 +40,24 @@ function ChatPageContent() {
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [threadLoading, setThreadLoading] = useState(!!sessionIdFromUrl);
   const [error, setError] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
+  const [pipeline, setPipeline] = useState<SessionPipeline | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [streamText, setStreamText] = useState('');
+  const [streamPhase, setStreamPhase] = useState<ChatStreamPhase | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const eventBaselineRef = useRef(0);
+  const streamAbortRef = useRef<AbortController | null>(null);
+
+  function abortActiveStream() {
+    streamAbortRef.current?.abort();
+    streamAbortRef.current = null;
+  }
 
   const syncUrl = useCallback(
     (id: string | null) => {
-      if (id) router.replace(`/chat?id=${id}`, { scroll: false });
-      else router.replace('/chat', { scroll: false });
+      if (id) router.replace(`${HIVEMIND_HOME_PATH}?id=${id}`, { scroll: false });
+      else router.replace(HIVEMIND_HOME_PATH, { scroll: false });
     },
     [router],
   );
@@ -61,7 +76,15 @@ function ChatPageContent() {
 
   useEffect(() => {
     setMounted(true);
+    return () => abortActiveStream();
   }, []);
+
+  useEffect(() => {
+    abortActiveStream();
+    setPending(null);
+    setStreamText('');
+    setStreamPhase(null);
+  }, [sessionIdFromUrl]);
 
   // 并行加载：侧栏列表 + 当前对话（若有 id）
   useEffect(() => {
@@ -114,9 +137,10 @@ function ChatPageContent() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turns, pending]);
+  }, [turns, pending, streamText]);
 
   function handleNew() {
+    abortActiveStream();
     setActiveId(null);
     setTurns([]);
     setPending(null);
@@ -131,28 +155,73 @@ function ChatPageContent() {
     syncUrl(id);
   }
 
-  async function handleDelete(id: string) {
-    await deleteChatSession(id).catch(() => {});
+  function handleDeleteRequest(id: string) {
+    setDeleteTargetId(id);
+  }
+
+  async function handleDeleteComplete(id: string) {
     await refreshSessions(true);
     if (activeId === id) handleNew();
+  }
+
+  const deleteTargetTitle =
+    sessions.find((s) => s.id === deleteTargetId)?.title ?? '未命名对话';
+
+  async function watchExtraction(sessionId: string) {
+    eventBaselineRef.current = pipeline?.stats.event_count ?? 0;
+    setExtracting(true);
+    const deadline = Date.now() + 18000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const p = await getSessionPipeline(sessionId);
+        setPipeline(p);
+        if (p.stats.event_count > eventBaselineRef.current) {
+          break;
+        }
+      } catch {
+        break;
+      }
+    }
+    setExtracting(false);
   }
 
   async function handleSend(text?: string) {
     const q = (text ?? input).trim();
     if (!q || pending !== null) return;
+    abortActiveStream();
+    const abort = new AbortController();
+    streamAbortRef.current = abort;
+
     setInput('');
     setPending(q);
     setError(null);
+    setStreamText('');
+    setStreamPhase('gathering');
 
     try {
-      const res = await sendChatMessage(q, activeId);
+      const res = await sendChatMessageStream(
+        q,
+        activeId,
+        {
+          onStatus: (phase) => setStreamPhase(phase),
+          onToken: (text) => setStreamText((prev) => prev + text),
+        },
+        undefined,
+        abort.signal,
+      );
+      const sessionId = res.session_id;
       if (!activeId) {
-        setActiveId(res.session_id);
-        syncUrl(res.session_id);
+        setActiveId(sessionId);
+        syncUrl(sessionId);
       }
       setTurns((prev) => [...prev, res.turn]);
       await refreshSessions(true);
+      void watchExtraction(sessionId);
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
       const msg = err instanceof Error ? err.message : '发送失败';
       setError(msg);
       setTurns((prev) => [
@@ -165,24 +234,37 @@ function ChatPageContent() {
         },
       ]);
     } finally {
+      if (streamAbortRef.current === abort) {
+        streamAbortRef.current = null;
+      }
       setPending(null);
+      setStreamText('');
+      setStreamPhase(null);
     }
   }
 
   const showEmpty = !threadLoading && turns.length === 0 && pending === null;
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.25rem)]">
+    <div className="flex h-full min-h-0 overflow-hidden">
       <ChatHistorySidebar
         sessions={sessions}
         activeId={activeId}
         loading={mounted && sessionsLoading}
+        extracting={extracting}
         onNew={handleNew}
         onSelect={handleSelect}
-        onDelete={handleDelete}
+        onDelete={handleDeleteRequest}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <ChatDeleteSessionDialog
+        sessionId={deleteTargetId}
+        sessionTitle={deleteTargetTitle}
+        onClose={() => setDeleteTargetId(null)}
+        onDeleted={handleDeleteComplete}
+      />
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {error && (
           <div className="border-b border-status-error/30 bg-status-error/5 px-4 py-2 text-[13px] text-status-error">
             {error}
@@ -206,6 +288,10 @@ function ChatPageContent() {
             onInputChange={setInput}
             onSend={handleSend}
             bottomRef={bottomRef}
+            extracting={extracting}
+            pipeline={pipeline}
+            streamText={streamText}
+            streamPhase={streamPhase}
           />
         )}
       </div>
@@ -215,8 +301,8 @@ function ChatPageContent() {
 
 function ChatPageShell() {
   return (
-    <div className="flex min-h-[calc(100dvh-3.25rem)]">
-      <aside className="flex w-56 shrink-0 flex-col border-r border-shell-border bg-shell-panel/50 lg:w-60">
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r border-shell-border bg-shell-panel/50 lg:w-60">
         <div className="p-3">
           <div className="h-10 animate-pulse rounded-xl bg-shell-border/40" />
         </div>

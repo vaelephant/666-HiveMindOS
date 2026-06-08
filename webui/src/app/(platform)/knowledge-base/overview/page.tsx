@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { ArrowRight, BookOpen, Bot, Brain, Library, MessageSquare, Network, Upload } from 'lucide-react';
 import { WikiCategoryCatalog } from '@/components/knowledge-base/wiki-category-catalog';
+import { CandidateQueue } from '@/components/knowledge-base/candidate-queue';
+import { KnowledgePipelineBanner } from '@/components/knowledge-base/knowledge-pipeline-banner';
 import { OverviewStats, RecentActivity } from '@/components/knowledge-base/overview-stats';
 import { HIVEMIND_HOME_PATH } from '@/config/navigation';
 
@@ -41,8 +43,8 @@ const QUICK_ACTIONS = [
     tone: 'default' as const,
   },
   {
-    href: '/knowledge-base/tasks',
-    label: 'Agent',
+    href: '/agent-tasks',
+    label: '分析任务',
     desc: '提交复杂分析任务',
     icon: Bot,
     tone: 'default' as const,
@@ -79,6 +81,11 @@ export default function KnowledgeBaseOverviewPage() {
           </div>
         </div>
       </header>
+
+      {/* 知识管线说明 */}
+      <section className="mt-4">
+        <KnowledgePipelineBanner />
+      </section>
 
       {/* 统计 */}
       <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
@@ -141,6 +148,26 @@ export default function KnowledgeBaseOverviewPage() {
           </div>
           <RecentActivity />
         </div>
+      </section>
+
+      {/* 知识候选池 */}
+      <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[14px] font-semibold text-shell-text">待晋升 Wiki</p>
+            <p className="mt-0.5 text-[12px] text-shell-muted">
+              对话与智慧提炼产生的候选知识，解析后可编译进企业 Wiki
+            </p>
+          </div>
+          <Link
+            href="/human-review"
+            className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-primary hover:underline"
+          >
+            前往人工审核
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </div>
+        <CandidateQueue />
       </section>
 
       {/* 知识目录 */}

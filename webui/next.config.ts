@@ -7,6 +7,12 @@ import type { NextConfig } from 'next';
  */
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  async redirects() {
+    return [
+      { source: '/chat', destination: '/hivemind-chat', permanent: false },
+      { source: '/chat/:path*', destination: '/hivemind-chat/:path*', permanent: false },
+    ];
+  },
   images: {
     remotePatterns: [
       {

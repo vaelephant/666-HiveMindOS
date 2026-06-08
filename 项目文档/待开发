@@ -1,0 +1,9 @@
+P2：Lint Layer、实体候选+EntityResolver。
+
+已实现：
+- recapped_at 复盘去重、Chat SSE 流式+Abort 取消、侧栏知识管线、删除 L2 复盘弹窗
+- 配置模块化（prompts.yaml + settings/*.yaml）
+- **人工审核页** `/human-review`：候选池全量审核、批准/驳回、批量解析与编译进 Wiki
+- **自动化任务页** `/automations`：会话复盘、向量同步、候选解析/编译；侧栏「分析任务」`/agent-tasks`（原 Agent）
+
+见 5-知识候选池.md

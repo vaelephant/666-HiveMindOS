@@ -59,6 +59,30 @@ def complete(
     return response.choices[0].message.content or ""
 
 
+def complete_stream(
+    prompt: str,
+    system: Optional[str] = None,
+    model: Optional[str] = None,
+    max_tokens: int = 8192,
+):
+    """Yield text deltas from a streaming chat completion."""
+    model = model or DEFAULT_MODEL
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+    stream = _get_client().chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=messages,
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content if chunk.choices else None
+        if delta:
+            yield delta
+
+
 def agentic_loop(
     system: str,
     user_message: str,

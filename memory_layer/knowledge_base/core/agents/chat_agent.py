@@ -8,72 +8,18 @@ from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base import config
+from memory_layer.knowledge_base.core.parsers.llm_json import parse_json
+from memory_layer.knowledge_base.core.tools.kb_toolkit import WikiToolExecutor, tool_runtime, tool_schemas
+from memory_layer.knowledge_base.prompts import get, render
 from model_layer import client as llm
 
 log = get_logger("hivemind.agent.chat")
 
-_GATHER_SYSTEM = """你是企业知识库检索助手。
-任务：检索与用户问题相关的知识库内容。
-- 先用 search_wiki 搜索关键词，找到相关页面路径
-- 对匹配的页面用 read_page 读取完整内容（最多读 4 个页面）
-- 完成检索后停止，不需要生成最终答案"""
-
-_SYNTHESIS_SYSTEM = """你是企业知识库智能助手。根据提供的知识库来源与用户长期智慧，精准回答用户问题。
-规则：
-- 回答使用 Markdown（支持 ## 标题、- 列表、**加粗**）
-- 引用 Wiki 来源时在句末加 [数字]，例如「合同金额为 500 万元 [1]」
-- 如多个来源支持同一事实，可写 [1][2]
-- 若提供了「用户长期智慧」，在回答中自然融入（如用户问过往项目、偏好、决策）
-- 如知识库无相关内容，可仅依据用户长期智慧回答；两者皆无则直接说明
-严格返回如下 JSON（不要有其他文字）：
-{"answer": "Markdown 格式回答", "follow_ups": ["追问1", "追问2", "追问3"]}"""
-
-_TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "search_wiki",
-            "description": "按关键词搜索 Wiki 页面，返回匹配页面列表",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜索关键词"}
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "read_page",
-            "description": "读取指定 Wiki 页面的完整内容",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "页面路径，如 entities/中康尚德.md"}
-                },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "list_entities",
-            "description": "列出知识图谱中的实体，可按类型筛选",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "entity_type": {
-                        "type": "string",
-                        "description": "可选。实体类型：company / person / contract / product / rule / department / customer",
-                    }
-                },
-            },
-        },
-    },
-]
+_CHAT_GATHER = get("chat.gather")
+_CHAT_SYNTHESIS = get("chat.synthesis")
+_CHAT_SYNTHESIS_STREAM = get("chat.synthesis_stream")
+_CHAT_FOLLOW_UPS = get("chat.follow_ups")
+_RT = tool_runtime()
 
 
 class ChatAgent:
@@ -98,11 +44,67 @@ class ChatAgent:
         """
         log.info("[chat] turn  org=%s  msg=%s…", org_id, message[:50])
 
-        # Phase 1: gather information via tool calls
-        read_pages: list[tuple[str, str]] = []  # (path, content), insertion-ordered, deduplicated
+        read_pages, steps = self._gather_pages(message, history, org_id)
+        answer, follow_ups = self._synthesize(message, read_pages, memory_context)
+        sources = self._pages_to_sources(read_pages)
+
+        log.info("[chat] done  steps=%d  sources=%d  ans_len=%d", len(steps), len(sources), len(answer))
+        return {"answer": answer, "sources": sources, "follow_ups": follow_ups}
+
+    def run_stream(
+        self,
+        message: str,
+        history: list[dict],
+        org_id: str,
+        memory_context: str = "",
+    ):
+        """
+        流式版本：Phase 1 检索 → Phase 2 逐 token 输出回答。
+        Yields: {type: status|token|complete, ...}
+        """
+        log.info("[chat] stream  org=%s  msg=%s…", org_id, message[:50])
+        yield {"type": "status", "phase": "gathering"}
+
+        read_pages, steps = self._gather_pages(message, history, org_id)
+        sources = self._pages_to_sources(read_pages)
+
+        yield {"type": "status", "phase": "writing"}
+        yield {"type": "sources", "sources": sources}
+
+        prompt = self._build_synthesis_prompt(message, read_pages, memory_context, stream=True)
+        chunks: list[str] = []
+        for delta in llm.complete_stream(
+            prompt=prompt,
+            system=_CHAT_SYNTHESIS_STREAM.system,
+            model=_CHAT_SYNTHESIS_STREAM.resolve_model(config),
+        ):
+            chunks.append(delta)
+            yield {"type": "token", "text": delta}
+
+        answer = "".join(chunks)
+        follow_ups = self._generate_follow_ups(message, answer)
+        log.info(
+            "[chat] stream done  steps=%d  sources=%d  ans_len=%d",
+            len(steps), len(sources), len(answer),
+        )
+        yield {
+            "type": "complete",
+            "answer": answer,
+            "sources": sources,
+            "follow_ups": follow_ups,
+        }
+
+    def _gather_pages(
+        self,
+        message: str,
+        history: list[dict],
+        org_id: str,
+    ) -> tuple[list[tuple[str, str]], list[dict]]:
+        read_pages: list[tuple[str, str]] = []
+        tools = WikiToolExecutor(self._wiki, self._graph, org_id)
 
         def track_executor(name: str, args: dict) -> str:
-            result = self._execute(name, args, org_id)
+            result = tools(name, args)
             if name == "read_page":
                 path = args.get("path", "")
                 if path and result and not result.startswith("页面不存在") and not any(p == path for p, _ in read_pages):
@@ -110,18 +112,17 @@ class ChatAgent:
             return result
 
         _, steps = llm.agentic_loop(
-            system=_GATHER_SYSTEM,
+            system=_CHAT_GATHER.system,
             user_message=self._build_user_message(message, history),
-            tools_schema=_TOOLS,
+            tools_schema=tool_schemas(),
             tool_executor=track_executor,
-            model=config.FAST_MODEL,
-            max_iterations=6,
+            model=_CHAT_GATHER.resolve_model(config),
+            max_iterations=_RT.get("gather_max_iterations", 6),
         )
+        return read_pages, steps
 
-        # Phase 2: synthesize cited answer + follow-up suggestions
-        answer, follow_ups = self._synthesize(message, read_pages, memory_context)
-
-        sources = [
+    def _pages_to_sources(self, read_pages: list[tuple[str, str]]) -> list[dict]:
+        return [
             {
                 "path": path,
                 "name": path.split("/")[-1].replace(".md", ""),
@@ -130,8 +131,58 @@ class ChatAgent:
             for path, content in read_pages
         ]
 
-        log.info("[chat] done  steps=%d  sources=%d  ans_len=%d", len(steps), len(sources), len(answer))
-        return {"answer": answer, "sources": sources, "follow_ups": follow_ups}
+    def _build_synthesis_prompt(
+        self,
+        question: str,
+        read_pages: list[tuple[str, str]],
+        memory_context: str,
+        *,
+        stream: bool = False,
+    ) -> str:
+        parts = [f"用户问题：{question}"]
+        if memory_context:
+            parts.append(memory_context)
+        if read_pages:
+            sources_block = "\n\n".join(
+                f"[{i+1}] 来源文件：{path}\n{content[:_RT.get('synthesis_source_chars', 800)]}"
+                for i, (path, content) in enumerate(read_pages)
+            )
+            parts.append(f"以下是检索到的知识库内容：\n\n{sources_block}")
+        if stream:
+            if memory_context or read_pages:
+                parts.append("请根据以上内容回答。")
+            else:
+                parts.append("知识库与用户长期智慧中均无相关内容，请直接说明。")
+        elif memory_context or read_pages:
+            parts.append("请根据以上内容回答，并返回 JSON。")
+        else:
+            parts.append(
+                "知识库与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
+                '返回 JSON：{"answer": "...", "follow_ups": ["...", "...", "..."]}'
+            )
+        return "\n\n".join(parts)
+
+    def _generate_follow_ups(self, question: str, answer: str) -> list[str]:
+        if not answer.strip():
+            return []
+        ans_max = _CHAT_FOLLOW_UPS.limit("answer_max_chars", 1200)
+        raw = llm.complete(
+            render(
+                "chat.follow_ups",
+                question=question,
+                answer=answer[:ans_max],
+            ),
+            system=_CHAT_FOLLOW_UPS.system,
+            model=_CHAT_FOLLOW_UPS.resolve_model(config),
+            max_tokens=_CHAT_FOLLOW_UPS.limit("max_tokens", 256),
+        )
+        try:
+            data = parse_json(raw)
+            if isinstance(data, list):
+                return [str(x) for x in data][:3]
+        except (json.JSONDecodeError, ValueError):
+            log.warning("[chat] follow_ups parse failed")
+        return []
 
     def _synthesize(
         self,
@@ -139,40 +190,19 @@ class ChatAgent:
         read_pages: list[tuple[str, str]],
         memory_context: str = "",
     ) -> tuple[str, list[str]]:
-        parts = [f"用户问题：{question}"]
-
-        if memory_context:
-            parts.append(memory_context)
-
-        if read_pages:
-            sources_block = "\n\n".join(
-                f"[{i+1}] 来源文件：{path}\n{content[:800]}"
-                for i, (path, content) in enumerate(read_pages)
-            )
-            parts.append(f"以下是检索到的知识库内容：\n\n{sources_block}")
-
-        if memory_context or read_pages:
-            parts.append("请根据以上内容回答，并返回 JSON。")
-        else:
-            parts.append(
-                "知识库与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
-                '返回 JSON：{"answer": "...", "follow_ups": ["...", "...", "..."]}'
-            )
-
-        prompt = "\n\n".join(parts)
-
+        prompt = self._build_synthesis_prompt(question, read_pages, memory_context, stream=False)
         raw = llm.complete(
             prompt=prompt,
-            system=_SYNTHESIS_SYSTEM,
-            model=config.FAST_MODEL,
+            system=_CHAT_SYNTHESIS.system,
+            model=_CHAT_SYNTHESIS.resolve_model(config),
         )
         return self._parse_synthesis(raw)
 
     def _parse_synthesis(self, raw: str) -> tuple[str, list[str]]:
         try:
-            text = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
-            data = json.loads(text)
-            return data.get("answer", raw), data.get("follow_ups", [])[:3]
+            data = parse_json(raw)
+            if isinstance(data, dict):
+                return data.get("answer", raw), data.get("follow_ups", [])[:3]
         except (json.JSONDecodeError, ValueError):
             log.warning("[chat] synthesis JSON parse failed, using raw text")
             return raw, []
@@ -189,41 +219,8 @@ class ChatAgent:
         if not history:
             return message
         lines = []
-        for h in history[-6:]:
+        for h in history[-_RT.get("history_turns", 6):]:
             role = "用户" if h["role"] == "user" else "助手"
             lines.append(f"{role}：{h['content']}")
         lines.append(f"用户：{message}")
         return "\n".join(lines)
-
-    def _execute(self, name: str, args: dict, org_id: str) -> str:
-        if name == "search_wiki":
-            return self._search_wiki(args.get("query", ""), org_id)
-        if name == "read_page":
-            return self._read_page(args.get("path", ""), org_id)
-        if name == "list_entities":
-            return self._list_entities(args.get("entity_type"), org_id)
-        return f"未知工具: {name}"
-
-    def _search_wiki(self, query: str, org_id: str) -> str:
-        pages = self._wiki.list_pages(org_id)
-        q = query.lower()
-        matches = []
-        for p in pages:
-            content = self._wiki.read_page(org_id, p["path"]) or ""
-            if q in p["name"].lower() or q in content.lower():
-                preview = content[:150].replace("\n", " ").strip()
-                matches.append({"name": p["name"], "path": p["path"], "preview": preview})
-        if not matches:
-            return f"未找到与「{query}」相关的页面"
-        return json.dumps(matches[:8], ensure_ascii=False, indent=2)
-
-    def _read_page(self, path: str, org_id: str) -> str:
-        content = self._wiki.read_page(org_id, path)
-        return content if content is not None else f"页面不存在: {path}"
-
-    def _list_entities(self, entity_type: str | None, org_id: str) -> str:
-        entities = self._graph.list_entities(org_id, entity_type)
-        if not entities:
-            return "未找到实体"
-        rows = [{"name": e["name"], "type": e["entity_type"]} for e in entities]
-        return json.dumps(rows, ensure_ascii=False, indent=2)

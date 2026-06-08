@@ -6,10 +6,16 @@ import { Loader2 } from 'lucide-react';
 import { getOverviewData } from '@/lib/kb-api';
 import type { ActivityRecord, OverviewData, SourceActivityRecord } from '@/lib/kb-types';
 import { HIVEMIND_HOME_PATH } from '@/config/navigation';
+import { CANDIDATE_STATUS_LABEL, MEMORY_TYPE_LABEL } from '@/lib/kb-labels';
 import { cn } from '@/lib/utils';
 
 function normalizeActivity(item: ActivityRecord & { kind?: string }): ActivityRecord {
-  if (item.kind === 'chat' || item.kind === 'memory' || item.kind === 'source') {
+  if (
+    item.kind === 'chat' ||
+    item.kind === 'memory' ||
+    item.kind === 'source' ||
+    item.kind === 'candidate'
+  ) {
     return item;
   }
   return { ...(item as SourceActivityRecord), kind: 'source' };
@@ -37,12 +43,6 @@ function statusLabel(status: string): string {
   }
 }
 
-const MEMORY_TYPE_LABEL: Record<string, string> = {
-  project: '项目',
-  preference: '偏好',
-  decision: '决策',
-};
-
 const MEMORY_EVENT_LABEL: Record<string, string> = {
   create: '新增',
   update: '更新',
@@ -53,6 +53,7 @@ const KIND_META = {
   source: { label: '编译', className: 'bg-shell-bg text-shell-subtext' },
   chat: { label: '对话', className: 'bg-brand-primary/8 text-brand-primary' },
   memory: { label: '智慧', className: 'bg-brand-primary/8 text-brand-primary' },
+  candidate: { label: '候选', className: 'bg-brand-primary/8 text-brand-primary' },
 } as const;
 
 type StatItem = {
@@ -105,7 +106,7 @@ function StatGroup({ title, desc, items }: { title: string; desc?: string; items
   );
 }
 
-function KindBadge({ kind }: { kind: keyof typeof KIND_META }) {
+function KindBadge({ kind }: { kind: keyof typeof KIND_META | 'candidate' }) {
   const meta = KIND_META[kind];
   return (
     <span
@@ -187,6 +188,15 @@ export function OverviewStats() {
         : '从对话自动提取',
       accent: (stats.memories_week ?? 0) > 0,
     },
+    {
+      label: '待晋升 Wiki',
+      value: String(stats.candidate_pending ?? 0),
+      unit: '条',
+      hint: (stats.candidates_pending_week ?? 0) > 0
+        ? `本周新增 ${stats.candidates_pending_week}`
+        : '候选池待审核',
+      accent: (stats.candidate_pending ?? 0) > 0,
+    },
   ];
 
   return (
@@ -221,6 +231,27 @@ function ActivityRow({ item }: { item: ActivityRecord }) {
             <span className="text-shell-muted"> · 对话更新</span>
           </p>
           <p className="mt-1 text-[11px] text-shell-subtext">原始聊天记录</p>
+        </div>
+        <span className="shrink-0 text-[11px] tabular-nums text-shell-muted">
+          {timeAgo(item.created_at)}
+        </span>
+      </li>
+    );
+  }
+
+  if (item.kind === 'candidate') {
+    const statusLabel = CANDIDATE_STATUS_LABEL[item.status] ?? item.status;
+    return (
+      <li className="flex items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-shell-bg">
+        <KindBadge kind="candidate" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[13px] text-shell-text">
+            <span className="font-medium">{item.title}</span>
+            <span className="text-shell-muted"> · {statusLabel}</span>
+          </p>
+          <p className="mt-1 text-[11px] text-shell-subtext">
+            Wiki 候选 · {item.source_type === 'chat' ? '来自对话' : item.source_type}
+          </p>
         </div>
         <span className="shrink-0 text-[11px] tabular-nums text-shell-muted">
           {timeAgo(item.created_at)}

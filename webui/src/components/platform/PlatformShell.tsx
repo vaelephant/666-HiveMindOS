@@ -29,6 +29,14 @@ import { ModeToggle } from '@/components/mode-toggle';
 const NAV_EXPANDED_PX = 260;
 const NAV_COLLAPSED_PX = 64;
 
+function HiveLogoMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 2L4 6.5V14l8 4.5L20 14V6.5L12 2zm0 2.3l6 3.37v6.66L12 17.7 6 14.33V7.67L12 4.3z" />
+    </svg>
+  );
+}
+
 function navItemActive(href: string, pathname: string): boolean {
   if (href === PLATFORM_HOME_PATH) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -65,46 +73,72 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
     if (pathname.startsWith(KB_BASE_PATH)) setKnowledgeBaseOpen(true);
   }, [pathname]);
 
+  const navLinkClass = (active: boolean, collapsed: boolean) =>
+    [
+      'group relative flex w-full items-center rounded-xl text-[13px] font-medium transition-all duration-200',
+      collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
+      active
+        ? collapsed
+          ? 'bg-brand-primary/12 text-brand-primary shadow-sm shadow-brand-primary/10'
+          : 'bg-brand-primary/10 text-brand-primary ring-1 ring-brand-primary/15'
+        : 'text-shell-muted hover:bg-shell-panel-hover hover:text-shell-text',
+    ].join(' ');
+
+  const subNavLinkClass = (active: boolean) =>
+    [
+      'flex items-center rounded-lg px-2.5 py-2 text-[12px] font-medium transition-all duration-200',
+      active
+        ? 'bg-brand-primary/10 text-brand-primary'
+        : 'text-shell-muted hover:bg-shell-panel-hover hover:text-shell-text',
+    ].join(' ');
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-shell-bg font-sans text-slate-100">
+    <div className="flex h-screen w-full overflow-hidden bg-shell-bg font-sans text-shell-text">
       {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{ width: navCollapsed ? NAV_COLLAPSED_PX : NAV_EXPANDED_PX }}
         transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-        className="flex shrink-0 flex-col overflow-hidden border-r border-shell-border bg-shell-sidebar"
+        className="relative flex shrink-0 flex-col overflow-hidden border-r border-shell-border bg-shell-sidebar"
         aria-label="主导航"
       >
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-brand-primary/[0.06] to-transparent dark:from-brand-primary/10"
+          aria-hidden
+        />
+
         {/* Logo */}
-        <div className={`shrink-0 border-b border-shell-border-dim ${navCollapsed ? 'px-2 py-4' : 'px-4 py-4'}`}>
+        <div className={`relative shrink-0 ${navCollapsed ? 'px-2 py-4' : 'px-4 py-5'}`}>
           <div className={`flex gap-2 ${navCollapsed ? 'flex-col items-center' : 'items-center justify-between'}`}>
             {!navCollapsed && (
-              <div className="flex min-w-0 items-center gap-2.5">
-                {/* Hive hexagon mark */}
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-primary shadow-lg shadow-brand-primary/20">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-brand-on-primary">
-                    <path d="M12 2L4 6.5V14l8 4.5L20 14V6.5L12 2zm0 2.3l6 3.37v6.66L12 17.7 6 14.33V7.67L12 4.3z" />
-                  </svg>
+              <Link href={PLATFORM_HOME_PATH} className="flex min-w-0 items-center gap-3">
+                <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-primary to-brand-dim shadow-md shadow-brand-primary/25">
+                  <HiveLogoMark className="h-[18px] w-[18px] text-brand-on-primary" />
+                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-brand-bright ring-2 ring-shell-sidebar" />
                 </div>
-                <div>
-                  <h1 className="text-[13px] font-bold tracking-tight text-slate-100">HiveMindOS</h1>
-                  <p className="text-[9px] font-semibold uppercase tracking-widest text-brand-bright/70">
+                <div className="min-w-0">
+                  <h1 className="truncate text-[15px] font-semibold tracking-tight text-shell-text">
+                    HiveMindOS
+                  </h1>
+                  <p className="text-[10px] font-medium tracking-wide text-brand-primary dark:text-brand-bright">
                     Enterprise AI OS
                   </p>
                 </div>
-              </div>
+              </Link>
             )}
             {navCollapsed && (
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-primary shadow-lg shadow-brand-primary/20">
-                <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 text-brand-on-primary">
-                  <path d="M12 2L4 6.5V14l8 4.5L20 14V6.5L12 2zm0 2.3l6 3.37v6.66L12 17.7 6 14.33V7.67L12 4.3z" />
-                </svg>
-              </div>
+              <Link
+                href={PLATFORM_HOME_PATH}
+                title="HiveMindOS"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-primary to-brand-dim shadow-md shadow-brand-primary/25"
+              >
+                <HiveLogoMark className="h-[18px] w-[18px] text-brand-on-primary" />
+              </Link>
             )}
             <button
               type="button"
               onClick={() => setNavCollapsed((c) => !c)}
-              className="shrink-0 rounded-md p-1 text-shell-muted transition-colors hover:bg-shell-panel/5 hover:text-shell-subtext"
+              className="shrink-0 rounded-lg p-1.5 text-shell-muted transition-colors hover:bg-shell-panel-hover hover:text-shell-text"
               aria-label={navCollapsed ? '展开导航' : '收起导航'}
               aria-expanded={!navCollapsed}
             >
@@ -118,7 +152,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         </div>
 
         {/* Nav items */}
-        <nav className="custom-scrollbar flex-1 overflow-y-auto px-2 py-3">
+        <nav className="custom-scrollbar relative flex-1 space-y-0.5 overflow-y-auto px-2.5 py-2">
           {PRIMARY_NAV.flatMap((item, idx) => {
             const prev = PRIMARY_NAV[idx - 1];
             const prefix: React.ReactNode[] = [];
@@ -126,15 +160,15 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             // Section label above first HiveMind item
             if (!navCollapsed && item.factory === 'hivemind' && prev?.factory !== 'hivemind') {
               prefix.push(
-                <p key={`label-hivemind`} className="mb-1 mt-1 px-3 text-[9px] font-semibold uppercase tracking-widest text-brand-bright/40">
+                <p key="label-hivemind" className="mb-1.5 mt-3 px-3 text-[10px] font-medium text-shell-muted">
                   HiveMind
                 </p>
               );
             }
-            // Divider between factory groups
+            // Spacer between factory groups
             if (prev && prev.factory !== item.factory) {
               prefix.push(
-                <div key={`div-${item.navKey}`} className="my-2 border-t border-shell-border-dim" />
+                <div key={`div-${item.navKey}`} className="my-2.5 mx-3 border-t border-shell-border-dim" />
               );
             }
 
@@ -147,28 +181,32 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   key={item.navKey}
                   href="/annotation/overview"
                   title={item.label}
-                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${annotationActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
+                  className={navLinkClass(annotationActive, true)}
                 >
                   <item.icon className="h-[18px] w-[18px] shrink-0" />
                 </Link>
               ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button type="button" onClick={() => setAnnotationOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${annotationActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
+                  <button
+                    type="button"
+                    onClick={() => setAnnotationOpen((o) => !o)}
+                    className={navLinkClass(annotationActive, false)}
                   >
-                    <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${annotationOpen ? 'rotate-0' : '-rotate-90'}`} />
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-shell-muted transition-transform ${annotationOpen ? 'rotate-0' : '-rotate-90'}`}
+                    />
                   </button>
                   <AnimatePresence initial={false}>
                     {annotationOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
+                        <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
                           {ANNOTATION_CHILDREN.map((child) => {
                             const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (
-                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
-                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+                              <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
+                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
                             );
@@ -182,29 +220,25 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             } else if (isIpfsMonitorItem(item)) {
               const ipfsActive = pathname.startsWith(IPFS_MONITOR_BASE_PATH);
               el = navCollapsed ? (
-                <Link key={item.navKey} href={IPFS_MONITOR_BASE_PATH} title={item.label}
-                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${ipfsActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
-                >
+                <Link key={item.navKey} href={IPFS_MONITOR_BASE_PATH} title={item.label} className={navLinkClass(ipfsActive, true)}>
                   <item.icon className="h-[18px] w-[18px] shrink-0" />
                 </Link>
               ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button type="button" onClick={() => setIpfsMonitorOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${ipfsActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
-                  >
-                    <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${ipfsMonitorOpen ? 'rotate-0' : '-rotate-90'}`} />
+                  <button type="button" onClick={() => setIpfsMonitorOpen((o) => !o)} className={navLinkClass(ipfsActive, false)}>
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-muted transition-transform ${ipfsMonitorOpen ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                   <AnimatePresence initial={false}>
                     {ipfsMonitorOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
+                        <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
                           {IPFS_MONITOR_CHILDREN.map((child) => {
                             const active = isIpfsMonitorChildActive(child, pathname);
                             return (
-                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
-                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+                              <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
+                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
                             );
@@ -218,29 +252,25 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             } else if (isKnowledgeBaseItem(item)) {
               const kbActive = pathname.startsWith(KB_BASE_PATH);
               el = navCollapsed ? (
-                <Link key={item.navKey} href={`${KB_BASE_PATH}/overview`} title={item.label}
-                  className={`flex w-full items-center justify-center rounded-lg py-2.5 text-[13px] font-medium transition-all ${kbActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
-                >
+                <Link key={item.navKey} href={`${KB_BASE_PATH}/overview`} title={item.label} className={navLinkClass(kbActive, true)}>
                   <item.icon className="h-[18px] w-[18px] shrink-0" />
                 </Link>
               ) : (
                 <div key={item.navKey} className="space-y-0.5">
-                  <button type="button" onClick={() => setKnowledgeBaseOpen((o) => !o)}
-                    className={`flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[13px] font-medium transition-colors ${kbActive ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}
-                  >
-                    <item.icon className="mr-3 h-[18px] w-[18px] shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-subtext transition-transform ${knowledgeBaseOpen ? 'rotate-0' : '-rotate-90'}`} />
+                  <button type="button" onClick={() => setKnowledgeBaseOpen((o) => !o)} className={navLinkClass(kbActive, false)}>
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-shell-muted transition-transform ${knowledgeBaseOpen ? 'rotate-0' : '-rotate-90'}`} />
                   </button>
                   <AnimatePresence initial={false}>
                     {knowledgeBaseOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
-                        <div className="ml-2 space-y-0.5 border-l border-shell-border py-0.5 pl-2">
+                        <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
                           {KNOWLEDGE_BASE_CHILDREN.map((child) => {
                             const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (
-                              <Link key={child.navKey} href={child.href} className={`flex items-center rounded-md px-2 py-2 text-[12px] font-medium transition-colors ${active ? 'bg-brand-primary/10 text-brand-bright' : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'}`}>
-                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-70" />
+                              <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
+                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />
                                 <span className="truncate">{child.label}</span>
                               </Link>
                             );
@@ -258,17 +288,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   key={item.navKey}
                   href={item.href}
                   title={item.label}
-                  className={`flex w-full items-center rounded-lg py-2.5 text-[13px] font-medium transition-all duration-150 ${
-                    navCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'
-                  } ${
-                    active
-                      ? navCollapsed
-                        ? 'bg-brand-primary/10 text-brand-bright'
-                        : 'border-l-2 border-brand-primary bg-brand-primary/10 pl-[10px] text-brand-bright'
-                      : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
-                  }`}
+                  className={navLinkClass(active, navCollapsed)}
                 >
-                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                  <item.icon className={`h-[18px] w-[18px] shrink-0 ${active ? 'text-brand-primary' : 'text-shell-muted group-hover:text-shell-text'}`} />
                   {!navCollapsed && <span className="truncate">{item.label}</span>}
                 </Link>
               );
@@ -279,15 +301,19 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         </nav>
 
         {/* User */}
-        <div className="mt-auto border-t border-shell-border-dim px-2 py-3">
-          <div className={`flex items-center ${navCollapsed ? 'justify-center' : 'gap-3 px-2'}`}>
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-primary/15 text-brand-bright">
+        <div className="relative mt-auto px-2.5 py-3">
+          <div
+            className={`flex items-center rounded-xl border border-shell-border-dim bg-shell-panel-hover/60 ${
+              navCollapsed ? 'justify-center p-2' : 'gap-3 p-2.5'
+            }`}
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-primary to-brand-dim text-brand-on-primary shadow-sm shadow-brand-primary/20">
               <UserCircle className="h-5 w-5" />
             </div>
             {!navCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-semibold text-shell-subtext">演示用户</p>
-                <p className="truncate text-[10px] text-shell-subtext">HiveMindOS · Dev</p>
+                <p className="truncate text-[12px] font-semibold text-shell-text">演示用户</p>
+                <p className="truncate text-[10px] text-shell-muted">HiveMindOS · Dev</p>
               </div>
             )}
           </div>
@@ -297,7 +323,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar */}
-        <header className="flex h-13 shrink-0 items-center justify-between border-b border-shell-border bg-shell-sidebar/80 px-4 backdrop-blur-sm md:px-6">
+        <header className="flex h-13 shrink-0 items-center justify-between border-b border-shell-border bg-shell-sidebar/90 px-4 backdrop-blur-md md:px-6">
           <div className="flex min-w-0 flex-1 items-center gap-4 md:gap-6">
             <nav className="hidden gap-1 md:flex" aria-label="顶栏能力入口">
               {TOP_NAV.map((tab) => {
@@ -309,10 +335,10 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                   <Link
                     key={tab.navKey}
                     href={tab.href}
-                    className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                       active
-                        ? 'bg-brand-primary text-brand-on-primary'
-                        : 'text-shell-muted hover:bg-shell-panel/5 hover:text-shell-subtext'
+                        ? 'bg-brand-primary text-brand-on-primary shadow-sm shadow-brand-primary/20'
+                        : 'text-shell-muted hover:bg-shell-panel-hover hover:text-shell-text'
                     }`}
                   >
                     {tab.label}
@@ -323,7 +349,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             <div className="relative hidden max-w-sm flex-1 md:block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-shell-subtext" />
               <input
-                className="w-full rounded-lg border border-white/8 bg-shell-panel/5 py-1.5 pl-9 pr-3 text-xs text-shell-subtext outline-none transition-all placeholder:text-shell-subtext focus:border-brand-primary/40 focus:bg-shell-panel/8 focus:ring-1 focus:ring-brand-primary/20"
+                className="w-full rounded-lg border border-shell-border bg-shell-panel py-1.5 pl-9 pr-3 text-xs text-shell-text outline-none transition-all placeholder:text-shell-muted focus:border-brand-primary/40 focus:ring-1 focus:ring-brand-primary/20"
                 placeholder="搜索知识、Agent、工作流…"
                 type="search"
                 aria-label="全局搜索"
@@ -334,7 +360,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             <ModeToggle />
             <button
               type="button"
-              className="relative rounded-lg p-2 text-shell-subtext transition-colors hover:bg-shell-panel/5 hover:text-shell-subtext"
+              className="relative rounded-lg p-2 text-shell-muted transition-colors hover:bg-shell-panel-hover hover:text-shell-text"
               aria-label="通知"
             >
               <Bell className="h-4 w-4" />
@@ -342,14 +368,14 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             </button>
             <Link
               href="/dashboard"
-              className="hidden rounded-lg border border-white/8 px-2.5 py-1.5 text-[11px] font-medium text-shell-muted transition-colors hover:bg-shell-panel/5 hover:text-shell-subtext sm:inline"
+              className="hidden rounded-lg border border-shell-border px-2.5 py-1.5 text-[11px] font-medium text-shell-muted transition-colors hover:bg-shell-panel-hover hover:text-shell-text sm:inline"
             >
               WareMind 演示
             </Link>
           </div>
         </header>
 
-        <main className="relative min-h-0 flex-1 overflow-auto bg-shell-bg">
+        <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-shell-bg">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -357,7 +383,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18 }}
-              className="flex min-h-0 w-full flex-1 flex-col"
+              className="flex min-h-0 w-full flex-1 flex-col overflow-auto"
             >
               {children}
             </motion.div>

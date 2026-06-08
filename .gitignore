@@ -26,6 +26,7 @@ htmlcov/
 # ── Node / Next.js ──────────────────────────────────
 node_modules/
 .next/
+webui/.next/
 out/
 .turbo/
 .vercel/
@@ -59,8 +60,9 @@ memory_layer/knowledge_base/storage/registry.db
 
 # Root-level storage (not knowledge_base/storage/)
 /storage/
+storage/**/*.db
+storage/tasks.db
 
 # ── memory_demo local state ─────────────────────────
 memory_demo/session.db
 memory_demo/session.json
-.gitignore

@@ -7,6 +7,12 @@ from typing import Any, Optional
 
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRegistry
+from memory_layer.knowledge_base.core.domain.wiki_meta import (
+    folder_kind,
+    kind_label,
+    page_pipeline_stages,
+    source_type_label,
+)
 from memory_layer.knowledge_base.core.wiki.categories import category_meta
 from memory_layer.knowledge_base.core.wiki import wiki_meta
 
@@ -141,25 +147,12 @@ def _parse_list_items(body: str) -> list[str]:
 
 
 def _infer_kind(category: str, meta: dict[str, str]) -> str:
-    if category == "workflows":
-        return "workflow"
-    if category == "glossary":
-        return "rule"
-    if category == "decisions":
-        return "decision"
     if meta.get("类型"):
         return "entity"
+    kind = folder_kind(category)
+    if kind:
+        return kind
     return "entity" if category == "entities" else "other"
-
-
-def _source_type_label(source_type: str) -> str:
-    labels = {
-        "pdf": "PDF",
-        "word": "Word",
-        "excel": "Excel",
-        "text": "文本",
-    }
-    return labels.get(source_type, source_type.upper())
 
 
 def build_page_detail(
@@ -271,7 +264,7 @@ def build_page_detail(
                     "id": s.get("source_id"),
                     "filename": s["filename"],
                     "source_type": s.get("source_type", "text"),
-                    "source_type_label": _source_type_label(s.get("source_type", "text")),
+                    "source_type_label": source_type_label(s.get("source_type", "text")),
                     "created_at": s.get("created_at", ""),
                     "status": "done",
                 }
@@ -301,22 +294,12 @@ def build_page_detail(
         "graph_neighbors": graph_neighbors,
         "citations": citations,
         "version_log": version_log,
-        "pipeline": [
-            {"stage": "raw_sources", "label": "原始资料", "count": len(raw_sources)},
-            {"stage": "compiler", "label": "知识编译", "count": len(version_log) or 1},
-            {"stage": "wiki_page", "label": "生成知识页", "count": 1},
-            {
-                "stage": "knowledge",
-                "label": _kind_label(kind),
-                "count": 1,
-            },
-            {
-                "stage": "cross_links",
-                "label": "交叉引用",
-                "count": len(relations) + len(graph_neighbors),
-            },
-            {"stage": "version_log", "label": "版本记录", "count": len(version_log)},
-        ],
+        "pipeline": _build_page_pipeline(
+            kind,
+            len(raw_sources),
+            len(version_log),
+            len(relations) + len(graph_neighbors),
+        ),
     }
 
 
@@ -370,13 +353,33 @@ def _build_citations(
     return citations
 
 
-def _kind_label(kind: str) -> str:
-    return {
-        "entity": "实体档案",
-        "workflow": "业务流程",
-        "rule": "术语规则",
-        "decision": "历史决策",
-    }.get(kind, "知识页")
+def _build_page_pipeline(
+    kind: str,
+    raw_count: int,
+    version_count: int,
+    cross_link_count: int,
+) -> list[dict[str, Any]]:
+    counts = {
+        "raw_sources": raw_count,
+        "compiler": version_count or 1,
+        "wiki_page": 1,
+        "knowledge": 1,
+        "cross_links": cross_link_count,
+        "version_log": version_count,
+    }
+    pipeline: list[dict[str, Any]] = []
+    for stage in page_pipeline_stages():
+        label = stage["label"]
+        if label == "__kind__":
+            label = kind_label(kind)
+        pipeline.append(
+            {
+                "stage": stage["stage"],
+                "label": label,
+                "count": counts.get(stage["stage"], 0),
+            }
+        )
+    return pipeline
 
 
 def _resolve_sources(
@@ -413,7 +416,7 @@ def _resolve_sources(
                     "id": None,
                     "filename": filename,
                     "source_type": _guess_source_type(filename),
-                    "source_type_label": _source_type_label(_guess_source_type(filename)),
+                    "source_type_label": source_type_label(_guess_source_type(filename)),
                     "created_at": entry.get("date"),
                 }
             )
@@ -437,7 +440,7 @@ def _source_dict(source) -> dict[str, Any]:
         "id": source.id,
         "filename": source.filename,
         "source_type": source.source_type,
-        "source_type_label": _source_type_label(source.source_type),
+        "source_type_label": source_type_label(source.source_type),
         "created_at": source.created_at,
         "status": source.status,
     }

@@ -200,6 +200,43 @@ def record_rule_compile(
     save_meta(wiki_root, org_id, wiki_path, meta)
 
 
+def record_digest_compile(
+    wiki_root: Path,
+    org_id: str,
+    wiki_path: str,
+    *,
+    source_id: Optional[str],
+    source_label: str,
+    source_type: str,
+    category: str,
+    title: str,
+    candidate_id: Optional[int] = None,
+) -> None:
+    existing = load_meta(wiki_root, org_id, wiki_path) or {}
+    sources = existing.get("sources", [])
+    src = {
+        "source_id": source_id,
+        "filename": source_label,
+        "source_type": source_type,
+        "candidate_id": candidate_id,
+    }
+    if not any(s.get("filename") == src["filename"] for s in sources):
+        sources.append(src)
+
+    meta = {
+        **existing,
+        "kind": "digest",
+        "category": category,
+        "title": title,
+        "sources": sources,
+        "has_conflicts": False,
+        "conflicts": existing.get("conflicts", []),
+    }
+    note = "初始创建" if not existing else "候选知识编译更新"
+    _append_version(meta, source_label, [note], note)
+    save_meta(wiki_root, org_id, wiki_path, meta)
+
+
 def list_summary_from_meta(meta: Optional[dict[str, Any]], wiki_path: str) -> dict[str, Any]:
     category = wiki_path.split("/")[0] if "/" in wiki_path else "root"
     if not meta:

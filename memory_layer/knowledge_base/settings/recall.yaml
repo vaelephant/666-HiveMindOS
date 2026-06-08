@@ -1,0 +1,23 @@
+# Chat 智慧召回（context_builder）
+
+hints:
+  - 之前
+  - 记得
+  - 我说过
+  - 我的项目
+  - 我在做
+  - 上次
+  - 还记得
+  - 以前
+  - 曾经
+  - 做什么
+  - 我是谁
+  - 我的偏好
+  - 我的决策
+  - 最近在忙
+  - 在开发
+  - 在做啥
+
+keyword_threshold: 0.55
+semantic_threshold: 0.42
+max_memories: 5

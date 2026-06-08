@@ -13,15 +13,10 @@ from typing import Optional
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.db.postgres import pg_conn
+from memory_layer.knowledge_base.core.domain.taxonomy import memory_type_label
 from memory_layer.knowledge_base.models.memory import Memory
 
 log = get_logger("hivemind.vector")
-
-_TYPE_LABEL = {
-    "project": "项目",
-    "preference": "偏好",
-    "decision": "决策",
-}
 
 
 @dataclass
@@ -81,7 +76,7 @@ class MemoryVectorStore:
 
     @staticmethod
     def _memory_text(memory: Memory) -> str:
-        label = _TYPE_LABEL.get(memory.memory_type, memory.memory_type)
+        label = memory_type_label(memory.memory_type)
         return f"[{label}] {memory.title}: {memory.content}"
 
     def upsert_memory(self, memory: Memory) -> bool:

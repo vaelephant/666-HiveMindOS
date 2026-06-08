@@ -6,11 +6,10 @@ from model_layer import client as llm
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
+from memory_layer.knowledge_base.core.tools.kb_toolkit import tool_runtime
+from memory_layer.knowledge_base.prompts import get, render
 
-_SYSTEM = """你是企业知识库助手。根据提供的 Wiki 内容回答问题。
-- 回答准确、简洁
-- 注明信息来源（Wiki 页面名称）
-- 若知识库中无相关信息，直接说明，不要猜测"""
+_QUERY = get("agents.query")
 
 
 class QueryAgent:
@@ -21,17 +20,17 @@ class QueryAgent:
     def run(self, question: str, org_id: str) -> dict:
         context, source_pages = self._gather_context(question, org_id)
 
-        prompt = f"""根据以下企业知识库内容回答问题。
+        prompt = render(
+            "agents.query",
+            question=question,
+            context=context,
+        )
 
-## 问题
-{question}
-
-## 知识库内容
-{context}
-
-请给出准确回答，并注明信息来源。"""
-
-        answer = llm.complete(prompt, system=_SYSTEM, model=config.FAST_MODEL)
+        answer = llm.complete(
+            prompt,
+            system=_QUERY.system,
+            model=_QUERY.resolve_model(config),
+        )
         return {"question": question, "answer": answer, "source_pages": source_pages}
 
     def _gather_context(self, question: str, org_id: str) -> tuple[str, list[str]]:
@@ -39,12 +38,15 @@ class QueryAgent:
         keywords = set(question.lower().split())
         parts, sources = [], []
 
-        for page in pages[:30]:
+        rt = tool_runtime()
+        max_pages = rt.get("query_max_pages", 30)
+        page_chars = rt.get("query_page_chars", 2000)
+        for page in pages[:max_pages]:
             content = self.wiki.read_page(org_id, page["path"])
             if not content:
                 continue
             if any(kw in content.lower() for kw in keywords) or any(kw in page["name"].lower() for kw in keywords):
-                parts.append(f"### {page['name']}\n{content[:2000]}")
+                parts.append(f"### {page['name']}\n{content[:page_chars]}")
                 sources.append(page["path"])
 
         return ("\n\n".join(parts) or "（未找到相关内容）", sources)

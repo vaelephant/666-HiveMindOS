@@ -1,0 +1,10 @@
+# 候选池晋升 / 解析阈值
+
+enqueue:
+  importance_fallback: 0.85   # 非标准分类时，importance 超过此值进池
+
+recap_suggestion_confidence: 0.75
+
+auto_approve_confidence: 0.88
+
+ingest_mirror_confidence: 0.92

@@ -22,6 +22,7 @@ import {
   ListTodo,
   MessageSquare,
   Network,
+  Timer,
   Rocket,
   ScrollText,
   Server,
@@ -42,6 +43,7 @@ export type PrimaryNavKey =
   | 'home'
   // HiveMind 核心模块
   | 'agent_tasks'
+  | 'automations'
   | 'chat'
   | 'memories'
   | 'workflows'
@@ -160,7 +162,8 @@ export function isIpfsMonitorChildActive(child: IpfsMonitorChild, pathname: stri
 export const KB_BASE_PATH = '/knowledge-base' as const;
 
 /** HiveMind 模块默认着陆页 */
-export const HIVEMIND_HOME_PATH = '/chat' as const;
+// 不用 /chat：会与 /api/kb/[orgId]/chat/sessions 在 Next.js 路由树里冲突
+export const HIVEMIND_HOME_PATH = '/hivemind-chat' as const;
 
 export const KNOWLEDGE_BASE_CHILDREN: KnowledgeBaseChild[] = [
   { navKey: 'kb_overview', label: '概览',      href: `${KB_BASE_PATH}/overview`, icon: LayoutDashboard },
@@ -176,8 +179,9 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   // ── HiveMind 核心模块 ────────────────────────────────────────────────────
   { navKey: 'chat',         label: 'Chat',       href: HIVEMIND_HOME_PATH,      icon: MessageSquare, factory: 'hivemind' },
   { navKey: 'memories',     label: '智慧进化',   href: '/memories',             icon: Brain,         factory: 'hivemind' },
-  { navKey: 'agent_tasks',  label: 'Agent',      href: '/knowledge-base/tasks', icon: Bot,           factory: 'hivemind' },
-  { navKey: 'workflows',    label: '工作流',     href: '/workflows',            icon: GitBranch,  factory: 'hivemind' },
+  { navKey: 'agent_tasks',  label: '分析任务',   href: '/agent-tasks',          icon: Bot,           factory: 'hivemind' },
+  { navKey: 'automations',  label: '自动化任务', href: '/automations',          icon: Timer,         factory: 'hivemind' },
+  { navKey: 'workflows',    label: '工作流',     href: '/workflows',            icon: GitBranch,     factory: 'hivemind' },
   { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
   { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
   { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
@@ -252,7 +256,9 @@ export function isPlatformPathAllowed(segments: string[] | undefined): boolean {
   if (path.startsWith('/tools/')) return true;
   if (path.startsWith('/audit/')) return true;
   if (path.startsWith('/human-review/')) return true;
-  if (path === HIVEMIND_HOME_PATH || path === '/hivemind') return true;
+  if (path === '/automations' || path.startsWith('/automations/')) return true;
+  if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return true;
+  if (path === HIVEMIND_HOME_PATH || path === '/chat' || path === '/hivemind') return true;
   if (path === '/memories') return true;
   return false;
 }
@@ -283,10 +289,12 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/`)) return 'IPFS 监控';
   if (path === HIVEMIND_HOME_PATH) return 'Chat';
   if (path === '/memories') return '智慧进化';
+  if (path === '/automations' || path.startsWith('/automations/')) return '自动化任务';
+  if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return '分析任务';
   if (path.startsWith('/workflows/')) return '工作流';
   if (path.startsWith('/tools/')) return '工具箱';
   if (path.startsWith('/audit/')) return '审计日志';
   if (path.startsWith('/human-review/')) return '人工审核';
-  if (path.startsWith('/knowledge-base/tasks')) return 'Agent';
+  if (path.startsWith('/knowledge-base/tasks')) return '分析任务';
   return '页面';
 }

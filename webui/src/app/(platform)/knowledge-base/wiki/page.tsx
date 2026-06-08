@@ -10,14 +10,8 @@ import {
 } from '@/components/knowledge-base/wiki-compilation-view';
 import { getWikiPage, listWikiCategories, listWikiPages, migrateWiki } from '@/lib/kb-api';
 import type { WikiCategory, WikiPage, WikiPageDetail } from '@/lib/kb-types';
+import { KIND_BADGE } from '@/lib/kb-labels';
 import { cn } from '@/lib/utils';
-
-const KIND_BADGE: Record<string, string> = {
-  entity: '实体',
-  workflow: '流程',
-  rule: '规则',
-  decision: '决策',
-};
 
 function PageListItem({
   page,

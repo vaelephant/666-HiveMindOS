@@ -44,9 +44,44 @@ class MemoryStats:
 
 @dataclass
 class MemoryCandidate:
-    action: str  # create | update | skip
+    action: str  # create | update | archive | skip
     memory_type: str
     title: str
     content: str
     importance: float
-    match_title: str | None = None  # for update: existing memory title to match
+    match_title: str | None = None  # for update/archive: existing memory title to match
+
+
+@dataclass
+class WikiSuggestion:
+    title: str
+    reason: str
+    category: str = "general"
+    content_outline: str = ""
+
+
+@dataclass
+class MemoryConflict:
+    field: str
+    description: str
+    resolution: str = ""
+
+
+@dataclass
+class RecapPlan:
+    """LLM 复盘输出（待落库）。"""
+    summary: str
+    memories: list[MemoryCandidate]
+    archives: list[MemoryCandidate]
+    conflicts: list[MemoryConflict]
+    wiki_suggestions: list[WikiSuggestion]
+
+
+@dataclass
+class SessionRecapResult:
+    session_id: str
+    summary: str
+    memory_ids: list[int]
+    archived_ids: list[int]
+    conflicts: list[MemoryConflict]
+    wiki_suggestions: list[WikiSuggestion]

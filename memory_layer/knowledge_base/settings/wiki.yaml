@@ -1,0 +1,88 @@
+# Wiki 目录、分类映射与页面元数据
+
+default_folder: digests
+
+# 候选/记忆分类 → Wiki 子目录
+category_folders:
+  decision: decisions
+  project: projects
+  product: products
+  methodology: methodology
+  entity: entities
+  workflow: workflows
+  rule: glossary
+  other: digests
+
+# 已知 Wiki 子目录（编译产出 + UI 侧栏）
+folders:
+  entities:
+    label: 实体档案
+    description: 客户、产品、合同、人员
+    order: 1
+    kind: entity
+  workflows:
+    label: 业务流程
+    description: 端到端业务链路
+    order: 2
+    kind: workflow
+  glossary:
+    label: 术语规则
+    description: 政策、阈值、定义
+    order: 3
+    kind: rule
+  decisions:
+    label: 历史决策
+    description: 定价与策略记录
+    order: 4
+    kind: decision
+  projects:
+    label: 项目档案
+    description: 从对话提炼的项目信息
+    order: 5
+    kind: project
+  products:
+    label: 产品定义
+    description: 产品范围与能力说明
+    order: 6
+    kind: product
+  methodology:
+    label: 方法论
+    description: 实践方法与原则
+    order: 7
+    kind: methodology
+  digests:
+    label: 知识摘要
+    description: 未分类的编译摘要
+    order: 8
+    kind: other
+
+kind_labels:
+  entity: 实体档案
+  workflow: 业务流程
+  rule: 术语规则
+  decision: 历史决策
+  project: 项目档案
+  product: 产品定义
+  methodology: 方法论
+  other: 知识页
+
+source_type_labels:
+  pdf: PDF
+  word: Word
+  excel: Excel
+  text: 文本
+
+# Wiki 页详情 — 管线阶段文案（count 由运行时计算）
+page_pipeline:
+  - stage: raw_sources
+    label: 原始资料
+  - stage: compiler
+    label: 知识编译
+  - stage: wiki_page
+    label: 生成知识页
+  - stage: knowledge
+    label: __kind__
+  - stage: cross_links
+    label: 交叉引用
+  - stage: version_log
+    label: 版本记录

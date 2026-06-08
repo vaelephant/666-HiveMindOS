@@ -88,6 +88,67 @@ class ChatRegistry:
             "sessions_week": sessions_week,
         }
 
+    def get_recap_timestamps(
+        self,
+        session_id: str,
+        org_id: str,
+    ) -> tuple[str, str | None] | None:
+        """Return (updated_at, recapped_at) ISO strings, or None if missing."""
+        with pg_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT updated_at::text, recapped_at::text
+                FROM chat_sessions
+                WHERE id = %s::uuid AND org_id = %s
+                """,
+                (session_id, org_id),
+            ).fetchone()
+        if not row:
+            return None
+        return row[0], row[1]
+
+    def mark_recapped(self, session_id: str, org_id: str) -> None:
+        with pg_conn() as conn:
+            conn.execute(
+                """
+                UPDATE chat_sessions
+                SET recapped_at = NOW()
+                WHERE id = %s::uuid AND org_id = %s
+                """,
+                (session_id, org_id),
+            )
+            conn.commit()
+
+    def list_sessions_pending_recap(
+        self,
+        org_id: str,
+        user_id: str = _DEFAULT_USER,
+        idle_hours: int = 24,
+        limit: int = 10,
+    ) -> list[ChatSessionSummary]:
+        """活跃会话：超过 idle_hours 无更新，且自上次复盘后有新消息（或从未复盘）。"""
+        with pg_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT id::text, org_id, user_id, title, status,
+                       created_at::text, updated_at::text
+                FROM chat_sessions
+                WHERE org_id = %s AND user_id = %s AND status = 'active'
+                  AND updated_at < NOW() - make_interval(hours => %s)
+                  AND (recapped_at IS NULL OR updated_at > recapped_at)
+                ORDER BY updated_at ASC
+                LIMIT %s
+                """,
+                (org_id, user_id, idle_hours, limit),
+            ).fetchall()
+        return [
+            ChatSessionSummary(
+                id=r[0], org_id=r[1], user_id=r[2], title=r[3],
+                status=r[4], created_at=r[5], updated_at=r[6],
+            )
+            for r in rows
+        ]
+
     def list_sessions(
         self,
         org_id: str,

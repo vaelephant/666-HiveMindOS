@@ -16,14 +16,15 @@ export async function GET(
 }
 
 export async function DELETE(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ orgId: string; sessionId: string }> },
 ) {
   const { orgId, sessionId } = await params;
-  const res = await fetch(
-    `${BACKEND}/api/v1/orgs/${orgId}/chat/sessions/${sessionId}`,
-    { method: 'DELETE' },
-  );
+  const url = new URL(req.url);
+  const recap = url.searchParams.get('recap');
+  const backendUrl = new URL(`${BACKEND}/api/v1/orgs/${orgId}/chat/sessions/${sessionId}`);
+  if (recap === 'true') backendUrl.searchParams.set('recap', 'true');
+  const res = await fetch(backendUrl.toString(), { method: 'DELETE' });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
 }

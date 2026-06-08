@@ -6,6 +6,8 @@ Chat pipeline — all chat + memory logic lives in FastAPI.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Callable, Iterator
 from dataclasses import asdict
 
 from memory_layer.knowledge_base import config
@@ -107,3 +109,107 @@ def send_message(
             "memories_used": memories_used,
         },
     }
+
+
+def _prepare_turn(
+    org_id: str,
+    message: str,
+    session_id: str | None,
+    user_id: str,
+) -> tuple[str, list[dict], str, list]:
+    """Save user message, return (session_id, prior_history, memory_block, memories_used)."""
+    message = message.strip()
+    if not message:
+        raise ValueError("消息不能为空")
+
+    if not session_id:
+        session_id = _registry.create_session(org_id, "", user_id=user_id)
+
+    is_first = len(_registry.get_history(session_id)) == 0
+    _registry.add_message(session_id, org_id, user_id, "user", message)
+    if is_first:
+        _registry.ensure_title(session_id, message)
+
+    history = _registry.get_history(session_id)
+    prior = history[:-1] if history else []
+    memory_block, memories_used = build_context(org_id, user_id, message)
+    return session_id, prior, memory_block, memories_used
+
+
+def send_message_stream(
+    org_id: str,
+    message: str,
+    session_id: str | None = None,
+    user_id: str = _DEFAULT_USER,
+    cancel_check: Callable[[], bool] | None = None,
+) -> Iterator[str]:
+    """
+    SSE 流：status → sources → token* → done
+    每行格式：data: {json}\n\n
+    cancel_check 返回 True 时中止流，不保存 assistant 消息、不发送 done。
+    """
+    session_id, prior, memory_block, memories_used = _prepare_turn(
+        org_id, message, session_id, user_id,
+    )
+    wiki, graph = _wiki_and_graph(org_id)
+    agent = ChatAgent(wiki, graph)
+
+    answer = ""
+    sources: list = []
+    follow_ups: list = []
+
+    for event in agent.run_stream(message, prior, org_id, memory_context=memory_block):
+        if cancel_check and cancel_check():
+            log.info(
+                "[chat] stream aborted  org=%s  session=%s  partial_chars=%d",
+                org_id, session_id[:8], len(answer),
+            )
+            return
+        if event["type"] == "token":
+            answer += event["text"]
+        elif event["type"] == "sources":
+            sources = event["sources"]
+        elif event["type"] == "complete":
+            answer = event["answer"]
+            sources = event["sources"]
+            follow_ups = event["follow_ups"]
+            continue
+        yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    if cancel_check and cancel_check():
+        log.info(
+            "[chat] stream aborted before save  org=%s  session=%s",
+            org_id, session_id[:8],
+        )
+        return
+
+    _registry.add_message(
+        session_id,
+        org_id,
+        user_id,
+        "assistant",
+        answer,
+        sources=sources,
+        follow_ups=follow_ups,
+    )
+    log.info(
+        "[chat] stream saved  org=%s  session=%s  sources=%d  memories=%d",
+        org_id, session_id[:8], len(sources), len(memories_used),
+    )
+
+    done = {
+        "type": "done",
+        "session_id": session_id,
+        "answer": answer,
+        "sources": sources,
+        "follow_ups": follow_ups,
+        "memories_used": memories_used,
+        "turn": {
+            "question": message,
+            "answer": answer,
+            "sources": sources,
+            "follow_ups": follow_ups,
+            "memories_used": memories_used,
+        },
+    }
+    yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"

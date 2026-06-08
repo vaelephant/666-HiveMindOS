@@ -4,9 +4,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from memory_layer.knowledge_base.app.logging_config import setup_logging, get_logger
-from memory_layer.knowledge_base.app.routers import chat, ingest, memories, overview, query, tasks, wiki
+from memory_layer.knowledge_base.app.routers import (
+    automations,
+    candidates,
+    chat,
+    ingest,
+    memories,
+    overview,
+    query,
+    tasks,
+    wiki,
+)
 from memory_layer.knowledge_base import config
-from memory_layer.knowledge_base.core.db.postgres import close_pool
+from memory_layer.knowledge_base.core.db.postgres import close_pool, pg_conn
+from memory_layer.knowledge_base.core.db.sequences import repair_serial_sequences
 
 
 @asynccontextmanager
@@ -28,6 +39,15 @@ async def lifespan(_app: FastAPI):
     log.info("log_dir      = %s", config.LOG_DIR)
     log.info("━" * 50)
 
+    try:
+        with pg_conn() as conn:
+            fixed = repair_serial_sequences(conn)
+            conn.commit()
+        if fixed:
+            log.info("serial sequences repaired  %s", "; ".join(fixed))
+    except Exception as exc:
+        log.warning("serial sequence repair skipped: %s", exc)
+
     yield
 
     close_pool()
@@ -43,13 +63,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(chat.router,     prefix="/api/v1", tags=["chat"])
-app.include_router(memories.router, prefix="/api/v1", tags=["memories"])
+app.include_router(chat.router,       prefix="/api/v1", tags=["chat"])
+app.include_router(memories.router,   prefix="/api/v1", tags=["memories"])
+app.include_router(candidates.router, prefix="/api/v1", tags=["candidates"])
 app.include_router(ingest.router,   prefix="/api/v1", tags=["ingest"])
 app.include_router(overview.router, prefix="/api/v1", tags=["overview"])
 app.include_router(query.router,    prefix="/api/v1", tags=["query"])
-app.include_router(tasks.router,    prefix="/api/v1", tags=["tasks"])
-app.include_router(wiki.router,     prefix="/api/v1", tags=["wiki"])
+app.include_router(tasks.router,        prefix="/api/v1", tags=["tasks"])
+app.include_router(automations.router,  prefix="/api/v1", tags=["automations"])
+app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
 
 
 @app.get("/health")

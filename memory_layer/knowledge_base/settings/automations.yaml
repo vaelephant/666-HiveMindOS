@@ -1,0 +1,39 @@
+# 自动化任务定义 — 侧栏「自动化任务」页与 cron 脚本对齐
+
+jobs:
+  - id: recap_sessions
+    label: 会话复盘
+    description: L2 批量复盘空闲会话，合并智慧并产生 Wiki 候选
+    category: memory
+    cron_hint: "0 2 * * *"
+    defaults:
+      idle_hours: 24
+      limit: 10
+
+  - id: sync_vectors
+    label: 记忆向量同步
+    description: 将 PostgreSQL 活跃智慧同步到 Qdrant，供 Chat 语义召回
+    category: memory
+    cron_hint: "0 * * * *"
+    defaults:
+      limit: 200
+
+  - id: resolve_candidates
+    label: 候选批量解析
+    description: Resolver 匹配 Wiki / 标记冲突，高置信自动批准
+    category: wiki
+    cron_hint: "30 2 * * *"
+    defaults:
+      limit: 30
+
+  - id: compile_candidates
+    label: 候选编译进 Wiki
+    description: 将已批准候选写入企业 Wiki 文件
+    category: wiki
+    cron_hint: "0 3 * * *"
+    defaults:
+      limit: 20
+
+category_labels:
+  memory: 智慧进化
+  wiki: 知识晋升

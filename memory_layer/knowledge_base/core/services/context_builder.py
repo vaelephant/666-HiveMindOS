@@ -15,27 +15,17 @@ import re
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.registry.memory_registry import MemoryRegistry
 from memory_layer.knowledge_base.core.vector.memory_vector_store import get_vector_store
+from memory_layer.knowledge_base.core.domain.taxonomy import memory_type_label
 from memory_layer.knowledge_base.models.memory import Memory
+from memory_layer.knowledge_base.settings import load
 
 log = get_logger("hivemind.context")
 
 _registry = MemoryRegistry()
 
-_RECALL_HINTS = (
-    "之前", "记得", "我说过", "我的项目", "我在做", "上次", "还记得",
-    "以前", "曾经", "做什么", "我是谁", "我的偏好", "我的决策",
-    "最近在忙", "在开发", "在做啥",
-)
 
-_TYPE_LABEL = {
-    "project": "项目",
-    "preference": "偏好",
-    "decision": "决策",
-}
-
-_KEYWORD_THRESHOLD = 0.55
-_SEMANTIC_THRESHOLD = 0.42
-_MAX_MEMORIES = 5
+def _recall_cfg() -> dict:
+    return load("recall")
 
 
 def _keywords(text: str) -> list[str]:
@@ -45,7 +35,7 @@ def _keywords(text: str) -> list[str]:
 
 
 def _has_recall_intent(question: str) -> bool:
-    return any(h in question for h in _RECALL_HINTS)
+    return any(h in question for h in _recall_cfg()["hints"])
 
 
 def _keyword_score(question: str, memory: Memory) -> float:
@@ -78,11 +68,11 @@ def _select_keyword(
     scored.sort(key=lambda x: x[0], reverse=True)
 
     if _has_recall_intent(question):
-        selected = [m for s, m in scored if s >= _KEYWORD_THRESHOLD][:limit]
+        selected = [m for s, m in scored if s >= _recall_cfg()["keyword_threshold"]][:limit]
         if not selected:
             selected = [m for _, m in scored[:limit]]
     else:
-        selected = [m for s, m in scored if s >= _KEYWORD_THRESHOLD][:limit]
+        selected = [m for s, m in scored if s >= _recall_cfg()["keyword_threshold"]][:limit]
 
     return selected
 
@@ -116,7 +106,7 @@ def _select_semantic(
         scored.append((final, memory))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    threshold = _SEMANTIC_THRESHOLD - (0.08 if _has_recall_intent(question) else 0.0)
+    threshold = _recall_cfg()["semantic_threshold"] - (0.08 if _has_recall_intent(question) else 0.0)
     selected = [m for s, m in scored if s >= threshold][:limit]
 
     if selected:
@@ -134,8 +124,10 @@ def select_relevant_memories(
     org_id: str,
     user_id: str,
     question: str,
-    limit: int = _MAX_MEMORIES,
+    limit: int | None = None,
 ) -> list[Memory]:
+    if limit is None:
+        limit = _recall_cfg()["max_memories"]
     semantic = _select_semantic(org_id, user_id, question, limit)
     if semantic:
         return semantic
@@ -157,7 +149,7 @@ def format_memory_block(memories: list[Memory]) -> str:
         return ""
     lines = ["## 用户长期智慧（从过往对话自动沉淀，回答时可结合使用）"]
     for m in memories:
-        label = _TYPE_LABEL.get(m.memory_type, m.memory_type)
+        label = memory_type_label(m.memory_type)
         lines.append(f"- [{label}] {m.title}：{m.content}")
     return "\n".join(lines)
 

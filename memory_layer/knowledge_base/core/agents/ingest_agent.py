@@ -13,6 +13,7 @@ from memory_layer.knowledge_base.core.compiler.wiki_merger import (
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.wiki import wiki_meta
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
+from memory_layer.knowledge_base.core.services.candidate_service import enqueue_from_ingest_compile
 from memory_layer.knowledge_base.models.entity import Entity, Relation
 
 log = get_logger("hivemind.agent.ingest")
@@ -60,11 +61,18 @@ class IngestAgent:
 
         # ── 4. Wiki 增量更新 + 图谱写入 ───────────────────────────────────────
         pages: list[str] = []
+        mirror_items: list[dict] = []
         name_to_id: dict[str, str] = {}
 
         for raw, r in zip(raw_entities, resolved):
             wiki_path = upsert_entity_page(self.wiki.root, org_id, r, source_filename)
             pages.append(wiki_path)
+            mirror_items.append({
+                "wiki_path": wiki_path,
+                "category": "entity",
+                "title": r.name,
+                "content": r.description or "",
+            })
             name_to_id[r.name] = r.entity_id
 
             conflict_rows = [
@@ -127,6 +135,12 @@ class IngestAgent:
         for wf in workflows_data.get("workflows", []):
             wf_path = upsert_workflow_page(self.wiki.root, org_id, wf, source_filename)
             pages.append(wf_path)
+            mirror_items.append({
+                "wiki_path": wf_path,
+                "category": "workflow",
+                "title": wf["name"],
+                "content": "\n".join(wf.get("steps", [])),
+            })
             wiki_meta.record_workflow_compile(
                 self.wiki.root, org_id, wf_path,
                 source_id=source_id,
@@ -138,6 +152,12 @@ class IngestAgent:
         for rule in workflows_data.get("rules", []):
             rule_path = upsert_rule_page(self.wiki.root, org_id, rule, source_filename)
             pages.append(rule_path)
+            mirror_items.append({
+                "wiki_path": rule_path,
+                "category": "rule",
+                "title": rule["name"],
+                "content": rule.get("condition", "") or rule.get("action", ""),
+            })
             wiki_meta.record_rule_compile(
                 self.wiki.root, org_id, rule_path,
                 source_id=source_id,
@@ -146,7 +166,10 @@ class IngestAgent:
                 rule=rule,
             )
 
-        # ── 7. 索引更新 ───────────────────────────────────────────────────────
+        # ── 7. 候选池 mirror（ingest 双写）────────────────────────────────────
+        enqueue_from_ingest_compile(org_id, source_id, source_filename, mirror_items)
+
+        # ── 8. 索引更新 ───────────────────────────────────────────────────────
         self.wiki.update_index(org_id)
         log.info("wiki index updated  org=%s  total_pages=%d", org_id, len(pages))
 

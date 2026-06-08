@@ -1,0 +1,60 @@
+# 记忆类型 ↔ 候选分类 ↔ Wiki 目录 统一词汇表
+
+memory_types:
+  p1: [project, preference, decision]
+  labels:
+    project: 项目
+    preference: 偏好
+    decision: 决策
+
+memory_to_category:
+  project: project
+  decision: decision
+  preference: preference
+  workflow: workflow
+  rule: rule
+  entity: entity
+  goal: product
+  fact: methodology
+
+category_to_memory:
+  decision: decision
+  project: project
+  workflow: workflow
+  rule: rule
+  entity: entity
+  preference: preference
+  product: goal
+  methodology: fact
+  other: fact
+
+# 可进 Wiki 候选池的分类（preference 仅 memory，不进池）
+wiki_categories:
+  - decision
+  - project
+  - workflow
+  - rule
+  - product
+  - methodology
+  - entity
+
+# 候选池 / 进化面板 — 分类中文标签（前端 CATEGORY_LABEL 与后端一致）
+category_labels:
+  decision: 决策
+  project: 项目
+  workflow: 流程
+  rule: 规则
+  product: 产品
+  methodology: 方法论
+  entity: 实体
+  preference: 偏好
+  other: 其它
+  general: 通用
+
+# L2 复盘 / 外部来源的别名归一化（entities → entity）
+category_aliases:
+  entities: entity
+  workflows: workflow
+  rules: rule
+  general: other
+  methodology: methodology

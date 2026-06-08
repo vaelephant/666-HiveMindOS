@@ -1,0 +1,47 @@
+# 知识库 Agent 共用 OpenAI function tools
+
+schemas:
+  - type: function
+    function:
+      name: search_wiki
+      description: 按关键词搜索 Wiki 页面，返回匹配页面列表
+      parameters:
+        type: object
+        properties:
+          query:
+            type: string
+            description: 搜索关键词，支持中文
+        required: [query]
+
+  - type: function
+    function:
+      name: read_page
+      description: 读取指定 Wiki 页面的完整内容
+      parameters:
+        type: object
+        properties:
+          path:
+            type: string
+            description: 页面路径，如 entities/中康尚德.md
+        required: [path]
+
+  - type: function
+    function:
+      name: list_entities
+      description: 列出知识图谱中的实体，可按类型筛选
+      parameters:
+        type: object
+        properties:
+          entity_type:
+            type: string
+            description: 可选。实体类型：company / person / contract / product / rule / department / customer
+
+runtime:
+  search_preview_chars: 150
+  search_max_matches: 8
+  gather_max_iterations: 6
+  history_turns: 6
+  synthesis_source_chars: 800
+  task_search_preview_chars: 200
+  query_max_pages: 30
+  query_page_chars: 2000

@@ -57,6 +57,17 @@ def main() -> int:
             conn.execute(sql)
             print(f"  OK")
 
+        # Always re-sync sequences after migrations (idempotent)
+        sys.path.insert(0, str(ROOT))
+        from memory_layer.knowledge_base.core.db.sequences import repair_serial_sequences
+
+        with psycopg.connect(url) as conn2:
+            conn2.autocommit = False
+            fixed = repair_serial_sequences(conn2)
+            conn2.commit()
+        for line in fixed:
+            print(f"  sequence  {line}")
+
     print("Done.")
     return 0
 
