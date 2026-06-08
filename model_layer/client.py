@@ -13,6 +13,31 @@ def _get_client() -> OpenAI:
 
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "gpt-4o")
 FAST_MODEL = os.environ.get("FAST_MODEL", "gpt-4o-mini")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+
+
+def embed(text: str, model: str | None = None) -> list[float]:
+    """Single-text embedding via OpenAI-compatible API."""
+    text = text.strip()
+    if not text:
+        raise ValueError("embed: empty text")
+    response = _get_client().embeddings.create(
+        model=model or EMBEDDING_MODEL,
+        input=text,
+    )
+    return response.data[0].embedding
+
+
+def embed_batch(texts: list[str], model: str | None = None) -> list[list[float]]:
+    """Batch embedding; preserves input order."""
+    cleaned = [t.strip() for t in texts]
+    if not cleaned:
+        return []
+    response = _get_client().embeddings.create(
+        model=model or EMBEDDING_MODEL,
+        input=cleaned,
+    )
+    return [row.embedding for row in sorted(response.data, key=lambda d: d.index)]
 
 
 def complete(

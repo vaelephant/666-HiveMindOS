@@ -3,7 +3,17 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Crosshair, ExternalLink, Loader2, Maximize2, Route, Search, X } from 'lucide-react';
+import {
+  Crosshair,
+  ExternalLink,
+  Loader2,
+  Maximize2,
+  Network,
+  Route,
+  Search,
+  X,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   EntityGraphCanvas,
   type EntityGraphCanvasHandle,
@@ -40,7 +50,14 @@ function typeLabel(t: string) {
 
 export default function GraphPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-shell-muted">加载图谱…</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-48 items-center justify-center rounded-2xl border border-shell-border bg-shell-panel py-16 text-[14px] text-shell-muted">
+          <Loader2 className="mr-2 size-4 animate-spin" />
+          加载图谱…
+        </div>
+      }
+    >
       <GraphPageContent />
     </Suspense>
   );
@@ -294,126 +311,149 @@ function GraphPageContent() {
   const pathSteps = pathHighlight.nodeIds.size;
 
   return (
-    <div className="flex h-[calc(100dvh-3.25rem)] min-h-0 overflow-hidden">
-      <aside className="flex w-52 shrink-0 flex-col overflow-hidden border-r border-shell-border">
-        <div className="border-b border-shell-border px-3 py-4">
-          <p className="text-[11px] font-medium tracking-wide text-shell-muted">实体列表</p>
+    <div className="flex h-[calc(100dvh-4.5rem)] min-h-[640px] w-full gap-4 py-6 md:py-8">
+      {/* 左侧实体列表 */}
+      <aside className="flex w-56 shrink-0 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel lg:w-64">
+        <div className="border-b border-shell-border px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-primary/8">
+              <Network className="size-5 text-brand-primary" strokeWidth={1.5} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium tracking-wide text-shell-muted">知识管理</p>
+              <p className="text-[14px] font-semibold text-shell-text">实体图谱</p>
+            </div>
+          </div>
           {snapshot ? (
-            <p className="mt-1 text-[10px] text-shell-muted">
+            <p className="mt-3 text-[11px] text-shell-subtext">
               {snapshot.stats.node_count} 节点 · {snapshot.stats.edge_count} 关系
             </p>
           ) : null}
           <div className="relative mt-3">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-shell-muted" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-shell-muted" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索实体…"
-              className="w-full rounded-lg border border-shell-border bg-shell-bg py-1.5 pl-8 pr-2 text-[12px] text-shell-text outline-none focus:border-brand-primary/40"
+              className="w-full rounded-lg border border-shell-border bg-shell-bg py-2 pl-9 pr-3 text-[13px] text-shell-text placeholder:text-shell-muted focus:border-brand-primary/40 focus:outline-none focus:ring-1 focus:ring-brand-primary/20"
             />
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-x-2 gap-y-1 border-b border-shell-border px-3 py-3">
-          {types.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setFilter(t)}
-              className={`rounded-md px-2 py-0.5 text-[11px] transition-colors ${
-                filter === t
-                  ? 'bg-brand-primary/10 font-medium text-brand-primary'
-                  : 'text-shell-muted hover:text-shell-subtext'
-              }`}
-            >
-              {t === 'all' ? '全部' : typeLabel(t)}
-            </button>
-          ))}
+        <div className="border-b border-shell-border p-3">
+          <div className="flex flex-wrap gap-1.5">
+            {types.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setFilter(t)}
+                className={cn(
+                  'rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                  filter === t
+                    ? 'bg-brand-primary text-brand-on-primary'
+                    : 'bg-shell-bg text-shell-muted hover:text-shell-text',
+                )}
+              >
+                {t === 'all' ? '全部' : typeLabel(t)}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-shell-subtext">{filteredList.length} 个实体</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <ul className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-2">
           {loading ? (
-            <div className="flex items-center justify-center py-10">
+            <li className="flex items-center justify-center py-10">
               <Loader2 className="size-4 animate-spin text-shell-muted" />
-            </div>
+            </li>
           ) : error ? (
-            <p className="px-3 py-6 text-[12px] text-status-error">{error}</p>
+            <li className="px-3 py-6 text-[12px] text-status-error">{error}</li>
           ) : filteredList.length === 0 ? (
-            <p className="px-3 py-6 text-[12px] text-shell-muted">无匹配实体</p>
+            <li className="rounded-xl border border-dashed border-shell-border bg-shell-bg px-3 py-8 text-center text-[13px] text-shell-muted">
+              无匹配实体
+            </li>
           ) : (
-            <ul className="divide-y divide-shell-border">
-              {filteredList.map((e) => (
-                <li key={e.id}>
-                  <button
-                    type="button"
-                    onClick={() => selectEntity(e)}
-                    className={`w-full px-3 py-3 text-left transition-colors ${
-                      selectedId === e.id
-                        ? 'bg-brand-primary/5 text-brand-primary'
-                        : 'text-shell-subtext hover:bg-shell-bg hover:text-shell-text'
-                    }`}
+            filteredList.map((e) => (
+              <li key={e.id}>
+                <button
+                  type="button"
+                  onClick={() => selectEntity(e)}
+                  className={cn(
+                    'w-full rounded-xl px-3 py-2.5 text-left transition-colors',
+                    selectedId === e.id
+                      ? 'border border-brand-primary/30 bg-brand-primary/8'
+                      : 'border border-transparent hover:border-shell-border hover:bg-shell-bg',
+                  )}
+                >
+                  <span className="text-[11px] text-shell-muted">{typeLabel(e.entity_type)}</span>
+                  <p
+                    className={cn(
+                      'mt-0.5 truncate text-[13px] font-medium',
+                      selectedId === e.id ? 'text-brand-primary' : 'text-shell-text',
+                    )}
                   >
-                    <span className="text-[10px] text-shell-muted">{typeLabel(e.entity_type)}</span>
-                    <p className="mt-0.5 truncate text-[13px] font-medium">{e.name}</p>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    {e.name}
+                  </p>
+                </button>
+              </li>
+            ))
           )}
-        </div>
+        </ul>
       </aside>
 
-      <div className="relative flex min-w-0 flex-1 flex-col border-r border-shell-border">
-        <div className="shrink-0 border-b border-shell-border">
-          <div className="flex items-center justify-between gap-3 px-3 py-2">
-            <div className="flex items-center gap-1">
+      {/* 中间图谱 */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel">
+        <div className="shrink-0 border-b border-shell-border px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5">
               {([0, 1, 2] as FocusHops[]).map((h) => (
                 <button
                   key={h}
                   type="button"
                   disabled={h > 0 && !selectedId}
                   onClick={() => setFocusHopsAndUrl(h)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                  className={cn(
+                    'rounded-full px-3 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                     focusHops === h
-                      ? 'bg-brand-primary/10 font-medium text-brand-primary'
-                      : 'text-shell-muted hover:bg-shell-bg hover:text-shell-text'
-                  }`}
+                      ? 'bg-brand-primary text-brand-on-primary'
+                      : 'bg-shell-bg text-shell-muted hover:text-shell-text',
+                  )}
                 >
                   {h === 0 ? '全图' : `${h} 跳`}
                 </button>
               ))}
             </div>
 
-            <p className="truncate text-[11px] text-shell-muted">
+            <p className="text-[12px] text-shell-muted">
               {focusHops > 0 && selectedId
                 ? `${focusLabel} · ${graphNodes.length} 节点 · ${graphEdges.length} 边`
                 : `${graphNodes.length} 节点 · ${graphEdges.length} 边`}
             </p>
 
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => graphRef.current?.fitView()}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-shell-muted hover:bg-shell-bg hover:text-shell-text"
+                className="inline-flex items-center gap-1 rounded-lg border border-shell-border bg-shell-bg px-2.5 py-1.5 text-[11px] text-shell-muted transition-colors hover:border-brand-primary/30 hover:text-shell-text"
               >
-                <Maximize2 className="size-3.5" />
+                <Maximize2 className="size-3.5" strokeWidth={1.75} />
                 适应
               </button>
               <button
                 type="button"
                 disabled={!selectedId}
                 onClick={() => graphRef.current?.centerOnSelected()}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-shell-muted hover:bg-shell-bg hover:text-shell-text disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-lg border border-shell-border bg-shell-bg px-2.5 py-1.5 text-[11px] text-shell-muted transition-colors hover:border-brand-primary/30 hover:text-shell-text disabled:opacity-40"
               >
-                <Crosshair className="size-3.5" />
+                <Crosshair className="size-3.5" strokeWidth={1.75} />
                 居中
               </button>
             </div>
           </div>
 
           {allRelationTypes.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-shell-border px-3 py-2">
-              <span className="text-[10px] text-shell-muted">关系类型</span>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-shell-border-dim pt-3">
+              <span className="text-[11px] text-shell-muted">关系类型</span>
               {allRelationTypes.map((type) => {
                 const active =
                   activeRelationTypes.size === 0 ||
@@ -424,11 +464,12 @@ function GraphPageContent() {
                     key={type}
                     type="button"
                     onClick={() => toggleRelationType(type)}
-                    className={`rounded-full px-2 py-0.5 text-[10px] transition-colors ${
+                    className={cn(
+                      'rounded-full px-2.5 py-0.5 text-[11px] transition-colors',
                       active
-                        ? 'bg-brand-primary/10 text-brand-primary'
-                        : 'bg-shell-bg text-shell-muted line-through'
-                    }`}
+                        ? 'bg-brand-primary/8 text-brand-primary'
+                        : 'bg-shell-bg text-shell-muted line-through',
+                    )}
                   >
                     {relationLabel(type)}
                   </button>
@@ -439,8 +480,8 @@ function GraphPageContent() {
         </div>
 
         {viaParam && detail ? (
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-status-warning/30 bg-status-warning/8 px-3 py-2">
-            <div className="flex min-w-0 items-center gap-2 text-[11px] text-shell-text">
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-status-warning/35 bg-status-warning/8 px-4 py-2.5">
+            <div className="flex min-w-0 items-center gap-2 text-[12px] text-shell-text">
               <Route className="size-3.5 shrink-0 text-status-warning" />
               <span className="truncate">
                 {pathSteps > 1
@@ -453,7 +494,7 @@ function GraphPageContent() {
             <button
               type="button"
               onClick={clearPathHighlight}
-              className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[10px] text-shell-muted hover:bg-shell-bg"
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-shell-border bg-shell-panel px-2 py-1 text-[11px] text-shell-muted transition-colors hover:text-shell-text"
             >
               <X className="size-3" />
               清除
@@ -461,10 +502,11 @@ function GraphPageContent() {
           </div>
         ) : null}
 
-        <div className="relative min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-b-2xl">
           {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <Loader2 className="size-5 animate-spin text-shell-muted" />
+            <div className="flex h-full items-center justify-center gap-2 text-shell-muted">
+              <Loader2 className="size-5 animate-spin" />
+              <span className="text-[14px]">加载图谱…</span>
             </div>
           ) : (
             <EntityGraphCanvas
@@ -485,36 +527,37 @@ function GraphPageContent() {
         </div>
       </div>
 
-      <aside className="flex w-72 shrink-0 flex-col overflow-y-auto">
+      {/* 右侧详情 */}
+      <aside className="flex w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel lg:w-80">
         {loadingDetail ? (
-          <div className="flex items-center gap-2 p-6 text-shell-muted">
+          <div className="flex items-center justify-center gap-2 p-8 text-shell-muted">
             <Loader2 className="size-4 animate-spin" />
             <span className="text-[13px]">加载详情…</span>
           </div>
         ) : detail ? (
-          <div className="space-y-6 p-5">
-            <header>
-              <p className="text-[11px] text-shell-muted">{typeLabel(detail.entity.entity_type)}</p>
-              <h1 className="mt-1 text-[18px] font-semibold tracking-tight text-shell-text">
+          <div className="custom-scrollbar space-y-5 overflow-y-auto p-5">
+            <header className="border-b border-shell-border-dim pb-4">
+              <span className="rounded-full bg-brand-primary/8 px-2.5 py-0.5 text-[11px] font-medium text-brand-primary">
+                {typeLabel(detail.entity.entity_type)}
+              </span>
+              <h1 className="mt-2 text-[18px] font-semibold tracking-tight text-shell-text">
                 {detail.entity.name}
               </h1>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {wikiUrl ? (
-                  <Link
-                    href={wikiUrl}
-                    className="inline-flex items-center gap-1.5 text-[12px] text-brand-primary hover:underline"
-                  >
-                    Wiki 编译页
-                    <ExternalLink className="size-3" />
-                  </Link>
-                ) : null}
-              </div>
+              {wikiUrl ? (
+                <Link
+                  href={wikiUrl}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-bg px-3 py-1.5 text-[12px] font-medium text-brand-primary transition-colors hover:border-brand-primary/30 hover:bg-brand-primary/5"
+                >
+                  Wiki 编译页
+                  <ExternalLink className="size-3.5" strokeWidth={1.75} />
+                </Link>
+              ) : null}
             </header>
 
             {Object.keys(detail.entity.attributes).length > 0 && (
               <section>
-                <p className="text-[10px] font-medium tracking-wide text-shell-muted">属性</p>
-                <dl className="mt-2 space-y-2">
+                <p className="text-[12px] font-medium text-shell-muted">属性</p>
+                <dl className="mt-2 space-y-2 rounded-xl border border-shell-border bg-shell-bg p-3">
                   {Object.entries(detail.entity.attributes).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-3 text-[12px]">
                       <dt className="text-shell-muted">{k}</dt>
@@ -527,7 +570,7 @@ function GraphPageContent() {
 
             {(detail.relations?.length ?? 0) > 0 ? (
               <section>
-                <p className="text-[10px] font-medium tracking-wide text-shell-muted">
+                <p className="text-[12px] font-medium text-shell-muted">
                   关系 · {detail.relations!.length}
                 </p>
                 <ul className="mt-2 space-y-2">
@@ -539,11 +582,12 @@ function GraphPageContent() {
                     return (
                       <li
                         key={rel.id}
-                        className={`rounded-lg border px-3 py-2 text-[12px] ${
+                        className={cn(
+                          'rounded-xl border px-3 py-2.5 text-[12px]',
                           isPathTarget
                             ? 'border-status-warning/40 bg-status-warning/8'
-                            : 'border-shell-border'
-                        }`}
+                            : 'border-shell-border bg-shell-bg',
+                        )}
                       >
                         <p className="font-medium text-shell-text">
                           {rel.direction === 'outgoing' ? '→' : '←'} {rel.neighbor_name}
@@ -558,19 +602,22 @@ function GraphPageContent() {
                               const neighbor = entities.find((e) => e.name === rel.neighbor_name);
                               if (neighbor) selectEntity(neighbor);
                             }}
-                            className="text-brand-primary hover:underline"
+                            className="rounded-md px-1.5 py-0.5 text-brand-primary hover:bg-brand-primary/8"
                           >
                             聚焦
                           </button>
                           <button
                             type="button"
                             onClick={() => highlightPathTo(rel.neighbor_name)}
-                            className="text-status-warning hover:underline"
+                            className="rounded-md px-1.5 py-0.5 text-status-warning hover:bg-status-warning/10"
                           >
                             路径
                           </button>
                           {neighborWiki ? (
-                            <Link href={neighborWiki} className="text-shell-muted hover:underline">
+                            <Link
+                              href={neighborWiki}
+                              className="rounded-md px-1.5 py-0.5 text-shell-muted hover:bg-shell-bg hover:text-shell-text"
+                            >
                               Wiki
                             </Link>
                           ) : null}
@@ -582,7 +629,7 @@ function GraphPageContent() {
               </section>
             ) : detail.neighbors.length > 0 ? (
               <section>
-                <p className="text-[10px] font-medium tracking-wide text-shell-muted">
+                <p className="text-[12px] font-medium text-shell-muted">
                   关联实体 · {detail.neighbors.length}
                 </p>
                 <ul className="mt-2 space-y-1">
@@ -591,9 +638,9 @@ function GraphPageContent() {
                       <button
                         type="button"
                         onClick={() => selectEntity(n)}
-                        className="w-full rounded-lg px-2 py-2 text-left text-[12px] hover:bg-shell-bg"
+                        className="w-full rounded-xl border border-shell-border bg-shell-bg px-3 py-2 text-left text-[12px] transition-colors hover:border-brand-primary/30 hover:bg-brand-primary/5"
                       >
-                        <span className="text-shell-text">{n.name}</span>
+                        <span className="font-medium text-shell-text">{n.name}</span>
                         <span className="ml-2 text-shell-muted">{typeLabel(n.entity_type)}</span>
                       </button>
                     </li>
@@ -603,11 +650,20 @@ function GraphPageContent() {
             ) : null}
           </div>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <p className="text-[14px] text-shell-muted">点击图谱节点或左侧列表</p>
-            <p className="mt-2 text-[12px] text-shell-muted">
-              Wiki 页可带 ?via= 跳转并高亮路径
+          <div className="flex h-full flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="flex size-12 items-center justify-center rounded-xl bg-brand-primary/8">
+              <Network className="size-6 text-brand-primary" strokeWidth={1.5} />
+            </div>
+            <p className="mt-4 text-[14px] font-medium text-shell-text">选择实体查看详情</p>
+            <p className="mt-1 text-[12px] text-shell-muted">
+              点击图谱节点或左侧列表
             </p>
+            <Link
+              href="/knowledge-base/overview"
+              className="mt-4 text-[12px] font-medium text-brand-primary hover:underline"
+            >
+              返回知识管理概览
+            </Link>
           </div>
         )}
       </aside>

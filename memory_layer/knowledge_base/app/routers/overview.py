@@ -4,12 +4,16 @@ from fastapi import APIRouter
 
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRegistry
+from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
+from memory_layer.knowledge_base.core.registry.memory_registry import MemoryRegistry
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 
 router = APIRouter()
 
 _registry = SourceRegistry(config.REGISTRY_DB)
+_chat = ChatRegistry()
+_memory = MemoryRegistry()
 
 
 @router.get("/orgs/{org_id}/overview")
@@ -23,17 +27,24 @@ def get_overview(org_id: str):
         if _parse_dt(s.created_at) >= week_ago
     )
 
-    # ── 实体统计 ──────────────────────────────────────────────────────
+    # ── 实体 / Wiki ──────────────────────────────────────────────────────
     graph = MemoryGraph(config.GRAPH_ROOT / org_id / "graph.db")
     entity_count = len(graph.list_entities(org_id))
-
-    # ── Wiki 页数 ──────────────────────────────────────────────────────
     wiki = WikiManager(config.WIKI_ROOT)
     wiki_page_count = len(wiki.list_pages(org_id))
 
-    # ── 近期动态（最近 10 条，已编译完成或出错的） ──────────────────────
-    recent = [
+    # ── 对话统计 ──────────────────────────────────────────────────────
+    chat_stats = _chat.get_org_stats(org_id)
+    recent_chats = _chat.list_sessions(org_id, limit=5)
+
+    # ── 智慧统计 ──────────────────────────────────────────────────────
+    memory_stats = _memory.get_stats(org_id)
+    recent_memory_events = _memory.list_events(org_id, limit=5)
+
+    # ── 近期动态（资料编译 + 对话 + 智慧进化，按时间合并） ───────────────
+    source_activity = [
         {
+            "kind": "source",
             "created_at": s.created_at,
             "filename": s.filename,
             "status": s.status,
@@ -44,6 +55,30 @@ def get_overview(org_id: str):
         for s in sources[:10]
         if s.status in ("done", "error", "compiling", "uploaded")
     ]
+    chat_activity = [
+        {
+            "kind": "chat",
+            "created_at": c.updated_at,
+            "session_id": c.id,
+            "title": c.title or "新对话",
+        }
+        for c in recent_chats
+    ]
+    memory_activity = [
+        {
+            "kind": "memory",
+            "created_at": e.created_at,
+            "event_type": e.event_type,
+            "memory_title": e.memory_title,
+            "memory_type": e.memory_type,
+        }
+        for e in recent_memory_events
+    ]
+    recent_activity = sorted(
+        source_activity + chat_activity + memory_activity,
+        key=lambda x: _parse_dt(x["created_at"]),
+        reverse=True,
+    )[:12]
 
     return {
         "stats": {
@@ -51,8 +86,13 @@ def get_overview(org_id: str):
             "source_count_week": source_count_week,
             "entity_count": entity_count,
             "wiki_page_count": wiki_page_count,
+            "chat_session_count": chat_stats["session_count"],
+            "chat_message_count": chat_stats["message_count"],
+            "chat_sessions_week": chat_stats["sessions_week"],
+            "memory_count": memory_stats.total,
+            "memories_week": memory_stats.memories_this_week,
         },
-        "recent_activity": recent,
+        "recent_activity": recent_activity,
     }
 
 

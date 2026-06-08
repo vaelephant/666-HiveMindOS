@@ -340,7 +340,7 @@ export default function IngestPage() {
 
       <header className="flex flex-wrap items-end justify-between gap-6 py-8">
         <div>
-          <p className="text-[11px] font-medium tracking-wide text-shell-muted">知识库 / 原始资料</p>
+          <p className="text-[11px] font-medium tracking-wide text-shell-muted">知识管理 / 原始资料</p>
           <h1 className="mt-2 text-[26px] font-semibold tracking-tight text-shell-text">资料库</h1>
           <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-shell-muted">
             企业文档存放于 <code className="rounded bg-shell-bg px-1.5 py-0.5 font-mono text-[11px] text-shell-subtext">storage/raw</code>，编译后写入 Wiki 与知识图谱

@@ -1,8 +1,14 @@
 import type {
   AgentTask,
+  ChatSendResponse,
+  ChatSession,
+  ChatSessionSummary,
   EntityDetail,
   GraphSnapshot,
   IngestResult,
+  MemoryEventRecord,
+  MemoryRecord,
+  MemoryStats,
   OverviewData,
   QueryResult,
   SourceRecord,
@@ -134,4 +140,58 @@ export async function getEntityDetail(
 
 export async function getGraphSnapshot(orgId = DEFAULT_ORG): Promise<GraphSnapshot> {
   return req(`${base(orgId)}/graph/snapshot`);
+}
+
+export async function listChatSessions(orgId = DEFAULT_ORG): Promise<ChatSessionSummary[]> {
+  const data = await req<{ sessions: ChatSessionSummary[] }>(`${base(orgId)}/chat/sessions`);
+  return data.sessions;
+}
+
+export async function getChatSession(sessionId: string, orgId = DEFAULT_ORG): Promise<ChatSession> {
+  return req(`${base(orgId)}/chat/sessions/${sessionId}`);
+}
+
+export async function deleteChatSession(sessionId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/chat/sessions/${sessionId}`, { method: 'DELETE' });
+}
+
+export async function listMemories(orgId = DEFAULT_ORG): Promise<MemoryRecord[]> {
+  const data = await req<{ memories: MemoryRecord[] }>(`${base(orgId)}/memories`);
+  return data.memories;
+}
+
+export async function listMemoryEvents(
+  orgId = DEFAULT_ORG,
+  limit = 50,
+): Promise<MemoryEventRecord[]> {
+  const url = new URL(`${base(orgId)}/memories/events`, window.location.origin);
+  url.searchParams.set('limit', String(limit));
+  const data = await req<{ events: MemoryEventRecord[] }>(url.toString());
+  return data.events;
+}
+
+export async function getMemoryStats(orgId = DEFAULT_ORG): Promise<MemoryStats> {
+  const data = await req<{ stats: MemoryStats }>(`${base(orgId)}/memories/stats`);
+  return data.stats;
+}
+
+export async function syncMemoryVectors(orgId = DEFAULT_ORG): Promise<{
+  synced: number;
+  total: number;
+  available: boolean;
+}> {
+  return req(`${base(orgId)}/memories/sync-vectors`, { method: 'POST' });
+}
+
+/** 发送消息 — 历史由 FastAPI 从 PostgreSQL 加载，前端无需传 history */
+export async function sendChatMessage(
+  message: string,
+  sessionId?: string | null,
+  orgId = DEFAULT_ORG,
+): Promise<ChatSendResponse> {
+  return req(`${base(orgId)}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
+  });
 }

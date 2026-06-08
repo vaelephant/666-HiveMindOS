@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { resolveWikiMarkdownLink } from '@/lib/wiki-links';
 
 type Block =
   | { type: 'h2'; text: string; id: string }
@@ -26,7 +27,7 @@ function inlineFormat(text: string) {
     }
     const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
-      const href = link[2].startsWith('../') ? '/knowledge-base/wiki' : link[2];
+      const href = resolveWikiMarkdownLink(link[2]);
       return (
         <Link
           key={i}

@@ -2,17 +2,20 @@ import Link from 'next/link';
 import {
   Activity,
   ArrowRight,
+  Bot,
   Box,
   ClipboardList,
   Database,
   GraduationCap,
   LayoutDashboard,
+  MessageSquare,
   Network,
   Rocket,
   Sparkles,
   Tags,
   Wrench,
 } from 'lucide-react';
+import { HIVEMIND_HOME_PATH } from '@/config/navigation';
 import { IPFS_MONITOR_BASE_PATH } from '@/config/ipfs-monitor';
 import PlatformHomeFlowAnimation from '@/components/platform/PlatformHomeFlowAnimation';
 
@@ -30,6 +33,8 @@ const QUICK_LINKS: {
   icon: typeof Wrench;
   factory: string;
 }[] = [
+  { href: HIVEMIND_HOME_PATH, label: 'Chat', desc: '企业知识问答，答案带出处', icon: MessageSquare, factory: 'HiveMind' },
+  { href: '/knowledge-base/tasks', label: 'Agent', desc: '多步骤分析与报告', icon: Bot, factory: 'HiveMind' },
   { href: '/data/workshop', label: '数据工坊', desc: '清洗、转换与特征', icon: Wrench, factory: '数据工厂' },
   { href: '/data/center', label: '数据中心', desc: '资产目录与血缘', icon: Database, factory: '数据工厂' },
   { href: '/annotation/overview', label: '标注中心', desc: '场景、项目与任务', icon: Tags, factory: '数据工厂' },

@@ -755,8 +755,9 @@ export const EntityGraphCanvas = forwardRef<EntityGraphCanvasHandle, Props>(
 
     if (nodes.length === 0) {
       return (
-        <div className="flex h-full items-center justify-center text-[14px] text-shell-muted">
-          暂无图谱数据
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-[14px] text-shell-muted">
+          <p>暂无图谱数据</p>
+          <p className="text-[12px] text-shell-subtext">上传资料并完成编译后，实体将出现在此</p>
         </div>
       );
     }
@@ -765,7 +766,7 @@ export const EntityGraphCanvas = forwardRef<EntityGraphCanvasHandle, Props>(
       return (
         <div
           ref={containerRef}
-          className="relative h-full min-h-0 w-full overflow-hidden bg-shell-bg/40"
+          className="relative h-full min-h-0 w-full overflow-hidden bg-shell-bg"
         />
       );
     }
@@ -773,7 +774,7 @@ export const EntityGraphCanvas = forwardRef<EntityGraphCanvasHandle, Props>(
     return (
       <div
         ref={containerRef}
-        className="relative h-full min-h-0 w-full overflow-hidden bg-shell-bg/40"
+        className="relative h-full min-h-0 w-full overflow-hidden bg-shell-bg"
       >
         <canvas
           ref={canvasRef}
@@ -786,7 +787,7 @@ export const EntityGraphCanvas = forwardRef<EntityGraphCanvasHandle, Props>(
           onClick={onClick}
         />
 
-        <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 rounded-lg border border-shell-border bg-shell-surface/90 px-3 py-2">
+        <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 rounded-lg border border-shell-border bg-shell-panel/95 px-3 py-2 shadow-sm backdrop-blur-sm">
           {Object.entries(TYPE_COLOR).slice(0, 6).map(([type, color]) => (
             <span key={type} className="flex items-center gap-1 text-[10px] text-shell-muted">
               <span className="inline-block size-2 rounded-full" style={{ background: color }} />
@@ -796,12 +797,12 @@ export const EntityGraphCanvas = forwardRef<EntityGraphCanvasHandle, Props>(
         </div>
 
         {visibleRelationTypes.length > 0 ? (
-          <div className="pointer-events-none absolute bottom-3 right-3 max-w-[40%] truncate rounded-lg border border-shell-border bg-shell-surface/90 px-3 py-2 text-[10px] text-shell-muted">
+          <div className="pointer-events-none absolute bottom-3 right-3 max-w-[40%] truncate rounded-lg border border-shell-border bg-shell-panel/95 px-3 py-2 text-[10px] text-shell-muted shadow-sm backdrop-blur-sm">
             关系 · {visibleRelationTypes.join(' · ')}
           </div>
         ) : null}
 
-        <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-shell-border bg-shell-surface/90 px-3 py-1.5 text-[10px] text-shell-muted">
+        <div className="pointer-events-none absolute left-3 top-3 rounded-lg border border-shell-border bg-shell-panel/95 px-3 py-1.5 text-[10px] text-shell-muted shadow-sm backdrop-blur-sm">
           滚轮缩放 · 拖拽平移 · 点击空白取消选中
           {(pathEdgeIds?.size ?? 0) > 0 ? ' · 路径动画进行中' : ''}
           {nodes.length > LABEL_THRESHOLD ? ' · 大图仅显示选中/邻居标签' : ''}

@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from memory_layer.knowledge_base.app.logging_config import setup_logging, get_logger
-from memory_layer.knowledge_base.app.routers import ingest, overview, query, tasks, wiki
+from memory_layer.knowledge_base.app.routers import chat, ingest, memories, overview, query, tasks, wiki
 from memory_layer.knowledge_base import config
+from memory_layer.knowledge_base.core.db.postgres import close_pool
 
 
 @asynccontextmanager
@@ -21,12 +22,15 @@ async def lifespan(_app: FastAPI):
     log.info("storage      = %s", config.STORAGE_ROOT)
     log.info("wiki         = %s", config.WIKI_ROOT)
     log.info("registry_db  = %s", config.REGISTRY_DB)
+    db_host = config.DATABASE_URL.split("@")[-1] if "@" in config.DATABASE_URL else config.DATABASE_URL
+    log.info("postgres     = %s", db_host)
     log.info("openai_key   = %s", "✓ set" if config.OPENAI_API_KEY else "✗ missing — AI calls will fail")
     log.info("log_dir      = %s", config.LOG_DIR)
     log.info("━" * 50)
 
     yield
 
+    close_pool()
     log.info("Knowledge Base server shutting down.")
 
 
@@ -39,6 +43,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(chat.router,     prefix="/api/v1", tags=["chat"])
+app.include_router(memories.router, prefix="/api/v1", tags=["memories"])
 app.include_router(ingest.router,   prefix="/api/v1", tags=["ingest"])
 app.include_router(overview.router, prefix="/api/v1", tags=["overview"])
 app.include_router(query.router,    prefix="/api/v1", tags=["query"])

@@ -187,9 +187,15 @@ export type OverviewStats = {
   source_count_week: number;
   entity_count: number;
   wiki_page_count: number;
+  chat_session_count: number;
+  chat_message_count: number;
+  chat_sessions_week: number;
+  memory_count: number;
+  memories_week: number;
 };
 
-export type ActivityRecord = {
+export type SourceActivityRecord = {
+  kind: 'source';
   created_at: string;
   filename: string;
   status: 'uploaded' | 'compiling' | 'done' | 'error';
@@ -197,6 +203,26 @@ export type ActivityRecord = {
   wiki_pages_created: number;
   error: string | null;
 };
+
+export type ChatActivityRecord = {
+  kind: 'chat';
+  created_at: string;
+  session_id: string;
+  title: string;
+};
+
+export type MemoryActivityRecord = {
+  kind: 'memory';
+  created_at: string;
+  event_type: string;
+  memory_title: string;
+  memory_type: string;
+};
+
+export type ActivityRecord = SourceActivityRecord | ChatActivityRecord | MemoryActivityRecord;
+
+/** @deprecated Use ActivityRecord */
+export type LegacyActivityRecord = SourceActivityRecord;
 
 export type OverviewData = {
   stats: OverviewStats;
@@ -235,6 +261,96 @@ export type GraphSnapshotEdge = {
   target_name: string;
   relation_type: string;
   weight: number;
+};
+
+export type ChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
+export type ChatSource = {
+  path: string;
+  name: string;
+  excerpt: string;
+};
+
+export type MemoryType = 'project' | 'preference' | 'decision';
+
+export type MemoryUsed = {
+  id: number;
+  memory_type: MemoryType;
+  title: string;
+  content: string;
+  importance: number;
+};
+
+export type ChatTurn = {
+  question: string;
+  answer: string;
+  sources: ChatSource[];
+  follow_ups: string[];
+  memories_used?: MemoryUsed[];
+};
+
+export type ChatSessionSummary = {
+  id: string;
+  org_id: string;
+  user_id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ChatSession = ChatSessionSummary & {
+  turns: ChatTurn[];
+};
+
+export type ChatSendResponse = {
+  session_id: string;
+  answer: string;
+  sources: ChatSource[];
+  follow_ups: string[];
+  memories_used?: MemoryUsed[];
+  turn: ChatTurn;
+};
+
+export type MemoryRecord = {
+  id: number;
+  org_id: string;
+  user_id: string | null;
+  memory_type: MemoryType;
+  title: string;
+  content: string;
+  importance: number;
+  status: string;
+  source_type: string | null;
+  source_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemoryEventRecord = {
+  id: number;
+  memory_id: number;
+  org_id: string;
+  event_type: 'created' | 'updated' | 'merged' | 'conflict' | 'archived' | 'deleted' | 'decayed' | 'accessed';
+  old_content: string | null;
+  new_content: string | null;
+  created_at: string;
+  memory_title: string;
+  memory_type: MemoryType;
+  source_id: string | null;
+};
+
+export type MemoryStats = {
+  total: number;
+  project: number;
+  preference: number;
+  decision: number;
+  events_this_week: number;
+  memories_this_week: number;
+  vector_indexed?: number;
 };
 
 export type GraphSnapshot = {

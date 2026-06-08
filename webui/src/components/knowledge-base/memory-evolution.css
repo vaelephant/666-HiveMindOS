@@ -1,0 +1,143 @@
+/* Uiverse — andrew-manzyk brain loader (智慧进化页头) */
+
+.brain-loader-host {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.brain-loader {
+  /* HiveMind brand tokens — globals.css */
+  --color-one: color-mix(in srgb, var(--color-auth-accent-soft) 72%, transparent);
+  --color-two: color-mix(in srgb, var(--color-brand-dim) 58%, transparent);
+  --color-three: var(--color-brand-glow);
+  --color-four: color-mix(in srgb, var(--color-brand-dim) 40%, transparent);
+  --color-five: color-mix(in srgb, var(--color-brand-primary) 24%, transparent);
+  --time-animation: 2.5s; /* 动画时间 */  
+  --size: 0.8;
+  position: relative;
+  border-radius: 50%;
+  transform: scale(var(--size));
+  box-shadow:
+    0 0 20px 0 var(--color-three),
+    0 14px 36px 0 var(--color-four);
+  animation: brain-glow-pulse calc(var(--time-animation) * 3) ease-in-out infinite;
+}
+
+.brain-loader::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border-top: solid 1px var(--color-one);
+  border-bottom: solid 1px var(--color-two);
+  background: linear-gradient(180deg, var(--color-five), var(--color-four));
+  box-shadow:
+    inset 0 9px 9px 0 var(--color-three),
+    inset 0 -9px 9px 0 var(--color-four);
+}
+
+.brain-loader-box {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(180deg, var(--color-one) 28%, var(--color-two) 72%);
+  opacity: 0.97;
+}
+
+.brain-loader svg {
+  position: absolute;
+}
+
+.brain-loader svg #wisdom-brain-clipping {
+  filter: contrast(10);
+  animation: brain-roundness calc(var(--time-animation) / 2) linear infinite;
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon {
+  filter: blur(7px);
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(1) {
+  transform-origin: 75% 25%;
+  transform: rotate(90deg);
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(2) {
+  transform-origin: 50% 50%;
+  animation: brain-rotation var(--time-animation) linear infinite reverse;
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(3) {
+  transform-origin: 50% 60%;
+  animation: brain-rotation var(--time-animation) linear infinite;
+  animation-delay: calc(var(--time-animation) / -3);
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(4) {
+  transform-origin: 40% 40%;
+  animation: brain-rotation var(--time-animation) linear infinite reverse;
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(5) {
+  transform-origin: 40% 40%;
+  animation: brain-rotation var(--time-animation) linear infinite reverse;
+  animation-delay: calc(var(--time-animation) / -2);
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(6) {
+  transform-origin: 60% 40%;
+  animation: brain-rotation var(--time-animation) linear infinite;
+}
+
+.brain-loader svg #wisdom-brain-clipping polygon:nth-child(7) {
+  transform-origin: 60% 40%;
+  animation: brain-rotation var(--time-animation) linear infinite;
+  animation-delay: calc(var(--time-animation) / -1.5);
+}
+
+@keyframes brain-rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes brain-roundness {
+  0% {
+    filter: contrast(10);
+  }
+  20% {
+    filter: contrast(3.5);
+  }
+  40% {
+    filter: contrast(3.5);
+  }
+  60% {
+    filter: contrast(10);
+  }
+  100% {
+    filter: contrast(10);
+  }
+}
+
+@keyframes brain-glow-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px 0 var(--color-three),
+      0 14px 36px 0 var(--color-four);
+  }
+  50% {
+    box-shadow:
+      0 0 28px 0 color-mix(in srgb, var(--color-brand-primary) 30%, transparent),
+      0 14px 36px 0 var(--color-four);
+  }
+}

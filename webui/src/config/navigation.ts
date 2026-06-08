@@ -3,7 +3,9 @@ import { IPFS_MONITOR_BASE_PATH } from '@/config/ipfs-monitor';
 import {
   BookOpen,
   Bot,
+  Brain,
   Box,
+  Library,
   ClipboardList,
   Container,
   Database,
@@ -40,11 +42,13 @@ export type PrimaryNavKey =
   | 'home'
   // HiveMind 核心模块
   | 'agent_tasks'
+  | 'chat'
+  | 'memories'
   | 'workflows'
   | 'tools'
   | 'audit'
   | 'human_review'
-  // 知识库
+  // 知识管理
   | 'knowledge_base'
   // 原有模块
   | 'data_workshop'
@@ -78,7 +82,6 @@ export type KnowledgeBaseNavKey =
   | 'kb_overview'
   | 'kb_ingest'
   | 'kb_wiki'
-  | 'kb_query'
   | 'kb_graph';
 
 export type KnowledgeBaseChild = {
@@ -156,11 +159,13 @@ export function isIpfsMonitorChildActive(child: IpfsMonitorChild, pathname: stri
 
 export const KB_BASE_PATH = '/knowledge-base' as const;
 
+/** HiveMind 模块默认着陆页 */
+export const HIVEMIND_HOME_PATH = '/chat' as const;
+
 export const KNOWLEDGE_BASE_CHILDREN: KnowledgeBaseChild[] = [
   { navKey: 'kb_overview', label: '概览',      href: `${KB_BASE_PATH}/overview`, icon: LayoutDashboard },
   { navKey: 'kb_ingest',   label: '上传资料',  href: `${KB_BASE_PATH}/ingest`,   icon: Upload },
   { navKey: 'kb_wiki',     label: 'Wiki 浏览', href: `${KB_BASE_PATH}/wiki`,     icon: BookOpen },
-  { navKey: 'kb_query',    label: '知识问答',  href: `${KB_BASE_PATH}/query`,    icon: MessageSquare },
   { navKey: 'kb_graph',    label: '实体图谱',  href: `${KB_BASE_PATH}/graph`,    icon: Network },
 ];
 
@@ -169,17 +174,19 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   { navKey: 'home', label: '首页', href: PLATFORM_HOME_PATH, icon: Home, factory: 'platform' },
 
   // ── HiveMind 核心模块 ────────────────────────────────────────────────────
-  { navKey: 'agent_tasks',  label: 'Agent 任务', href: '/knowledge-base/tasks', icon: Bot,        factory: 'hivemind' },
+  { navKey: 'chat',         label: 'Chat',       href: HIVEMIND_HOME_PATH,      icon: MessageSquare, factory: 'hivemind' },
+  { navKey: 'memories',     label: '智慧进化',   href: '/memories',             icon: Brain,         factory: 'hivemind' },
+  { navKey: 'agent_tasks',  label: 'Agent',      href: '/knowledge-base/tasks', icon: Bot,           factory: 'hivemind' },
   { navKey: 'workflows',    label: '工作流',     href: '/workflows',            icon: GitBranch,  factory: 'hivemind' },
   { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
   { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
   { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
 
-  // ── 知识库 ───────────────────────────────────────────────────────────────
+  // ── 知识管理（Chat / Agent 的 grounding 层）────────────────────────────────
   {
     navKey: 'knowledge_base',
-    label: '知识库',
-    icon: Database,
+    label: '知识管理',
+    icon: Library,
     factory: 'hivemind',
     children: KNOWLEDGE_BASE_CHILDREN,
   },
@@ -245,6 +252,8 @@ export function isPlatformPathAllowed(segments: string[] | undefined): boolean {
   if (path.startsWith('/tools/')) return true;
   if (path.startsWith('/audit/')) return true;
   if (path.startsWith('/human-review/')) return true;
+  if (path === HIVEMIND_HOME_PATH || path === '/hivemind') return true;
+  if (path === '/memories') return true;
   return false;
 }
 
@@ -272,9 +281,12 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/analytics`)) return '分析';
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/settings`)) return '设置';
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/`)) return 'IPFS 监控';
+  if (path === HIVEMIND_HOME_PATH) return 'Chat';
+  if (path === '/memories') return '智慧进化';
   if (path.startsWith('/workflows/')) return '工作流';
   if (path.startsWith('/tools/')) return '工具箱';
   if (path.startsWith('/audit/')) return '审计日志';
   if (path.startsWith('/human-review/')) return '人工审核';
+  if (path.startsWith('/knowledge-base/tasks')) return 'Agent';
   return '页面';
 }

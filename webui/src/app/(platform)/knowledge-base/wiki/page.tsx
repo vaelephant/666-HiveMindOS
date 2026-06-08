@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, Loader2, Search } from 'lucide-react';
+import { BookOpen, ChevronRight, Loader2, Search } from 'lucide-react';
 import {
   WIKI_DETAIL_SECTIONS,
   WikiCompilationView,
 } from '@/components/knowledge-base/wiki-compilation-view';
 import { getWikiPage, listWikiCategories, listWikiPages, migrateWiki } from '@/lib/kb-api';
 import type { WikiCategory, WikiPage, WikiPageDetail } from '@/lib/kb-types';
+import { cn } from '@/lib/utils';
 
 const KIND_BADGE: Record<string, string> = {
   entity: '实体',
@@ -31,14 +32,22 @@ function PageListItem({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full rounded-xl px-3 py-2.5 text-left transition-all ${
+      className={cn(
+        'w-full rounded-xl px-3 py-2.5 text-left transition-colors',
         selected
-          ? 'border border-brand-primary/25 bg-brand-primary/8 shadow-sm'
-          : 'border border-transparent hover:border-shell-border hover:bg-shell-bg'
-      }`}
+          ? 'border border-brand-primary/30 bg-brand-primary/8'
+          : 'border border-transparent hover:border-shell-border hover:bg-shell-bg',
+      )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="truncate text-[13px] font-medium text-shell-text">{page.name}</p>
+        <p
+          className={cn(
+            'truncate text-[13px] font-medium',
+            selected ? 'text-brand-primary' : 'text-shell-text',
+          )}
+        >
+          {page.name}
+        </p>
         {page.has_conflicts ? (
           <span className="shrink-0 rounded-full bg-status-warning/15 px-1.5 py-0.5 text-[10px] text-status-warning">
             冲突
@@ -48,7 +57,6 @@ function PageListItem({
       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-shell-muted">
         <span>{KIND_BADGE[page.kind ?? ''] ?? page.category}</span>
         {(page.source_count ?? 0) > 0 ? <span>{page.source_count} 来源</span> : null}
-        {page.updated_at ? <span>{page.updated_at}</span> : null}
       </div>
     </button>
   );
@@ -176,16 +184,17 @@ function WikiPageContent() {
   }
 
   return (
-    <div className="flex min-h-[calc(100dvh-3.25rem)] gap-4 pb-6">
-      <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel shadow-sm lg:w-72">
+    <div className="flex w-full gap-4 py-6 md:py-8">
+      {/* 左侧导航 */}
+      <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel lg:w-72">
         <div className="border-b border-shell-border px-4 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-brand-primary/10">
-              <BookOpen className="size-4 text-brand-primary" strokeWidth={1.75} />
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-primary/8">
+              <BookOpen className="size-5 text-brand-primary" strokeWidth={1.5} />
             </div>
-            <div>
-              <p className="text-[13px] font-semibold text-shell-text">Wiki 浏览</p>
-              <p className="text-[11px] text-shell-muted">AI 编译知识结果</p>
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium tracking-wide text-shell-muted">知识管理</p>
+              <p className="text-[14px] font-semibold text-shell-text">Wiki 浏览</p>
             </div>
           </div>
         </div>
@@ -208,17 +217,18 @@ function WikiPageContent() {
                     key={c.key}
                     type="button"
                     onClick={() => selectCategory(c.key)}
-                    className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                    className={cn(
+                      'rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
                       category === c.key
-                        ? 'bg-brand-primary text-brand-on-primary shadow-sm'
-                        : 'bg-shell-bg text-shell-muted hover:text-shell-text'
-                    }`}
+                        ? 'bg-brand-primary text-brand-on-primary'
+                        : 'bg-shell-bg text-shell-muted hover:text-shell-text',
+                    )}
                   >
                     {c.label}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-shell-muted">
+              <p className="mt-2.5 text-[11px] leading-relaxed text-shell-muted">
                 {activeCategory?.description || `${activeCategory?.page_count ?? 0} 篇`}
               </p>
             </>
@@ -226,16 +236,16 @@ function WikiPageContent() {
         </div>
 
         <div className="border-b border-shell-border p-3">
-          <div className="flex items-center gap-2 rounded-lg border border-shell-border bg-shell-bg px-3 py-2">
-            <Search className="size-3.5 shrink-0 text-shell-muted" strokeWidth={1.5} />
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-shell-muted" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="搜索页面…"
-              className="w-full bg-transparent text-[13px] text-shell-text outline-none placeholder:text-shell-muted"
+              className="w-full rounded-lg border border-shell-border bg-shell-bg py-2 pl-9 pr-3 text-[13px] text-shell-text placeholder:text-shell-muted focus:border-brand-primary/40 focus:outline-none focus:ring-1 focus:ring-brand-primary/20"
             />
           </div>
-          <p className="mt-2 text-[11px] text-shell-muted">
+          <p className="mt-2 text-[11px] text-shell-subtext">
             {filteredPages.length} 篇 · {activeCategory?.label ?? '未选择分类'}
           </p>
         </div>
@@ -248,7 +258,7 @@ function WikiPageContent() {
           ) : pagesError ? (
             <li className="px-3 py-6 text-[12px] text-status-error">{pagesError}</li>
           ) : filteredPages.length === 0 ? (
-            <li className="rounded-xl bg-shell-bg px-3 py-8 text-center text-[13px] text-shell-muted">
+            <li className="rounded-xl border border-dashed border-shell-border bg-shell-bg px-3 py-8 text-center text-[13px] text-shell-muted">
               {pages.length === 0 ? '该分类暂无页面' : '无匹配页面'}
             </li>
           ) : (
@@ -265,50 +275,58 @@ function WikiPageContent() {
         </ul>
       </aside>
 
+      {/* 主内容 */}
       <div className="flex min-w-0 flex-1 gap-4">
         <div className="custom-scrollbar min-w-0 flex-1 overflow-y-auto">
           {contentLoading ? (
-            <div className="flex items-center gap-2 py-16 text-shell-muted">
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-shell-border bg-shell-panel py-20 text-shell-muted">
               <Loader2 className="size-4 animate-spin" />
               <span className="text-[14px]">加载内容…</span>
             </div>
           ) : selectedPage && pageDetail ? (
             <div className="space-y-4">
-              <nav className="flex flex-wrap items-center gap-1 px-1 text-[12px] text-shell-muted">
+              <nav className="flex flex-wrap items-center gap-1 rounded-xl border border-shell-border bg-shell-panel px-4 py-2.5 text-[12px] text-shell-muted">
                 <Link href="/knowledge-base/overview" className="hover:text-brand-primary">
-                  知识库
+                  知识管理
                 </Link>
-                <span>/</span>
+                <ChevronRight className="size-3 shrink-0" />
                 <span>{pageDetail.category_label}</span>
-                <span>/</span>
+                <ChevronRight className="size-3 shrink-0" />
                 <span className="font-medium text-shell-text">{selectedPage.name}</span>
               </nav>
               <WikiCompilationView detail={pageDetail} />
             </div>
           ) : selectedPage && !contentLoading ? (
-            <div className="rounded-2xl border border-shell-border bg-shell-panel px-6 py-10 text-center text-[14px] text-shell-muted">
+            <div className="rounded-2xl border border-shell-border bg-shell-panel px-6 py-16 text-center text-[14px] text-shell-muted">
               无法加载编译详情，请确认后端服务已启动。
             </div>
           ) : (
-            <div className="flex h-full min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-shell-border bg-shell-panel/50 p-10 text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-brand-primary/10">
-                <BookOpen className="size-7 text-brand-primary" strokeWidth={1.5} />
+            <div className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-dashed border-shell-border bg-shell-panel p-10 text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-brand-primary/8">
+                <BookOpen className="size-6 text-brand-primary" strokeWidth={1.5} />
               </div>
               <p className="mt-4 text-[15px] font-medium text-shell-text">选择一篇 Wiki</p>
               <p className="mt-1 max-w-xs text-[13px] text-shell-muted">
                 {categories.length === 0
                   ? '上传资料并完成编译后，分类会自动出现在左侧'
-                  : '选择页面查看 AI 编译后的知识结果'}
+                  : '从左侧选择页面，查看 AI 编译后的知识结果'}
               </p>
+              <Link
+                href="/knowledge-base/overview"
+                className="mt-4 text-[12px] font-medium text-brand-primary hover:underline"
+              >
+                返回知识管理概览
+              </Link>
             </div>
           )}
         </div>
 
         {pageDetail ? (
-          <aside className="hidden w-52 shrink-0 xl:block">
-            <div className="sticky top-0 rounded-2xl border border-shell-border bg-shell-panel p-4 shadow-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-shell-muted">编译结构</p>
-              <ul className="mt-3 space-y-1">
+          <aside className="hidden w-48 shrink-0 xl:block">
+            <div className="sticky top-6 rounded-2xl border border-shell-border bg-shell-panel p-4">
+              <p className="text-[12px] font-semibold text-shell-text">页面目录</p>
+              <p className="mt-0.5 text-[11px] text-shell-muted">编译结构导航</p>
+              <ul className="mt-3 space-y-0.5">
                 {WIKI_DETAIL_SECTIONS.map((section) => (
                   <li key={section.id}>
                     <a
@@ -332,7 +350,8 @@ export default function WikiPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-48 items-center justify-center rounded-2xl border border-shell-border bg-shell-panel text-[14px] text-shell-muted">
+        <div className="flex min-h-48 items-center justify-center rounded-2xl border border-shell-border bg-shell-panel py-16 text-[14px] text-shell-muted">
+          <Loader2 className="mr-2 size-4 animate-spin" />
           加载 Wiki…
         </div>
       }

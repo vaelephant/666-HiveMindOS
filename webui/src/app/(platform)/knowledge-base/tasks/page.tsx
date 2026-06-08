@@ -70,10 +70,12 @@ function TaskCard({
   onDelete: () => void;
 }) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`group w-full rounded-xl px-3 py-2.5 text-left transition-all ${
+      onKeyDown={(e) => e.key === 'Enter' && onSelect()}
+      className={`group w-full cursor-pointer rounded-xl px-3 py-2.5 text-left transition-all ${
         active
           ? 'border border-brand-primary/25 bg-brand-primary/8 shadow-sm'
           : 'border border-transparent hover:border-shell-border hover:bg-shell-bg'
@@ -96,7 +98,7 @@ function TaskCard({
         {STATUS_LABEL[task.status]}
         {task.steps.length > 0 && ` · ${task.steps.length} 步`}
       </p>
-    </button>
+    </div>
   );
 }
 
@@ -180,8 +182,8 @@ export default function TasksPage() {
               <Bot className="size-4 text-brand-primary" strokeWidth={1.75} />
             </div>
             <div>
-              <p className="text-[13px] font-semibold text-shell-text">Agent 任务</p>
-              <p className="text-[11px] text-shell-muted">基于知识库的智能分析</p>
+              <p className="text-[13px] font-semibold text-shell-text">Agent</p>
+              <p className="text-[11px] text-shell-muted">多步骤分析 · 分钟级报告</p>
             </div>
           </div>
         </div>
