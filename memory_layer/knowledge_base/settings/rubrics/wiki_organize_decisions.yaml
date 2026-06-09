@@ -1,0 +1,16 @@
+task_type: wiki_organize_decisions
+label: 整理决策进 Wiki
+pass_score: 75
+criteria:
+  - name: 检索完整性
+    weight: 25
+    check: 是否覆盖指定时间范围内 decision 类记忆与会话
+  - name: 事实准确性
+    weight: 25
+    check: 提炼事实是否有明确来源，无臆造
+  - name: 晋升合规
+    weight: 25
+    check: 候选分类、置信度、冲突处理是否符合 resolver 规则
+  - name: 可交付性
+    weight: 25
+    check: 用户能否从报告直接看到 Wiki 变更与待人工项

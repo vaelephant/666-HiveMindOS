@@ -42,8 +42,7 @@ export type FactoryDomain = 'data' | 'model' | 'platform' | 'hivemind';
 export type PrimaryNavKey =
   | 'home'
   // HiveMind 核心模块
-  | 'agent_tasks'
-  | 'automations'
+  | 'task_center'
   | 'chat'
   | 'memories'
   | 'workflows'
@@ -93,6 +92,22 @@ export type KnowledgeBaseChild = {
   icon: LucideIcon;
 };
 
+export type TaskCenterNavKey = 'tasks_agent' | 'tasks_ops';
+
+export type TaskCenterChild = {
+  navKey: TaskCenterNavKey;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+export const TASK_CENTER_BASE_PATH = '/tasks' as const;
+
+export const TASK_CENTER_CHILDREN: TaskCenterChild[] = [
+  { navKey: 'tasks_agent', label: '自主任务', href: `${TASK_CENTER_BASE_PATH}/agent`, icon: Bot },
+  { navKey: 'tasks_ops', label: '定时运维', href: `${TASK_CENTER_BASE_PATH}/ops`, icon: Timer },
+];
+
 export type IpfsMonitorNavKey =
   | 'ipfs_dashboard'
   | 'ipfs_nodes'
@@ -108,7 +123,7 @@ export type IpfsMonitorChild = {
 
 export type PrimaryNavItem =
   | {
-      navKey: Exclude<PrimaryNavKey, 'annotation' | 'ipfs_monitor' | 'knowledge_base'>;
+      navKey: Exclude<PrimaryNavKey, 'annotation' | 'ipfs_monitor' | 'knowledge_base' | 'task_center'>;
       label: string;
       href: string;
       icon: LucideIcon;
@@ -134,6 +149,13 @@ export type PrimaryNavItem =
       icon: LucideIcon;
       factory: FactoryDomain;
       children: KnowledgeBaseChild[];
+    }
+  | {
+      navKey: 'task_center';
+      label: string;
+      icon: LucideIcon;
+      factory: FactoryDomain;
+      children: TaskCenterChild[];
     };
 
 export const ANNOTATION_CHILDREN: AnnotationChild[] = [
@@ -178,10 +200,15 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
 
   // ── HiveMind 核心模块 ────────────────────────────────────────────────────
   { navKey: 'chat',         label: 'Chat',       href: HIVEMIND_HOME_PATH,      icon: MessageSquare, factory: 'hivemind' },
-  { navKey: 'memories',     label: '智慧进化',   href: '/memories',             icon: Brain,         factory: 'hivemind' },
-  { navKey: 'agent_tasks',  label: '分析任务',   href: '/agent-tasks',          icon: Bot,           factory: 'hivemind' },
-  { navKey: 'automations',  label: '自动化任务', href: '/automations',          icon: Timer,         factory: 'hivemind' },
-  { navKey: 'workflows',    label: '工作流',     href: '/workflows',            icon: GitBranch,     factory: 'hivemind' },
+  { navKey: 'memories', label: '智慧进化', href: '/memories', icon: Brain, factory: 'hivemind' },
+  {
+    navKey: 'task_center',
+    label: '任务中心',
+    icon: ListTodo,
+    factory: 'hivemind',
+    children: TASK_CENTER_CHILDREN,
+  },
+  { navKey: 'workflows', label: '工作流', href: '/workflows', icon: GitBranch, factory: 'hivemind' },
   { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
   { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
   { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
@@ -232,7 +259,8 @@ export function collectStaticPlatformPaths(): Set<string> {
     if (
       item.navKey === 'annotation' ||
       item.navKey === 'ipfs_monitor' ||
-      item.navKey === 'knowledge_base'
+      item.navKey === 'knowledge_base' ||
+      item.navKey === 'task_center'
     ) {
       for (const child of item.children) paths.add(child.href);
     } else {
@@ -256,6 +284,7 @@ export function isPlatformPathAllowed(segments: string[] | undefined): boolean {
   if (path.startsWith('/tools/')) return true;
   if (path.startsWith('/audit/')) return true;
   if (path.startsWith('/human-review/')) return true;
+  if (path === TASK_CENTER_BASE_PATH || path.startsWith(`${TASK_CENTER_BASE_PATH}/`)) return true;
   if (path === '/automations' || path.startsWith('/automations/')) return true;
   if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return true;
   if (path === HIVEMIND_HOME_PATH || path === '/chat' || path === '/hivemind') return true;
@@ -276,6 +305,9 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
       }
     } else if (item.navKey === 'knowledge_base') {
       for (const c of item.children) { if (c.href === path) return c.label; }
+    } else if (item.navKey === 'task_center') {
+      for (const c of item.children) { if (c.href === path) return c.label; }
+      if (path === TASK_CENTER_BASE_PATH || path.startsWith(`${TASK_CENTER_BASE_PATH}/`)) return item.label;
     } else if (item.href === path) {
       return item.label;
     }
@@ -289,12 +321,15 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/`)) return 'IPFS 监控';
   if (path === HIVEMIND_HOME_PATH) return 'Chat';
   if (path === '/memories') return '智慧进化';
-  if (path === '/automations' || path.startsWith('/automations/')) return '自动化任务';
-  if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return '分析任务';
+  if (path === `${TASK_CENTER_BASE_PATH}/agent`) return '自主任务';
+  if (path === `${TASK_CENTER_BASE_PATH}/ops`) return '定时运维';
+  if (path === TASK_CENTER_BASE_PATH || path.startsWith(`${TASK_CENTER_BASE_PATH}/`)) return '任务中心';
+  if (path === '/automations' || path.startsWith('/automations/')) return '定时运维';
+  if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return '自主任务';
   if (path.startsWith('/workflows/')) return '工作流';
   if (path.startsWith('/tools/')) return '工具箱';
   if (path.startsWith('/audit/')) return '审计日志';
   if (path.startsWith('/human-review/')) return '人工审核';
-  if (path.startsWith('/knowledge-base/tasks')) return '分析任务';
+  if (path.startsWith('/knowledge-base/tasks')) return '自主任务';
   return '页面';
 }

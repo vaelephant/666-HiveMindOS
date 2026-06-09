@@ -1,0 +1,13 @@
+task_type: generic_goal
+label: 通用业务目标
+pass_score: 70
+criteria:
+  - name: 完整性
+    weight: 30
+    check: 是否覆盖用户目标的关键方面
+  - name: 准确性
+    weight: 30
+    check: 是否有依据，无明显臆造
+  - name: 可执行性
+    weight: 40
+    check: 结果能否支持总目标继续推进

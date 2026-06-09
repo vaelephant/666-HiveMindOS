@@ -34,7 +34,7 @@ const QUICK_LINKS: {
   factory: string;
 }[] = [
   { href: HIVEMIND_HOME_PATH, label: 'Chat', desc: '企业知识问答，答案带出处', icon: MessageSquare, factory: 'HiveMind' },
-  { href: '/agent-tasks', label: '分析任务', desc: '多步骤分析与报告', icon: Bot, factory: 'HiveMind' },
+  { href: '/tasks/agent', label: '自主任务', desc: '开放目标，Agent 自主规划执行', icon: Bot, factory: 'HiveMind' },
   { href: '/data/workshop', label: '数据工坊', desc: '清洗、转换与特征', icon: Wrench, factory: '数据工厂' },
   { href: '/data/center', label: '数据中心', desc: '资产目录与血缘', icon: Database, factory: '数据工厂' },
   { href: '/annotation/overview', label: '标注中心', desc: '场景、项目与任务', icon: Tags, factory: '数据工厂' },

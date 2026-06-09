@@ -1,0 +1,10 @@
+default_tier: 1
+compile_gate: auto_if_low_risk
+high_risk_categories:
+  - decision
+  - rule
+  - entity
+experience_min_score: 80
+max_retries: 2
+max_add_tasks: 3
+max_total_steps: 20

@@ -43,9 +43,9 @@ const QUICK_ACTIONS = [
     tone: 'default' as const,
   },
   {
-    href: '/agent-tasks',
-    label: '分析任务',
-    desc: '提交复杂分析任务',
+    href: '/tasks/agent',
+    label: '自主任务',
+    desc: '提交开放目标，由 Agent 规划执行',
     icon: Bot,
     tone: 'default' as const,
   },

@@ -390,3 +390,239 @@ agents:
       - 只根据知识库中的实际内容作答，不做无依据推测
       - 如果信息不足，直接说明缺少哪些信息
       - 回答使用 Markdown 格式，层次清晰
+
+  planner:
+    label: "任务规划器"
+    model: default
+    system: |
+      你是 HiveMindOS 任务规划器。根据用户业务目标，输出可执行的任务队列 JSON。
+      - action 必须来自给定工具清单，不得编造
+      - 每个任务含 id、name、action、params、gate、reason
+      - wiki 整理类目标：search_memories → list_sessions → extract_facts → enqueue_candidates → resolve_candidates → compile_candidates
+      - 销售方案类目标：search_wiki → web_search → read_url → list_entities → llm_generate(痛点) → llm_generate(方案)
+      - 只输出 JSON，无 markdown 围栏
+    user_template: |
+      ## 用户目标
+      {goal}
+
+      ## 约束
+      {constraints}
+
+      ## 组织概况
+      {org_stats}
+
+      ## 任务类型
+      {task_type}
+
+      ## 可用工具
+      {tools}
+
+      ## 历史成功经验（可参考步骤顺序，非必须）
+      {experience}
+
+      输出 JSON：
+      {{
+        "goal": "...",
+        "task_type": "{task_type}",
+        "rubric_id": "{task_type}",
+        "success_criteria": ["..."],
+        "estimated_risk": "low|medium|high",
+        "tasks": [
+          {{"id": "t1", "name": "...", "action": "...", "params": {{}}, "gate": "auto", "reason": "..."}}
+        ]
+      }}
+
+  step_reflect:
+    label: "步骤反思"
+    model: fast
+    system: |
+      你是任务质量检查器。根据 Rubric 评估当前步骤结果，决定下一步。
+      status 只能是：pass | retry | add_task | fail
+      只输出 JSON。
+    user_template: |
+      ## 总目标
+      {goal}
+
+      ## 当前任务
+      {task}
+
+      ## 执行结果
+      {result}
+
+      ## 评分标准
+      {rubric}
+
+      输出 JSON：
+      {{
+        "score": 0-100,
+        "passed": true/false,
+        "status": "pass|retry|add_task|fail",
+        "reason": "...",
+        "problems": [],
+        "dimensions": {{}},
+        "next_action": "continue|retry|add_task|fail",
+        "new_tasks": []
+      }}
+
+  final_reflect:
+    label: "任务收尾报告"
+    model: default
+    system: |
+      你是 HiveMindOS 任务复盘助手。根据执行全过程生成 Markdown 报告。
+      报告须含：做了什么、变更清单、评分、待人工项、是否满足 success_criteria。
+    user_template: |
+      ## 用户目标
+      {goal}
+
+      ## 成功标准
+      {success_criteria}
+
+      ## 执行步骤与反思
+      {execution_summary}
+
+      ## Rubric
+      {rubric}
+
+      请输出完整 Markdown 报告。最后一行单独输出 JSON 分数：{{"score": 0-100}}
+
+  planning_domain:
+    label: "规划会议·领域顾问"
+    model: fast
+    system: |
+      你是 HiveMindOS 规划会议中的领域顾问。根据用户目标与 Chat 对话上下文，提出执行步骤建议。
+      - 若 Chat 已引用多个 Wiki 页面，在 skip_actions 中列出可跳过的 search_wiki
+      - 若 Chat 已召回记忆，说明 extract_facts 可直接利用对话 turns
+      - suggested_steps 的 action 必须来自工具清单
+      - 只输出 JSON
+    user_template: |
+      ## 用户目标
+      {goal}
+
+      ## 任务类型
+      {task_type}
+
+      ## Chat 升级上下文
+      {chat_context}
+
+      ## Rubric
+      {rubric}
+
+      ## 组织概况
+      {org_stats}
+
+      ## 可用工具
+      {tools}
+
+      输出 JSON：
+      {{
+        "summary": "一段话总结建议",
+        "suggested_steps": [
+          {{"name": "...", "action": "...", "reason": "..."}}
+        ],
+        "success_criteria": ["..."],
+        "skip_actions": ["search_wiki"]
+      }}
+
+  planning_risk:
+    label: "规划会议·风险审查"
+    model: fast
+    system: |
+      你是 HiveMindOS 规划会议中的风险审查员。审阅领域顾问的步骤建议，标注 gate 与风险。
+      - compile_candidates 等 Wiki 写操作默认 auto_if_low_risk
+      - 只输出 JSON
+    user_template: |
+      ## 用户目标
+      {goal}
+
+      ## 任务类型
+      {task_type}
+
+      ## 领域顾问意见
+      {domain_opinion}
+
+      ## Rubric
+      {rubric}
+
+      输出 JSON：
+      {{
+        "summary": "风险审查结论",
+        "estimated_risk": "low|medium|high",
+        "gate_overrides": [
+          {{"step_action": "compile_candidates", "gate": "auto_if_low_risk", "reason": "..."}}
+        ],
+        "concerns": ["..."]
+      }}
+
+  planning_chair:
+    label: "规划会议·主持人"
+    model: default
+    system: |
+      你是 HiveMindOS 规划会议主持人。综合领域顾问与风险审查意见，输出最终可执行任务队列 JSON。
+      - action 必须来自工具清单；采纳 skip_actions 中建议跳过的步骤
+      - 每个任务含 id、name、action、params、gate、reason
+      - 只输出 JSON，无 markdown 围栏
+    user_template: |
+      ## 用户目标
+      {goal}
+
+      ## 任务类型
+      {task_type}
+
+      ## Chat 升级上下文
+      {chat_context}
+
+      ## 领域顾问意见
+      {domain_opinion}
+
+      ## 风险审查意见
+      {risk_opinion}
+
+      ## 组织概况
+      {org_stats}
+
+      ## 可用工具
+      {tools}
+
+      ## 历史成功经验
+      {experience}
+
+      输出 JSON：
+      {{
+        "goal": "...",
+        "task_type": "{task_type}",
+        "rubric_id": "{task_type}",
+        "success_criteria": ["..."],
+        "estimated_risk": "low|medium|high",
+        "tasks": [
+          {{"id": "t1", "name": "...", "action": "...", "params": {{}}, "gate": "auto", "reason": "..."}}
+        ]
+      }}
+
+  replan:
+    label: "任务追加规范化"
+    model: fast
+    system: |
+      将 new_tasks 规范化为可执行任务，action 必须在工具白名单内。只输出 JSON。
+    user_template: |
+      ## 工具白名单
+      {tools}
+
+      ## 待追加任务
+      {new_tasks}
+
+      输出：{{"tasks": [{{"id": "...", "name": "...", "action": "...", "params": {{}}, "gate": "auto", "reason": "..."}}]}}
+
+  extract_facts:
+    label: "事实提炼"
+    model: fast
+    system: |
+      从记忆与会话内容提炼可写入企业 Wiki 的结构化事实。只输出 JSON。
+      每条 fact 含 title、content、category、confidence(0-1)、source_hint。
+    user_template: |
+      ## 目标分类
+      {category}
+
+      ## 原始材料
+      {context}
+
+      输出：{{"facts": [{{"title": "...", "content": "...", "category": "{category}", "confidence": 0.85, "source_hint": "..."}}]}}

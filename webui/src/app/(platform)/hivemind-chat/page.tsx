@@ -1,17 +1,20 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { ChatEmptyState, ChatThread } from '@/components/knowledge-base/chat-conversation';
 import { ChatDeleteSessionDialog } from '@/components/knowledge-base/chat-delete-session-dialog';
 import { ChatHistorySidebar } from '@/components/knowledge-base/chat-history-sidebar';
+import { ChatUpgradeDialog } from '@/components/knowledge-base/chat-upgrade-dialog';
 import {
+  createTask,
   getChatSession,
   getSessionPipeline,
   listChatSessions,
   sendChatMessageStream,
 } from '@/lib/kb-api';
+import { detectUpgradeSuggestion, manualUpgradeSuggestion } from '@/lib/chat-task-upgrade';
 import type { ChatStreamPhase } from '@/lib/kb-api';
 import { readCachedSessions, writeCachedSessions } from '@/lib/chat-session-cache';
 import { HIVEMIND_HOME_PATH } from '@/config/navigation';
@@ -45,6 +48,8 @@ function ChatPageContent() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [streamText, setStreamText] = useState('');
   const [streamPhase, setStreamPhase] = useState<ChatStreamPhase | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const eventBaselineRef = useRef(0);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -245,6 +250,29 @@ function ChatPageContent() {
 
   const showEmpty = !threadLoading && turns.length === 0 && pending === null;
 
+  const upgradeSuggestion = useMemo(
+    () => (pending ? null : detectUpgradeSuggestion(turns)),
+    [turns, pending],
+  );
+
+  const upgradeDialogSuggestion = useMemo(() => {
+    if (upgradeSuggestion?.recommended) return upgradeSuggestion;
+    return manualUpgradeSuggestion(turns);
+  }, [upgradeSuggestion, turns]);
+
+  async function handleUpgradeConfirm(goal: string, constraints: Record<string, unknown>) {
+    setUpgradeSubmitting(true);
+    try {
+      const task = await createTask(goal, { constraints });
+      setUpgradeOpen(false);
+      router.push(`/tasks/agent?taskId=${task.id}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '创建任务失败');
+    } finally {
+      setUpgradeSubmitting(false);
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
       <ChatHistorySidebar
@@ -262,6 +290,16 @@ function ChatPageContent() {
         sessionTitle={deleteTargetTitle}
         onClose={() => setDeleteTargetId(null)}
         onDeleted={handleDeleteComplete}
+      />
+
+      <ChatUpgradeDialog
+        open={upgradeOpen}
+        suggestion={upgradeDialogSuggestion}
+        turns={turns}
+        sessionId={activeId}
+        submitting={upgradeSubmitting}
+        onClose={() => setUpgradeOpen(false)}
+        onConfirm={handleUpgradeConfirm}
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -292,6 +330,8 @@ function ChatPageContent() {
             pipeline={pipeline}
             streamText={streamText}
             streamPhase={streamPhase}
+            upgradeSuggestion={upgradeSuggestion}
+            onUpgrade={turns.length > 0 ? () => setUpgradeOpen(true) : undefined}
           />
         )}
       </div>

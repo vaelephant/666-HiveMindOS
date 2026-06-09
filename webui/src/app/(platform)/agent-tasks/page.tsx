@@ -1,5 +1,5 @@
-import { AgentTasksView } from '@/components/knowledge-base/agent-tasks-view';
+import { redirect } from 'next/navigation';
 
-export default function AgentTasksPage() {
-  return <AgentTasksView />;
+export default function AgentTasksRedirectPage() {
+  redirect('/tasks/agent');
 }

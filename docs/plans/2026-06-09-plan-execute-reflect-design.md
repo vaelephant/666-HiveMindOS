@@ -1,24 +1,26 @@
-# Plan → Execute → Reflect 任务引擎 — 设计文档
+# 企业目标驱动型 Agent 执行系统 — 设计文档
 
 > 日期：2026-06-09  
-> 状态：已确认  
-> 定位：HiveMindOS 核心能力 — 用户开放目标 → 自主规划 → 自主执行；知识库为沉淀副产物
+> 状态：已确认（v2）  
+> 定位：HiveMindOS 核心 — 用户业务目标 → 自主规划 → 自主执行 → 反思修正 → 经验沉淀；知识库为沉淀手段
+
+**一句话：** 不是问一句答一句，而是会拆解、会执行、会反思、会沉淀的智能任务系统。
 
 ---
 
 ## 一、产品定位
 
 ```
-用户开放目标（自然语言）
-    ↓
-Planner   — 产出结构化 Plan，可审阅
-    ↓
-Executor  — 按步调用 Tool，支持人工门
-    ↓
-Reflect   — 对照成功标准，生成执行报告
-    ↓
-Memory Layer — 智慧 / Wiki 自动沉淀（副产物）
+企业知识 + 企业标准 + 企业流程 + AI 执行
 ```
+
+| 对比 | Chatbot | HiveMindOS 任务引擎 |
+|------|---------|---------------------|
+| 触发 | 用户问一句 | 用户提出业务目标 |
+| 行为 | 一次性回答 | 拆解 → 执行 → 检查 → 修正 |
+| 标准 | 无 | Rubric（人定目标 + 公司定模板 + Agent 检查） |
+| 产出 | 文本 | 可审计执行过程 + 可追溯结果 + 可复用经验 |
+| 知识库 | 检索来源 | 执行副产物（Wiki / memories / experience） |
 
 **与现有模块关系：**
 
@@ -26,303 +28,435 @@ Memory Layer — 智慧 / Wiki 自动沉淀（副产物）
 |------|------|
 | Chat | 对话问答；复杂目标可「升级为任务」 |
 | L1/L2 进化 | 被动沉淀；任务引擎是**主动、有目标**的沉淀 |
-| 自动化 4 job | 降级为预置 Plan 模板（未来） |
-| Agent 任务页 | 升级为任务中心：Plan 预览、逐步进度、Reflect 报告 |
-| 人工审核页 | 接收 Executor 产生的 `conflict` / 高风险 compile |
-
-**Phase 1 边界（架构按 B 设计，实现按 A）：**
-
-- 工具域：memory + knowledge + candidate + extract + meta
-- 不实现：Shell、HTTP、外部通知（接口预留 `ToolRegistry.register`）
+| 自动化 4 job | 未来降级为预置 Plan 模板 |
+| Agent 任务页 | 任务中心：Plan、逐步进度、Reflect 评分、经验召回 |
+| 人工审核页 | HumanReviewNode：冲突 / 低分 / 高风险写操作 |
 
 ---
 
-## 二、核心数据模型
+## 二、核心编排（六节点）
 
-### 2.1 Plan（Planner 输出）
+```mermaid
+flowchart TB
+  U[用户目标 + 业务约束]
+  U --> P[PlannerNode]
+  P --> Q[Task Queue]
+  Q --> E[ExecutorNode]
+  E --> T[Tools]
+  T --> R[ReflectNode 逐步检查]
+  R -->|pass| Q
+  R -->|retry| E
+  R -->|add_task| RP[ReplanNode]
+  RP --> Q
+  R -->|fail| H[HumanReviewNode]
+  H --> Q
+  R -->|done| M[MemoryNode 经验沉淀]
+```
+
+> MemoryNode 将高分成功路径写入 `agent_experience` 表，供 Planner 下次召回复用。
+
+| 节点 | 职责 | 输入 | 输出 |
+|------|------|------|------|
+| **PlannerNode** | 拆初始任务队列；召回相似成功经验 | 目标 + Rubric 类型 + 经验 Top-K | `tasks[]` |
+| **PlanningCommittee** | 角色见 `settings/planning_committee.yaml` | 目标 + constraints | `tasks[]` + `planning_minutes[]` |
+| **ExecutorNode** | 调 Tool 执行单步 | task + context | `result` |
+| **ReflectNode** | 按 Rubric 打分；决定下一步 | result + goal + rubric | pass / retry / add_task / fail |
+| **ReplanNode** | 追加或调整任务 | `reflect.new_tasks` | 更新队列 |
+| **MemoryNode** | 沉淀成功路径（非全文） | 高分 workflow + 评分 | `agent_experience` |
+| **HumanReviewNode** | 低分 / 高风险 / 冲突 | reflect / gate | 人批后继续 |
+
+**核心原则：**
+
+- **Executor 做事，Reflect 判断能不能往下走**
+- **标准不是模型定的，是企业业务知识定的**
+- **经验存路径，不存过时结果**
+
+---
+
+## 三、执行闭环
+
+### 3.1 主流程
+
+```
+用户目标
+   ↓
+Planner（初始 tasks + task_type + rubric_id）
+   ↓
+Task Queue（pending → running → done / failed）
+   ↓
+for each task:
+    Executor → Tool
+       ↓
+    StepReflect（Rubric 评分 + next_action）
+       ↓
+    pass     → 下一任务
+    retry    → 重试本任务（上限 2 次）
+    add_task → Replan 追加任务（单 goal 上限 +3）
+    fail     → HumanReview 或标记 failed
+   ↓
+FinalReflect（总报告 + 是否满足目标）
+   ↓
+MemoryNode（score ≥ 80 沉淀 workflow）
+```
+
+### 3.2 Reflect 两级
+
+| 级别 | 时机 | 职责 |
+|------|------|------|
+| **StepReflect** | 每个子任务完成后 | Rubric 打分、`pass/retry/add_task/fail` |
+| **FinalReflect** | 全部任务结束 | 总报告 Markdown、success_criteria 验收、待人工清单 |
+
+**StepReflect 输出示例：**
 
 ```json
 {
-  "goal": "整理本周项目决策进 Wiki",
-  "success_criteria": [
-    "本周 decision 类记忆已全部检索",
-    "新事实已写入候选池或 Wiki",
-    "用户收到变更清单"
-  ],
-  "steps": [
-    {
-      "id": "s1",
-      "action": "search_memories",
-      "params": { "category": "decision", "since_days": 7 },
-      "gate": "auto",
-      "when": null,
-      "reason": "检索本周决策记忆"
-    },
-    {
-      "id": "s2",
-      "action": "list_sessions",
-      "params": { "since_days": 7 },
-      "gate": "auto",
-      "when": null,
-      "reason": "列出本周相关会话"
-    },
-    {
-      "id": "s3",
-      "action": "extract_facts",
-      "params": { "sources": ["$s1", "$s2"], "category": "decision" },
-      "gate": "auto",
-      "when": null,
-      "reason": "从记忆与会话提炼结构化事实"
-    },
-    {
-      "id": "s4",
-      "action": "enqueue_candidates",
-      "params": { "facts": "$s3" },
-      "gate": "auto",
-      "when": "$s3.count > 0",
-      "reason": "写入候选池"
-    },
-    {
-      "id": "s5",
-      "action": "resolve_candidates",
-      "params": { "limit": 50 },
-      "gate": "auto",
-      "when": "$s4.created > 0",
-      "reason": "Resolver 自动解析"
-    },
-    {
-      "id": "s6",
-      "action": "compile_candidates",
-      "params": { "limit": 30 },
-      "gate": "auto_if_low_risk",
-      "when": "$s5.approved > 0",
-      "reason": "低风险类自动编译进 Wiki"
-    }
-  ],
-  "estimated_risk": "medium"
+  "score": 82,
+  "passed": true,
+  "status": "pass",
+  "reason": "已检索到 12 条决策记忆，信息足够进入提炼",
+  "problems": [],
+  "dimensions": {
+    "completeness": 85,
+    "accuracy": 80,
+    "relevance": 90,
+    "actionability": 75
+  },
+  "next_action": "continue",
+  "new_tasks": []
 }
 ```
 
-**约束：**
+**评分档位：**
 
-- `action` 必须来自 `TaskToolRegistry` 白名单
-- `params` 支持 `$step_id` 引用上步结果摘要字段
-- `when` 为可选条件表达式，不满足则跳过
-- `gate` 见 §2.4
+| 分数 | 含义 | 动作 |
+|------|------|------|
+| 90–100 | 优秀 | pass，进入下一步 |
+| 70–89 | 可用 | pass，FinalReflect 标注小修项 |
+| 50–69 | 信息不足 | add_task 或 retry |
+| 0–49 | 失败 | retry（换参数）或 fail |
 
-### 2.2 Task（扩展现有模型）
+**防死循环：**
+
+- 单任务 `retry` ≤ 2
+- 单 goal `add_task` 追加 ≤ 3
+- 总步数上限 20（可配置）
+
+---
+
+## 四、Rubric 体系（好坏标准谁定）
+
+**三方共同制定：**
+
+| 来源 | 内容 | 存储 |
+|------|------|------|
+| **业务负责人** | 目标约束（预算、周期、KPI、客群） | 用户 input + `goal.constraints` |
+| **公司模板** | 交付物结构（必须包含哪些章节） | `settings/rubrics/*.yaml` |
+| **Agent** | 按 Rubric 逐项检查打分 | StepReflect prompt |
+
+**Rubric 文件示例** — `settings/rubrics/wiki_organize_decisions.yaml`：
+
+```yaml
+task_type: wiki_organize_decisions
+label: 整理决策进 Wiki
+pass_score: 75
+criteria:
+  - name: 检索完整性
+    weight: 25
+    check: 是否覆盖指定时间范围内 decision 类记忆与会话
+  - name: 事实准确性
+    weight: 25
+    check: 提炼事实是否有明确来源，无臆造
+  - name: 晋升合规
+    weight: 25
+    check: 候选分类、置信度、冲突处理是否符合 resolver 规则
+  - name: 可交付性
+    weight: 25
+    check: 用户能否从报告直接看到 Wiki 变更与待人工项
+```
+
+**Phase 1.5 预埋** — `settings/rubrics/sales_proposal.yaml`（客户分析 + 销售方案，需 `web_search`）。
+
+Planner 根据目标语义匹配 `task_type`；匹配不到则用 `generic_goal`。
+
+---
+
+## 五、数据模型
+
+### 5.1 Goal（用户总目标，扩展现有 `tasks` 表）
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `id` | str | UUID |
 | `org_id` | str | 组织 |
 | `input` | str | 用户原始目标 |
-| `phase` | str | `planning` \| `planned` \| `executing` \| `reflecting` \| `done` \| `error` \| `awaiting_approval` |
-| `plan` | dict \| null | 结构化 Plan |
-| `steps` | list[dict] | 执行步骤记录（action、args、result、status、skipped） |
-| `checkpoints` | dict | 步骤 id → 结果摘要，供 `$sN` 引用 |
-| `result` | str \| null | Reflect 报告（Markdown） |
-| `error` | str \| null | 错误信息 |
-| `created_at` / `completed_at` | str | ISO 时间 |
+| `task_type` | str | Rubric 类型，如 `wiki_organize_decisions` |
+| `rubric_id` | str | 对应 rubrics yaml |
+| `constraints` | dict | 用户补充约束（预算、周期等，可选） |
+| `phase` | str | 见 §5.4 |
+| `plan` | dict | Planner 初始输出 |
+| `queue` | list[dict] | 当前任务队列（含追加任务） |
+| `steps` | list[dict] | 已执行步骤记录 |
+| `checkpoints` | dict | 步骤 id → 结果摘要 |
+| `reflections` | list[dict] | 每步 StepReflect 记录 |
+| `score` | int \| null | FinalReflect 总分 |
+| `result` | str \| null | FinalReflect Markdown 报告 |
+| `experience_id` | str \| null | 沉淀的经验 id |
+| `pending_step_id` | str \| null | 人工门暂停点 |
+| `error` | str \| null | |
+| `created_at` / `completed_at` | str | |
 
-**兼容：** 旧 Task 无 `phase`/`plan` 时视为 legacy `agentic_loop` 任务（可选保留 fallback）。
+**Phase 1：** 单表 `tasks` 用 JSON 字段承载 `queue` / `reflections`（避免过早拆表）。  
+**Phase 2：** 拆 `goals` + `goal_tasks` + `goal_task_runs`，支持 React Flow DAG。
 
-### 2.3 Step 执行记录
+### 5.2 Queue Task（子任务）
 
 ```json
 {
-  "step_id": "s4",
-  "action": "enqueue_candidates",
-  "args": { "facts": "..." },
+  "id": "t1",
+  "name": "检索本周决策记忆",
+  "action": "search_memories",
+  "params": { "category": "decision", "since_days": 7 },
+  "tool": "search_memories",
+  "status": "pending",
+  "gate": "auto",
+  "when": null,
+  "reason": "收集原料",
+  "retry_count": 0,
+  "parent_reflect_id": null
+}
+```
+
+> `action` / `tool` 同义，Planner 输出用 `action`；与讨论稿 `tool` 字段兼容。
+
+### 5.3 Step 执行记录
+
+```json
+{
+  "task_id": "t1",
+  "action": "search_memories",
   "status": "done",
-  "result_summary": { "created": 3, "skipped": 1 },
-  "result_raw": "...",
+  "result_summary": { "count": 12 },
+  "reflection": { "score": 85, "status": "pass" },
   "started_at": "...",
   "completed_at": "..."
 }
 ```
 
-### 2.4 Gate 策略
+### 5.4 Goal 生命周期
+
+```
+pending → planning → planned → executing ⇄ replanning → reflecting → done
+                              ↘ awaiting_approval ↗
+                              ↘ error / failed
+```
+
+### 5.5 Gate 策略
 
 | gate | 行为 |
 |------|------|
 | `auto` | 直接执行 |
-| `auto_if_low_risk` | 查 `resolver.yaml` + 分类；decision/rule/entity 或存在 conflict 则暂停任务，状态 `awaiting_approval` |
-| `human` | Plan 生成后整单待批（`POST .../tasks/{id}/approve` 后执行） |
+| `auto_if_low_risk` | decision/rule/entity 或 conflict → `awaiting_approval` |
+| `human` | Plan 后整单待批 |
 | `step_human` | 执行到该步前暂停 |
 
-Phase 1 默认：`compile_candidates` 使用 `auto_if_low_risk`（对齐档 1 运营策略）。
+与 `6-自动与人工审核分界线.md` 档 1 对齐。
 
 ---
 
-## 三、组件架构
+## 六、经验沉淀（MemoryNode）
+
+### 6.1 理念
+
+沉淀 4 类，**不存所有对话**：
+
+| 类型 | 存什么 | 落点 |
+|------|--------|------|
+| 成功流程 | steps 顺序 + tools + task_type + score | `agent_experience.workflow` |
+| 失败原因 | reflection.problems | `success=false` |
+| 高质量结果 | 抽样进组织 Wiki | candidates → Wiki |
+| 用户偏好 | 风格、格式 | memories（轨 A） |
+
+**存路径，不存过时结果。**
+
+### 6.2 `agent_experience` 表
+
+```sql
+CREATE TABLE agent_experience (
+    id              TEXT PRIMARY KEY,
+    org_id          TEXT NOT NULL,
+    task_type       TEXT NOT NULL,
+    goal            TEXT NOT NULL,
+    success         BOOLEAN NOT NULL,
+    score           INTEGER,
+    workflow        TEXT NOT NULL,   -- JSON: steps/actions 顺序
+    reflection      TEXT,            -- JSON: 末次或 FinalReflect
+    final_output    TEXT,            -- 摘要，非全文
+    tags            TEXT,            -- JSON array
+    embedding_id    TEXT,            -- Qdrant point id（Phase 2）
+    created_at      TEXT NOT NULL
+);
+```
+
+**沉淀条件：** `success=true` 且 `score ≥ 80`（可配置）。
+
+### 6.3 经验召回（Planner 输入）
+
+新任务开始时：
+
+1. `goal` 文本 embedding
+2. Qdrant 检索同 org `task_type` 相似经验 Top-3
+3. Planner prompt 注入「过去高分工作流参考」
+
+Phase 1：仅 PostgreSQL/SQLite 按 `task_type` 取最近高分记录；Phase 2 接 Qdrant 语义召回。
+
+---
+
+## 七、组件架构
 
 ```
 memory_layer/knowledge_base/
 ├── models/
-│   ├── task.py              # 扩展 Task
-│   └── plan.py              # Plan, PlanStep dataclasses
+│   ├── plan.py                 # Plan, QueueTask
+│   ├── reflection.py           # StepReflectResult
+│   └── task.py                 # Goal（扩展 Task）
 ├── core/
 │   ├── agents/
-│   │   ├── planner_agent.py    # Plan 生成
-│   │   ├── reflect_agent.py    # 收尾报告
-│   │   └── task_agent.py       # legacy 或删除
+│   │   ├── planner_agent.py
+│   │   ├── step_reflect_agent.py
+│   │   ├── final_reflect_agent.py
+│   │   └── replan_agent.py
 │   ├── execution/
-│   │   ├── executor_engine.py  # 逐步执行 + gate + when
-│   │   └── condition_eval.py   # when 表达式求值
+│   │   ├── executor_engine.py
+│   │   ├── condition_eval.py
+│   │   └── orchestrator.py     # 主循环：execute → reflect → replan
 │   ├── tools/
-│   │   ├── task_toolkit.py     # ToolRegistry + TaskToolExecutor
-│   │   └── kb_toolkit.py       # 现有 Wiki 工具（复用）
+│   │   ├── task_toolkit.py
+│   │   └── kb_toolkit.py
+│   ├── registry/
+│   │   ├── task_registry.py
+│   │   └── experience_registry.py
 │   └── services/
-│       └── task_service.py     # Plan → Execute → Reflect 编排
+│       └── task_service.py
 ├── settings/
-│   └── task_tools.yaml         # 可用 action 清单（给 Planner）
-├── prompts/prompts.yaml        # agents.planner, agents.reflect
-└── app/routers/tasks.py        # API 扩展
+│   ├── task_tools.yaml
+│   ├── task_gates.yaml
+│   └── rubrics/
+│       ├── wiki_organize_decisions.yaml
+│       └── sales_proposal.yaml   # Phase 1.5 预埋
+├── prompts/prompts.yaml          # planner, step_reflect, final_reflect, replan
+└── app/routers/tasks.py
 ```
 
-### 3.1 Planner Agent
-
-**输入：**
-
-- 用户目标 `input`
-- `task_tools.yaml` 能力清单（action 名、描述、params schema）
-- 轻量 `get_org_stats` 快照（pending/approved/conflict 数量）
-
-**输出：**
-
-- 严格 JSON Plan（`parse_json` + schema 校验）
-- 校验失败最多重试 1 次
-
-**不做：** 不调用工具、不读 Wiki 全文（避免 Planner 过重）。
-
-### 3.2 Executor Engine
-
-**流程：**
-
-1. 遍历 `plan.steps`
-2. 求值 `when`；不满足 → 标记 `skipped`
-3. 检查 `gate`；需人工 → 更新 `phase=awaiting_approval`，保存 `pending_step_id`
-4. 解析 `params` 中的 `$sN` 引用
-5. 调用 `TaskToolExecutor.execute(action, params)`
-6. 写入 `steps` + `checkpoints[step_id]`
-7. 单步失败：记录 error，根据配置 continue 或 abort
-
-**不做：** 不让 LLM 在 Execute 阶段自由选 tool（防幻觉）。
-
-### 3.3 Reflect Agent
-
-**输入：**
-
-- 原始目标 + Plan + 全部 step 结果 + checkpoints
-
-**输出：**
-
-- Markdown 报告：做了什么、沉淀了什么、哪些需人工、是否满足 success_criteria
-- 可选：调用 L1 式 `extract_from_turn` 将任务摘要写入 memories（Phase 2）
-
-### 3.4 Task Tool Registry（Phase 1）
+### 7.1 Task Tool Registry（Phase 1 · 知识域）
 
 | action | 域 | 底层 |
 |--------|-----|------|
 | `get_org_stats` | meta | candidate_stats + memory count |
-| `search_memories` | memory | MemoryRegistry.list_active + 过滤 |
-| `list_sessions` | memory | ChatRegistry.list_sessions + since 过滤 |
-| `read_session` | memory | ChatRegistry.get_history |
-| `search_wiki` | knowledge | WikiToolExecutor |
-| `read_page` | knowledge | WikiToolExecutor |
-| `list_entities` | knowledge | WikiToolExecutor |
-| `extract_facts` | extract | LLM 子调用，输入 sources → facts[] |
-| `enqueue_candidates` | candidate | CandidateRegistry.create |
-| `resolve_candidates` | candidate | candidate_service.resolve_pending_candidates |
-| `compile_candidates` | candidate | candidate_service.compile_approved_candidates |
+| `search_memories` | memory | MemoryRegistry |
+| `list_sessions` / `read_session` | memory | ChatRegistry |
+| `search_wiki` / `read_page` / `list_entities` | knowledge | WikiToolExecutor |
+| `extract_facts` | extract | LLM 子调用 |
+| `enqueue_candidates` | candidate | CandidateRegistry |
+| `resolve_candidates` | candidate | candidate_service |
+| `compile_candidates` | candidate | candidate_service |
+| `llm_generate` | generate | 结构化生成（报告/方案草稿，Phase 1 用于 FinalReflect 前的中间产物） |
+
+**Phase 1.5 新增：** `web_search`、`read_url`（销售方案场景）。
+
+接口预留 `ToolRegistry.register()`，未来接 MCP。
 
 ---
 
-## 四、API 设计
-
-### 现有扩展
+## 八、API 设计
 
 ```
 POST   /api/v1/orgs/{org_id}/tasks
-       Body: { "input": "...", "auto_run": true }
-       → 创建任务，后台跑 Plan → Execute → Reflect
+       Body: { "input": "...", "constraints": {}, "auto_run": true }
 
-GET    /api/v1/orgs/{org_id}/tasks/{task_id}
-       → 含 plan, phase, steps, result
+GET    /api/v1/orgs/{org_id}/tasks/{id}
+       → plan, queue, phase, steps, reflections, score, result, experience_id
 
-POST   /api/v1/orgs/{org_id}/tasks/{task_id}/approve
-       Body: { "from_step": "s6" }  # 可选，从某步继续
-       → awaiting_approval → 继续执行
+POST   /api/v1/orgs/{org_id}/tasks/{id}/approve
+       Body: { "from_task": "t6" }
 
-POST   /api/v1/orgs/{org_id}/tasks/{task_id}/cancel
-       → 取消运行中任务
-```
+POST   /api/v1/orgs/{org_id}/tasks/{id}/cancel
 
-### 任务生命周期
-
-```
-pending → planning → planned → executing → reflecting → done
-                              ↘ awaiting_approval ↗
-                              ↘ error
+GET    /api/v1/orgs/{org_id}/experiences?task_type=...
+       → 经验列表（治理 / 调试）
 ```
 
 ---
 
-## 五、UI 设计（Agent 任务页）
+## 九、UI 设计（Agent 任务页）
 
-1. **提交区**：文案改为「描述你想完成的目标」；示例改为「帮我整理本周项目决策进 Wiki」
-2. **Plan 卡片**：`phase=planned` 时展示步骤列表 + 每步 reason；`awaiting_approval` 显示「批准继续」
-3. **执行步骤**：按 step_id 展示 action 中文标签、状态（done/skipped/error/running）
-4. **Reflect 报告**：`phase=done` 时展示 Markdown 报告，含 Wiki 变更链接
-5. **冲突提示**：报告内 conflict 条目链到 `/human-review`
-
----
-
-## 六、配置与治理
-
-### settings/task_tools.yaml
-
-声明 Planner 可见的 action 列表与参数 schema（与 Executor 注册表同步）。
-
-### settings/task_gates.yaml（可选 Phase 1 硬编码）
-
-```yaml
-default_tier: 1
-compile_gate: auto_if_low_risk
-high_risk_categories: [decision, rule, entity]
-```
-
-与 `6-自动与人工审核分界线.md` 档 1 对齐：compile 遇高风险类暂停。
+1. **提交区**：「描述业务目标」；示例见 §十 MVP 场景
+2. **Plan + Queue**：任务列表、状态、Rubric 类型
+3. **执行过程**：每步 result + Reflect 分数 + problems
+4. **`add_task` 追加**：高亮新增任务（Replan）
+5. **`awaiting_approval`**：批准继续
+6. **FinalReflect 报告**：总分、维度分、Wiki 链接、待人工项
+7. **Phase 2**：React Flow DAG 可视化
 
 ---
 
-## 七、端到端验收场景
+## 十、MVP 场景策略（推荐 C）
 
-**用户输入：** 「帮我整理本周项目决策进 Wiki」
+| 阶段 | 场景 | 目的 |
+|------|------|------|
+| **Phase 1** | **A：整理本周项目决策进 Wiki** | 打穿六节点闭环；工具现成；可验证 Reflect + Rubric + 沉淀 |
+| **Phase 1 同步预埋** | 销售方案 Rubric yaml + `task_type` 路由 | 不实现 web_search，但 Planner/Reflect 已认识该类型 |
+| **Phase 1.5** | **B：客户分析 + 销售方案** | 加 `web_search`；用预埋 Rubric；产品演示叙事 |
+
+**推荐 C 的理由：**
+
+1. Phase 1 不被外域工具阻塞，2～3 周可验收端到端
+2. 引擎能力（StepReflect、Replan、Rubric、experience）与场景无关，A 足以验证
+3. 销售方案是企业叙事门面，Rubric 先写好，1.5 只加工具即可演示
+4. A 与现有 memories/candidates/Wiki 管线直接咬合，沉淀闭环可实测
+
+**Phase 1 验收输入：** 「帮我整理本周项目决策进 Wiki」
 
 **期望：**
 
-1. 10s 内出现 Plan（6～7 步）
-2. 自动执行（或档 1 在 compile 前暂停）
-3. 完成报告列出：检索了多少记忆/会话、新增候选数、编译 Wiki 路径、待人工项
-4. `conflict` 条目可在人工审核页看到
+1. Planner 输出 6～7 步队列 + `task_type=wiki_organize_decisions`
+2. 逐步执行，每步有 StepReflect 分数
+3. 信息不足时 `add_task`（如「补充检索相关 project 会话」）
+4. compile 遇 decision 高风险 → `awaiting_approval`
+5. FinalReflect 报告 + `score ≥ 80` 写入 `agent_experience`
+6. 第二次同类目标，Planner 参考历史 workflow
 
 ---
 
-## 八、后续扩展（不在 Phase 1）
+## 十一、技术栈（对齐现网）
 
-- Chat 内「升级为任务」按钮
-- 预置 Plan 模板（替代 cron 自动化）
-- Shell / HTTP tools
-- 子 Agent 并行（Research + Executor）
-- Reflect 自动写入 memories
-- Rust kernel 侧 planner.rs 与 Python 计划格式对齐
+| 能力 | Phase 1 | 后期 |
+|------|---------|------|
+| 后端 | FastAPI + BackgroundTasks | Celery（长任务） |
+| 任务存储 | SQLite `tasks` + JSON queue | PostgreSQL 拆表 |
+| 长期记忆 | SQLite `agent_experience` | + Qdrant embedding 召回 |
+| 模型 | `model_layer.client` | Router 按节点选模型 |
+| 工具协议 | yaml registry | MCP adapter |
+| 前端 | Next.js 步骤列表 | React Flow DAG |
+| 日志 | steps + reflections 表内 | LangSmith / audit 表 |
 
 ---
 
-## 九、修订记录
+## 十二、后续扩展
+
+- Chat「升级为任务」
+- 预置 SOP 模板（新品营销、投标、AI 获客…）
+- Shell / HTTP / email tools
+- 多 Agent 并行
+- Rust `planner.rs` 与 Plan JSON 格式对齐
+- React Flow 执行图
+- AI Workflow Governance 控制台（Rubric 在线编辑）
+
+---
+
+## 十三、修订记录
 
 | 日期 | 说明 |
 |------|------|
-| 2026-06-09 | 初稿：用户确认 Plan → Execute → Reflect 架构 |
+| 2026-06-09 | v1：Plan → Execute → Reflect 初稿 |
+| 2026-06-09 | v2：并入六节点、StepReflect/Replan、Rubric、agent_experience；MVP 定为 C |
+| 2026-06-09 | v2.1：统一核心编排 Mermaid 流程图；同步 `项目文档/7-自主任务引擎.md` |

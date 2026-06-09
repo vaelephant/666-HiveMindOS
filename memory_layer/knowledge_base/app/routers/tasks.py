@@ -8,10 +8,8 @@ from pydantic import BaseModel
 
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
-from memory_layer.knowledge_base.core.agents.task_agent import TaskAgent
-from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.registry.task_registry import TaskRegistry
-from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
+from memory_layer.knowledge_base.core.services.task_service import list_experiences, run_goal
 from memory_layer.knowledge_base.models.task import Task
 
 router = APIRouter()
@@ -23,39 +21,16 @@ _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="task-worker")
 
 class TaskRequest(BaseModel):
     input: str
+    constraints: dict | None = None
+    auto_run: bool = True
 
 
-def _run_task(task_id: str, org_id: str):
-    _registry.update(task_id, status="running")
-    log.info("[task] running  id=%s", task_id[:8])
-    try:
-        wiki = WikiManager(config.WIKI_ROOT)
-        graph = MemoryGraph(config.GRAPH_ROOT / org_id / "graph.db")
-        task = _registry.get(task_id)
+class ApproveRequest(BaseModel):
+    from_task: str | None = None
 
-        accumulated_steps: list[dict] = []
 
-        def on_step(step: dict):
-            accumulated_steps.append(step)
-            _registry.update(task_id, steps=list(accumulated_steps))
-            log.debug("[task] step  tool=%s  args=%s", step["tool"], step["args"])
-
-        answer, steps = TaskAgent(wiki, graph).run(task, on_step=on_step)
-        _registry.update(
-            task_id,
-            status="done",
-            result=answer,
-            steps=steps,
-            completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        )
-    except Exception as exc:
-        log.error("[task] error  id=%s  err=%s", task_id[:8], exc)
-        _registry.update(
-            task_id,
-            status="error",
-            error=str(exc),
-            completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        )
+def _run_task(task_id: str, org_id: str, resume_from: str | None = None):
+    run_goal(task_id, org_id, resume_from=resume_from)
 
 
 @router.post("/orgs/{org_id}/tasks")
@@ -65,12 +40,15 @@ def create_task(org_id: str, req: TaskRequest, background_tasks: BackgroundTasks
         org_id=org_id,
         input=req.input,
         status="pending",
+        phase="pending",
+        constraints=req.constraints or {},
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     _registry.add(task)
-    background_tasks.add_task(_run_task, task.id, org_id)
+    if req.auto_run:
+        background_tasks.add_task(_run_task, task.id, org_id)
     log.info("[task] created  id=%s  org=%s", task.id[:8], org_id)
-    return asdict(task)
+    return asdict(_registry.get(task.id))
 
 
 @router.get("/orgs/{org_id}/tasks")
@@ -87,6 +65,33 @@ def get_task(org_id: str, task_id: str):
     return asdict(task)
 
 
+@router.post("/orgs/{org_id}/tasks/{task_id}/approve")
+def approve_task(org_id: str, task_id: str, req: ApproveRequest, background_tasks: BackgroundTasks):
+    task = _registry.get(task_id)
+    if not task or task.org_id != org_id:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if task.phase != "awaiting_approval":
+        raise HTTPException(status_code=400, detail="任务不在待批准状态")
+    from_task = req.from_task or task.pending_step_id
+    background_tasks.add_task(_run_task, task_id, org_id, from_task)
+    return asdict(_registry.get(task_id))
+
+
+@router.post("/orgs/{org_id}/tasks/{task_id}/cancel")
+def cancel_task(org_id: str, task_id: str):
+    task = _registry.get(task_id)
+    if not task or task.org_id != org_id:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    _registry.update(
+        task_id,
+        phase="error",
+        status="error",
+        error="用户取消",
+        completed_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    return {"cancelled": task_id}
+
+
 @router.delete("/orgs/{org_id}/tasks/{task_id}")
 def delete_task(org_id: str, task_id: str):
     task = _registry.get(task_id)
@@ -95,3 +100,8 @@ def delete_task(org_id: str, task_id: str):
     with _registry._conn() as conn:
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     return {"deleted": task_id}
+
+
+@router.get("/orgs/{org_id}/experiences")
+def get_experiences(org_id: str, task_type: str | None = None, limit: int = 20):
+    return {"experiences": list_experiences(org_id, task_type=task_type, limit=limit)}

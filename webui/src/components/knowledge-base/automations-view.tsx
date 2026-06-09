@@ -325,10 +325,17 @@ export function AutomationsView() {
             <Timer className="size-6 text-brand-primary" strokeWidth={1.5} />
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] font-medium tracking-wide text-shell-muted">HiveMind 运营</p>
+            <p className="text-[11px] font-medium tracking-wide text-shell-muted">任务中心</p>
             <h2 className="mt-1 text-[22px] font-semibold tracking-tight text-shell-text md:text-[24px]">
-              自动化任务
+              定时运维
             </h2>
+            <p className="mt-1 text-[13px] text-shell-muted">
+              按周期自动运行的内置任务，与
+              <Link href="/tasks/agent" className="mx-1 text-brand-primary hover:underline">
+                自主任务
+              </Link>
+              互补。
+            </p>
             
           </div>
         </div>

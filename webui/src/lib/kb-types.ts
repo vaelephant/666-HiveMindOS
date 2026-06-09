@@ -1,7 +1,98 @@
+export type StepReflection = {
+  score?: number;
+  status?: string;
+  reason?: string;
+  problems?: string[];
+  dimensions?: Record<string, number | string>;
+  passed?: boolean;
+};
+
 export type TaskStep = {
-  tool: string;
-  args: Record<string, string>;
-  result: string;
+  tool?: string;
+  args?: Record<string, string>;
+  result?: string;
+  task_id?: string;
+  name?: string;
+  action?: string;
+  status?: string;
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
+  result_summary?: Record<string, unknown>;
+  reflection?: StepReflection;
+};
+
+export type AgentExperience = {
+  id: string;
+  org_id: string;
+  task_type: string;
+  goal: string;
+  success: boolean;
+  score: number | null;
+  created_at: string;
+};
+
+export type TaskPhase =
+  | 'pending'
+  | 'planning'
+  | 'planned'
+  | 'executing'
+  | 'reflecting'
+  | 'done'
+  | 'error'
+  | 'awaiting_approval';
+
+export type QueueTaskItem = {
+  id: string;
+  name: string;
+  action: string;
+  status: string;
+  reason?: string;
+  gate?: string;
+};
+
+export type PlanningMinute = {
+  role: string;
+  label: string;
+  summary: string;
+  detail?: string;
+  fallback?: boolean;
+};
+
+export type CommitteeRoleMeta = {
+  id: string;
+  label: string;
+  description: string;
+  order: number;
+};
+
+export type TaskPlan = {
+  goal: string;
+  task_type: string;
+  rubric_id: string;
+  success_criteria: string[];
+  estimated_risk: string;
+  tasks: QueueTaskItem[];
+  planning_mode?: 'committee' | 'single';
+  planning_minutes?: PlanningMinute[];
+  planning_active_role?: string | null;
+  committee_roles?: CommitteeRoleMeta[];
+};
+
+export type TaskConstraints = {
+  source?: 'chat_upgrade' | 'task_center';
+  session_id?: string;
+  turn_index?: number;
+  context?: {
+    turns?: Array<{
+      question: string;
+      answer: string;
+      sources?: { path: string; name: string }[];
+      memories_used?: { id: number; title: string; memory_type: string }[];
+    }>;
+    wiki_paths?: string[];
+    memory_ids?: number[];
+  };
 };
 
 export type AgentTask = {
@@ -9,9 +100,18 @@ export type AgentTask = {
   org_id: string;
   input: string;
   status: 'pending' | 'running' | 'done' | 'error';
+  phase?: TaskPhase;
+  task_type?: string;
+  constraints?: TaskConstraints & Record<string, unknown>;
+  plan?: TaskPlan | null;
+  queue?: QueueTaskItem[];
   steps: TaskStep[];
+  reflections?: Record<string, unknown>[];
+  score?: number | null;
   result: string | null;
   error: string | null;
+  pending_step_id?: string | null;
+  experience_id?: string | null;
   created_at: string;
   completed_at: string | null;
 };

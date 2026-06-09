@@ -19,6 +19,8 @@ import {
   KNOWLEDGE_BASE_CHILDREN,
   PLATFORM_HOME_PATH,
   PRIMARY_NAV,
+  TASK_CENTER_BASE_PATH,
+  TASK_CENTER_CHILDREN,
   TOP_NAV,
   isIpfsMonitorChildActive,
   type PrimaryNavItem,
@@ -54,12 +56,22 @@ function isKnowledgeBaseItem(item: PrimaryNavItem): item is Extract<PrimaryNavIt
   return item.navKey === 'knowledge_base';
 }
 
+function isTaskCenterItem(item: PrimaryNavItem): item is Extract<PrimaryNavItem, { navKey: 'task_center' }> {
+  return item.navKey === 'task_center';
+}
+
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [annotationOpen, setAnnotationOpen] = useState(() => pathname.startsWith('/annotation'));
   const [ipfsMonitorOpen, setIpfsMonitorOpen] = useState(() => pathname.startsWith(IPFS_MONITOR_BASE_PATH));
   const [knowledgeBaseOpen, setKnowledgeBaseOpen] = useState(() => pathname.startsWith(KB_BASE_PATH));
+  const [taskCenterOpen, setTaskCenterOpen] = useState(
+    () =>
+      pathname.startsWith(TASK_CENTER_BASE_PATH) ||
+      pathname.startsWith('/agent-tasks') ||
+      pathname.startsWith('/automations'),
+  );
 
   useEffect(() => {
     if (pathname.startsWith('/annotation')) setAnnotationOpen(true);
@@ -71,6 +83,16 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     if (pathname.startsWith(KB_BASE_PATH)) setKnowledgeBaseOpen(true);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (
+      pathname.startsWith(TASK_CENTER_BASE_PATH) ||
+      pathname.startsWith('/agent-tasks') ||
+      pathname.startsWith('/automations')
+    ) {
+      setTaskCenterOpen(true);
+    }
   }, [pathname]);
 
   const navLinkClass = (active: boolean, collapsed: boolean) =>
@@ -268,6 +290,59 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                         <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
                           {KNOWLEDGE_BASE_CHILDREN.map((child) => {
                             const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                            return (
+                              <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
+                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+                                <span className="truncate">{child.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            } else if (isTaskCenterItem(item)) {
+              const tasksActive =
+                pathname.startsWith(TASK_CENTER_BASE_PATH) ||
+                pathname.startsWith('/agent-tasks') ||
+                pathname.startsWith('/automations');
+              el = navCollapsed ? (
+                <Link
+                  key={item.navKey}
+                  href={`${TASK_CENTER_BASE_PATH}/agent`}
+                  title={item.label}
+                  className={navLinkClass(tasksActive, true)}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                </Link>
+              ) : (
+                <div key={item.navKey} className="space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setTaskCenterOpen((o) => !o)}
+                    className={navLinkClass(tasksActive, false)}
+                  >
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-shell-muted transition-transform ${taskCenterOpen ? 'rotate-0' : '-rotate-90'}`}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {taskCenterOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
+                          {TASK_CENTER_CHILDREN.map((child) => {
+                            const active =
+                              pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (
                               <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
                                 <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />

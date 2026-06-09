@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { ArrowUp, Bot, Brain, ChevronDown, Loader2, Sparkles, User } from 'lucide-react';
 import { useState } from 'react';
 import { TurnEvolutionHint } from '@/components/knowledge-base/chat-evolution-panel';
+import { ChatUpgradeSessionBanner, ChatUpgradeTurnHint } from '@/components/knowledge-base/chat-upgrade-hint';
 import type { ChatTurn, MemoryUsed, SessionPipeline } from '@/lib/kb-types';
+import type { UpgradeSuggestion } from '@/lib/chat-task-upgrade';
 import { MEMORY_TYPE_LABEL } from '@/lib/kb-labels';
 import { wikiHref } from '@/lib/wiki-links';
 import { cn } from '@/lib/utils';
@@ -231,12 +233,18 @@ function AssistantMessage({
   turn,
   onFollowUp,
   showEvolutionHint,
+  showUpgradeHint,
+  upgradeSuggestion,
+  onUpgrade,
   extracting,
   pipeline,
 }: {
   turn: ChatTurn;
   onFollowUp: (q: string) => void;
   showEvolutionHint?: boolean;
+  showUpgradeHint?: boolean;
+  upgradeSuggestion?: UpgradeSuggestion | null;
+  onUpgrade?: () => void;
   extracting?: boolean;
   pipeline?: SessionPipeline | null;
 }) {
@@ -250,6 +258,9 @@ function AssistantMessage({
           <div className="mt-3">
             <TurnEvolutionHint extracting={!!extracting} pipeline={pipeline ?? null} />
           </div>
+        )}
+        {showUpgradeHint && upgradeSuggestion && onUpgrade && (
+          <ChatUpgradeTurnHint suggestion={upgradeSuggestion} onUpgrade={onUpgrade} />
         )}
         <FollowUpChips items={turn.follow_ups} onSelect={onFollowUp} />
       </div>
@@ -288,12 +299,18 @@ function TurnPair({
   turn,
   onFollowUp,
   showEvolutionHint,
+  showUpgradeHint,
+  upgradeSuggestion,
+  onUpgrade,
   extracting,
   pipeline,
 }: {
   turn: ChatTurn;
   onFollowUp: (q: string) => void;
   showEvolutionHint?: boolean;
+  showUpgradeHint?: boolean;
+  upgradeSuggestion?: UpgradeSuggestion | null;
+  onUpgrade?: () => void;
   extracting?: boolean;
   pipeline?: SessionPipeline | null;
 }) {
@@ -304,6 +321,9 @@ function TurnPair({
         turn={turn}
         onFollowUp={onFollowUp}
         showEvolutionHint={showEvolutionHint}
+        showUpgradeHint={showUpgradeHint}
+        upgradeSuggestion={upgradeSuggestion}
+        onUpgrade={onUpgrade}
         extracting={extracting}
         pipeline={pipeline}
       />
@@ -435,6 +455,8 @@ export function ChatThread({
   pipeline = null,
   streamText = '',
   streamPhase = null,
+  upgradeSuggestion = null,
+  onUpgrade,
 }: {
   turns: ChatTurn[];
   pending: string | null;
@@ -446,6 +468,8 @@ export function ChatThread({
   pipeline?: SessionPipeline | null;
   streamText?: string;
   streamPhase?: 'gathering' | 'writing' | null;
+  upgradeSuggestion?: UpgradeSuggestion | null;
+  onUpgrade?: () => void;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -457,6 +481,9 @@ export function ChatThread({
               turn={turn}
               onFollowUp={onSend}
               showEvolutionHint={i === turns.length - 1 && !pending}
+              showUpgradeHint={i === turns.length - 1 && !pending && !!onUpgrade}
+              upgradeSuggestion={upgradeSuggestion}
+              onUpgrade={onUpgrade}
               extracting={extracting}
               pipeline={pipeline}
             />
@@ -473,6 +500,13 @@ export function ChatThread({
 
       <div className="shrink-0 bg-gradient-to-t from-shell-bg via-shell-bg to-transparent px-5 pb-4 pt-2">
         <div className="mx-auto w-full max-w-5xl">
+          {upgradeSuggestion && onUpgrade && (
+            <ChatUpgradeSessionBanner
+              suggestion={upgradeSuggestion}
+              turnCount={turns.length}
+              onUpgrade={onUpgrade}
+            />
+          )}
           <ChatInputBar
             value={input}
             onChange={onInputChange}
@@ -482,6 +516,18 @@ export function ChatThread({
           />
           <p className="mt-2 text-center text-[11px] text-shell-muted">
             回答基于知识库与智慧记忆，重要决策请核实原文
+            {onUpgrade && turns.length > 0 && !upgradeSuggestion?.recommended && (
+              <>
+                {' · '}
+                <button
+                  type="button"
+                  onClick={onUpgrade}
+                  className="text-brand-primary hover:underline"
+                >
+                  从此对话创建任务
+                </button>
+              </>
+            )}
           </p>
         </div>
       </div>

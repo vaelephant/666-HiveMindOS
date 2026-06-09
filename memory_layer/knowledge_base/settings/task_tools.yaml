@@ -1,0 +1,92 @@
+# 自主任务引擎 — Planner 可见的 action 清单（与 TaskToolExecutor 同步）
+
+actions:
+  - name: get_org_stats
+    domain: meta
+    description: 获取组织候选池与智慧概况
+    params: {}
+
+  - name: search_memories
+    domain: memory
+    description: 按分类与时间范围搜索活跃智慧
+    params:
+      category: { type: string, optional: true }
+      since_days: { type: integer, optional: true, default: 7 }
+      query: { type: string, optional: true }
+
+  - name: list_sessions
+    domain: memory
+    description: 列出近期聊天会话
+    params:
+      since_days: { type: integer, optional: true, default: 7 }
+      limit: { type: integer, optional: true, default: 20 }
+
+  - name: read_session
+    domain: memory
+    description: 读取指定会话的消息记录
+    params:
+      session_id: { type: string, required: true }
+
+  - name: search_wiki
+    domain: knowledge
+    description: 搜索 Wiki 页面
+    params:
+      query: { type: string, required: true }
+
+  - name: read_page
+    domain: knowledge
+    description: 读取 Wiki 页面全文
+    params:
+      path: { type: string, required: true }
+
+  - name: list_entities
+    domain: knowledge
+    description: 列出知识图谱实体
+    params:
+      entity_type: { type: string, optional: true }
+
+  - name: extract_facts
+    domain: extract
+    description: 从记忆/会话内容提炼结构化事实
+    params:
+      sources: { type: array, required: true }
+      category: { type: string, optional: true }
+
+  - name: enqueue_candidates
+    domain: candidate
+    description: 将事实批量写入候选池
+    params:
+      facts: { type: array, required: true }
+
+  - name: resolve_candidates
+    domain: candidate
+    description: Resolver 批量解析 pending 候选
+    params:
+      limit: { type: integer, optional: true, default: 30 }
+
+  - name: compile_candidates
+    domain: candidate
+    description: 将 approved 候选编译进 Wiki
+    params:
+      limit: { type: integer, optional: true, default: 20 }
+
+  - name: llm_generate
+    domain: generate
+    description: 基于上下文生成结构化文本
+    params:
+      prompt: { type: string, required: true }
+      context: { type: string, optional: true }
+
+  - name: web_search
+    domain: web
+    description: 搜索互联网获取客户/市场公开信息（优先 Tavily，否则 DuckDuckGo）
+    params:
+      query: { type: string, required: true }
+      limit: { type: integer, optional: true, default: 5 }
+
+  - name: read_url
+    domain: web
+    description: 读取网页正文（用于补充客户背景、新闻等）
+    params:
+      url: { type: string, required: true }
+      max_chars: { type: integer, optional: true, default: 8000 }

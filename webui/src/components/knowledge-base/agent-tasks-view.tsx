@@ -1,62 +1,52 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Bot, ChevronDown, ChevronRight, Loader2, Send, Trash2, Wrench } from 'lucide-react';
-import { WikiMarkdown } from '@/components/knowledge-base/wiki-markdown';
-import { createTask, deleteTask, getTask, listTasks } from '@/lib/kb-api';
-import type { AgentTask, TaskStep } from '@/lib/kb-types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, Brain, Loader2, Send, Trash2, XCircle } from 'lucide-react';
+import {
+  TaskApprovalPanel,
+  TaskErrorPanel,
+  TaskExecutionTimeline,
+  TaskFinalReport,
+  TaskPlanningCommittee,
+  TaskPlanSummary,
+} from '@/components/knowledge-base/agent-task-detail';
+import {
+  approveTask,
+  cancelTask,
+  createTask,
+  deleteTask,
+  getTask,
+  listExperiences,
+  listTasks,
+} from '@/lib/kb-api';
+import type { AgentExperience, AgentTask, TaskPhase } from '@/lib/kb-types';
+import { type TaskFilter, taskMatchesFilter } from '@/lib/task-display';
 
-const TOOL_LABELS: Record<string, string> = {
-  search_wiki: '搜索 Wiki',
-  read_page: '读取页面',
-  list_entities: '查询实体',
+const PHASE_LABEL: Record<TaskPhase, string> = {
+  pending: '等待中',
+  planning: '规划中',
+  planned: '计划就绪',
+  executing: '执行中',
+  reflecting: '生成报告',
+  done: '已完成',
+  error: '出错',
+  awaiting_approval: '待批准',
 };
 
-const STATUS_DOT: Record<AgentTask['status'], string> = {
+const STATUS_DOT: Record<string, string> = {
   pending: 'bg-shell-muted',
   running: 'bg-status-warning animate-pulse',
   done: 'bg-status-success',
   error: 'bg-status-error',
+  awaiting_approval: 'bg-amber-500 animate-pulse',
 };
 
-const STATUS_LABEL: Record<AgentTask['status'], string> = {
-  pending: '等待中',
-  running: '执行中',
-  done: '已完成',
-  error: '出错',
-};
-
-function StepRow({ step }: { step: TaskStep }) {
-  const [open, setOpen] = useState(false);
-  const label = TOOL_LABELS[step.tool] ?? step.tool;
-  const argSummary = Object.values(step.args)[0] as string | undefined;
-
-  return (
-    <div className="rounded-lg border border-shell-border bg-shell-bg text-[12px]">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
-      >
-        <Wrench className="size-3 shrink-0 text-brand-primary" />
-        <span className="font-medium text-shell-text">{label}</span>
-        {argSummary && (
-          <span className="min-w-0 truncate text-shell-muted">— {argSummary}</span>
-        )}
-        {open ? (
-          <ChevronDown className="ml-auto size-3 shrink-0 text-shell-muted" />
-        ) : (
-          <ChevronRight className="ml-auto size-3 shrink-0 text-shell-muted" />
-        )}
-      </button>
-      {open && (
-        <pre className="custom-scrollbar max-h-48 overflow-y-auto border-t border-shell-border px-3 py-2 font-mono text-[11px] text-shell-subtext whitespace-pre-wrap">
-          {step.result}
-        </pre>
-      )}
-    </div>
-  );
-}
+const FILTER_TABS: { key: TaskFilter; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'active', label: '进行中' },
+  { key: 'approval', label: '待批准' },
+  { key: 'done', label: '已完成' },
+];
 
 function TaskCard({
   task,
@@ -69,6 +59,9 @@ function TaskCard({
   onSelect: () => void;
   onDelete: () => void;
 }) {
+  const phase = task.phase ?? (task.status as TaskPhase);
+  const dot = STATUS_DOT[phase === 'awaiting_approval' ? 'awaiting_approval' : task.status] ?? STATUS_DOT.pending;
+
   return (
     <div
       role="button"
@@ -82,7 +75,7 @@ function TaskCard({
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className={`size-2 shrink-0 rounded-full ${STATUS_DOT[task.status]}`} />
+        <span className={`size-2 shrink-0 rounded-full ${dot}`} />
         <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-shell-text">
           {task.input}
         </p>
@@ -95,25 +88,77 @@ function TaskCard({
         </button>
       </div>
       <p className="mt-0.5 pl-4 text-[11px] text-shell-muted">
-        {STATUS_LABEL[task.status]}
-        {task.steps.length > 0 && ` · ${task.steps.length} 步`}
+        {PHASE_LABEL[phase] ?? task.status}
+        {task.task_type && ` · ${task.task_type}`}
+        {task.score != null && ` · ${task.score}分`}
       </p>
     </div>
   );
 }
 
-export function AgentTasksView() {
+function ExperiencePanel({ items }: { items: AgentExperience[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-shell-border bg-shell-panel p-4 shadow-sm">
+      <div className="flex items-center gap-2">
+        <Brain className="size-4 text-brand-primary" />
+        <p className="text-[12px] font-semibold text-shell-text">历史成功经验</p>
+      </div>
+      <p className="mt-1 text-[11px] text-shell-muted">Planner 会参考高分路径拆解类似目标</p>
+      <ul className="mt-3 space-y-2">
+        {items.map((exp) => (
+          <li
+            key={exp.id}
+            className="rounded-lg border border-shell-border bg-shell-bg px-3 py-2 text-[12px]"
+          >
+            <p className="line-clamp-2 font-medium text-shell-text">{exp.goal}</p>
+            <p className="mt-0.5 text-[11px] text-shell-muted">
+              {exp.task_type}
+              {exp.score != null && ` · ${exp.score}分`}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function AgentTasksView({ initialTaskId }: { initialTaskId?: string | null }) {
   const [tasks, setTasks] = useState<AgentTask[]>([]);
+  const [experiences, setExperiences] = useState<AgentExperience[]>([]);
+  const [filter, setFilter] = useState<TaskFilter>('all');
   const [input, setInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AgentTask | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    listTasks().then(setTasks).catch(() => {});
-  }, []);
+    listTasks()
+      .then((list) => {
+        setTasks(list);
+        if (initialTaskId) {
+          const found = list.find((t) => t.id === initialTaskId);
+          if (found) {
+            setSelectedId(found.id);
+            setDetail(found);
+          } else {
+            getTask(initialTaskId)
+              .then((t) => {
+                setSelectedId(t.id);
+                setDetail(t);
+                setTasks((prev) => (prev.some((p) => p.id === t.id) ? prev : [t, ...prev]));
+              })
+              .catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
+    listExperiences(undefined, undefined, 4).then(setExperiences).catch(() => {});
+  }, [initialTaskId]);
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -124,8 +169,11 @@ export function AgentTasksView() {
         const t = await getTask(selectedId);
         setDetail(t);
         setTasks((prev) => prev.map((p) => (p.id === t.id ? t : p)));
-        if (t.status === 'done' || t.status === 'error') {
+        const terminal = t.status === 'done' || t.status === 'error';
+        const waiting = t.phase === 'awaiting_approval';
+        if (terminal && !waiting) {
           if (pollRef.current) clearInterval(pollRef.current);
+          listExperiences(undefined, undefined, 4).then(setExperiences).catch(() => {});
         }
       } catch {
         if (pollRef.current) clearInterval(pollRef.current);
@@ -133,22 +181,62 @@ export function AgentTasksView() {
     };
 
     poll();
-    pollRef.current = setInterval(poll, 1500);
+    pollRef.current = setInterval(poll, 700);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [selectedId]);
+
+  const filteredTasks = useMemo(
+    () => tasks.filter((t) => taskMatchesFilter(t, filter)),
+    [tasks, filter],
+  );
+
+  const filterCounts = useMemo(() => ({
+    all: tasks.length,
+    active: tasks.filter((t) => taskMatchesFilter(t, 'active')).length,
+    approval: tasks.filter((t) => taskMatchesFilter(t, 'approval')).length,
+    done: tasks.filter((t) => taskMatchesFilter(t, 'done')).length,
+  }), [tasks]);
 
   async function handleSubmit() {
     const q = input.trim();
     if (!q || submitting) return;
     setSubmitting(true);
     try {
-      const task = await createTask(q);
+      const task = await createTask(q, {
+        constraints: { source: 'task_center' },
+      });
       setTasks((prev) => [task, ...prev]);
       setInput('');
       setSelectedId(task.id);
       setDetail(task);
+      setFilter('all');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleApprove() {
+    if (!detail || approving) return;
+    setApproving(true);
+    try {
+      const t = await approveTask(detail.id, detail.pending_step_id ?? undefined);
+      setDetail(t);
+      setTasks((prev) => prev.map((p) => (p.id === t.id ? t : p)));
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!detail || cancelling) return;
+    setCancelling(true);
+    try {
+      await cancelTask(detail.id);
+      const t = await getTask(detail.id);
+      setDetail(t);
+      setTasks((prev) => prev.map((p) => (p.id === t.id ? t : p)));
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -165,6 +253,15 @@ export function AgentTasksView() {
     }
   }
 
+  const isRunning = detail && (
+    detail.status === 'running'
+    || detail.phase === 'planning'
+    || detail.phase === 'executing'
+    || detail.phase === 'reflecting'
+  );
+
+  const canCancel = detail && isRunning && detail.phase !== 'awaiting_approval';
+
   return (
     <div className="flex min-h-[calc(100dvh-3.25rem)] gap-4 pb-6">
       <aside className="flex w-64 shrink-0 flex-col overflow-hidden rounded-2xl border border-shell-border bg-shell-panel shadow-sm lg:w-72">
@@ -174,19 +271,39 @@ export function AgentTasksView() {
               <Bot className="size-4 text-brand-primary" strokeWidth={1.75} />
             </div>
             <div>
-              <p className="text-[13px] font-semibold text-shell-text">分析任务</p>
-              <p className="text-[11px] text-shell-muted">多步骤分析 · 分钟级报告</p>
+              <p className="text-[13px] font-semibold text-shell-text">自主任务</p>
+              <p className="text-[11px] text-shell-muted">规划 · 执行 · 反思 · 沉淀</p>
             </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setFilter(tab.key)}
+                className={[
+                  'rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+                  filter === tab.key
+                    ? 'bg-brand-primary/10 text-brand-primary'
+                    : 'text-shell-muted hover:bg-shell-bg hover:text-shell-text',
+                ].join(' ')}
+              >
+                {tab.label}
+                {filterCounts[tab.key] > 0 && (
+                  <span className="ml-1 opacity-70">{filterCounts[tab.key]}</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
 
         <ul className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-2">
-          {tasks.length === 0 ? (
+          {filteredTasks.length === 0 ? (
             <li className="rounded-xl bg-shell-bg px-3 py-8 text-center text-[13px] text-shell-muted">
-              暂无任务
+              {tasks.length === 0 ? '暂无任务' : '该筛选下暂无任务'}
             </li>
           ) : (
-            tasks.map((t) => (
+            filteredTasks.map((t) => (
               <li key={t.id}>
                 <TaskCard
                   task={t}
@@ -203,16 +320,17 @@ export function AgentTasksView() {
       <div className="flex min-w-0 flex-1 flex-col gap-4">
         <div className="rounded-2xl border border-shell-border bg-shell-panel p-4 shadow-sm">
           <textarea
-            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="输入任务，例如：帮我整理中康尚德所有应收款相关信息，并判断风险等级"
+            placeholder="描述业务目标，例如：帮我整理本周项目决策进 Wiki；或：分析某某客户并生成销售方案"
             rows={3}
             className="w-full resize-none bg-transparent text-[14px] text-shell-text outline-none placeholder:text-shell-muted"
           />
           <div className="mt-3 flex items-center justify-between">
-            <p className="text-[12px] text-shell-muted">⌘ Enter 提交 · 将自动检索知识库并逐步推理</p>
+            <p className="text-[12px] text-shell-muted">
+              ⌘ Enter 提交 · 规划委员会讨论后自动执行
+            </p>
             <button
               type="button"
               onClick={handleSubmit}
@@ -220,59 +338,58 @@ export function AgentTasksView() {
               className="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-[13px] font-medium text-brand-on-primary shadow-sm transition-opacity disabled:opacity-50 hover:opacity-90"
             >
               {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-              执行任务
+              启动任务
             </button>
           </div>
         </div>
 
+        {!detail && <ExperiencePanel items={experiences} />}
+
         {detail ? (
           <div className="space-y-3">
-            {detail.steps.length > 0 && (
-              <div className="rounded-2xl border border-shell-border bg-shell-panel p-4 shadow-sm">
-                <p className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-shell-muted">
-                  执行步骤 · {detail.steps.length} 步
-                </p>
-                <div className="space-y-2">
-                  {detail.steps.map((step, i) => (
-                    <StepRow key={i} step={step} />
-                  ))}
-                  {detail.status === 'running' && (
-                    <div className="flex items-center gap-2 px-3 py-2 text-[12px] text-shell-muted">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      正在思考…
-                    </div>
-                  )}
-                </div>
+            {canCancel && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border px-3 py-1.5 text-[12px] text-shell-muted transition-colors hover:border-status-error/40 hover:text-status-error disabled:opacity-50"
+                >
+                  {cancelling ? <Loader2 className="size-3.5 animate-spin" /> : <XCircle className="size-3.5" />}
+                  取消任务
+                </button>
               </div>
             )}
 
-            {detail.status === 'running' && detail.steps.length === 0 && (
+            <TaskPlanningCommittee task={detail} />
+            <TaskPlanSummary task={detail} />
+            <TaskApprovalPanel task={detail} approving={approving} onApprove={handleApprove} />
+            <TaskExecutionTimeline task={detail} isRunning={!!isRunning} />
+
+            {isRunning && detail.steps.length === 0 && !detail.plan && (
               <div className="flex items-center gap-2 rounded-2xl border border-shell-border bg-shell-panel p-6 text-[14px] text-shell-muted shadow-sm">
                 <Loader2 className="size-4 animate-spin" />
-                正在启动…
+                {PHASE_LABEL[detail.phase ?? 'planning'] ?? '正在启动…'}
               </div>
             )}
 
-            {detail.status === 'done' && detail.result && (
-              <article className="rounded-2xl border border-shell-border bg-shell-panel p-6 shadow-sm md:p-8">
-                <WikiMarkdown md={detail.result} />
-              </article>
-            )}
+            <TaskFinalReport task={detail} />
+            <TaskErrorPanel task={detail} />
 
-            {detail.status === 'error' && (
-              <div className="rounded-2xl border border-status-error/30 bg-status-error/5 p-4 text-[13px] text-status-error">
-                执行出错：{detail.error}
-              </div>
+            {detail.experience_id && (
+              <p className="text-center text-[11px] text-shell-muted">
+                本次执行已写入经验库，可供后续类似目标参考
+              </p>
             )}
           </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-shell-border bg-shell-panel/50 p-10 text-center">
             <div className="flex size-14 items-center justify-center rounded-2xl bg-brand-primary/10">
-              <Bot className="size-7 text-brand-primary" strokeWidth={1.5} />
+              <Bot className="size-7 text-brand-primary" strokeWidth={1.75} />
             </div>
-            <p className="mt-4 text-[15px] font-medium text-shell-text">提交一个分析任务</p>
-            <p className="mt-1 max-w-xs text-[13px] text-shell-muted">
-              系统会主动搜索知识库、逐步推理，最终给出结构化答案
+            <p className="mt-4 text-[15px] font-medium text-shell-text">提交一个业务目标</p>
+            <p className="mt-1 max-w-sm text-[13px] text-shell-muted">
+              系统会自动拆解任务、逐步执行、反思检查，并将成功经验沉淀复用
             </p>
           </div>
         )}

@@ -33,6 +33,7 @@ MAX_FILE_SIZE_BYTES: int = 20 * 1024 * 1024  # 20MB
 QDRANT_URL: str = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY: str = os.environ.get("QDRANT_API_KEY", "")
 QDRANT_COLLECTION: str = os.environ.get("QDRANT_COLLECTION", "hivemind_memories")
+EXPERIENCE_COLLECTION: str = os.environ.get("EXPERIENCE_COLLECTION", "hivemind_experiences")
 EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
 EMBEDDING_DIM: int = int(os.environ.get("EMBEDDING_DIM", "1536"))
 QDRANT_ENABLED: bool = os.environ.get("QDRANT_ENABLED", "true").lower() in ("1", "true", "yes")

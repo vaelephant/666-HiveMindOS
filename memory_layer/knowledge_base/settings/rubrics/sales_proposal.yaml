@@ -1,0 +1,22 @@
+task_type: sales_proposal
+label: 客户分析与销售方案
+pass_score: 80
+criteria:
+  - name: 目标清晰度
+    weight: 20
+    check: 是否明确销售目标、线索目标、时间周期
+  - name: 客户定位
+    weight: 15
+    check: 是否明确目标客户、使用场景、购买决策人
+  - name: 卖点表达
+    weight: 20
+    check: 是否把产品价值讲清楚，而不是堆功能
+  - name: 渠道策略
+    weight: 15
+    check: 是否说明每个渠道怎么打
+  - name: 执行计划
+    weight: 20
+    check: 是否有时间表、负责人、预算、动作
+  - name: 数据指标
+    weight: 10
+    check: 是否有可衡量的 KPI

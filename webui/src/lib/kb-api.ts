@@ -1,4 +1,5 @@
 import type {
+  AgentExperience,
   AgentTask,
   AutomationJob,
   AutomationJobUpdate,
@@ -71,11 +72,18 @@ export async function queryKnowledge(question: string, orgId = DEFAULT_ORG): Pro
   });
 }
 
-export async function createTask(input: string, orgId = DEFAULT_ORG): Promise<AgentTask> {
+export async function createTask(
+  input: string,
+  options?: { orgId?: string; constraints?: Record<string, unknown> },
+): Promise<AgentTask> {
+  const orgId = options?.orgId ?? DEFAULT_ORG;
   return req(`${base(orgId)}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ input }),
+    body: JSON.stringify({
+      input,
+      ...(options?.constraints ? { constraints: options.constraints } : {}),
+    }),
   });
 }
 
@@ -90,6 +98,34 @@ export async function getTask(taskId: string, orgId = DEFAULT_ORG): Promise<Agen
 
 export async function deleteTask(taskId: string, orgId = DEFAULT_ORG): Promise<void> {
   await req(`${base(orgId)}/tasks/${taskId}`, { method: 'DELETE' });
+}
+
+export async function approveTask(
+  taskId: string,
+  fromTask?: string,
+  orgId = DEFAULT_ORG,
+): Promise<AgentTask> {
+  return req(`${base(orgId)}/tasks/${taskId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_task: fromTask ?? null }),
+  });
+}
+
+export async function cancelTask(taskId: string, orgId = DEFAULT_ORG): Promise<void> {
+  await req(`${base(orgId)}/tasks/${taskId}/cancel`, { method: 'POST' });
+}
+
+export async function listExperiences(
+  orgId = DEFAULT_ORG,
+  taskType?: string,
+  limit = 5,
+): Promise<AgentExperience[]> {
+  const url = new URL(`${base(orgId)}/experiences`, window.location.origin);
+  if (taskType) url.searchParams.set('task_type', taskType);
+  url.searchParams.set('limit', String(limit));
+  const data = await req<{ experiences: AgentExperience[] }>(url.pathname + url.search);
+  return data.experiences;
 }
 
 export async function listAutomations(orgId = DEFAULT_ORG): Promise<AutomationJob[]> {

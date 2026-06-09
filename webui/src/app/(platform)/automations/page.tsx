@@ -1,5 +1,5 @@
-import { AutomationsView } from '@/components/knowledge-base/automations-view';
+import { redirect } from 'next/navigation';
 
-export default function AutomationsPage() {
-  return <AutomationsView />;
+export default function AutomationsRedirectPage() {
+  redirect('/tasks/ops');
 }
