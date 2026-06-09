@@ -153,6 +153,36 @@ export function taskMatchesFilter(task: AgentTask, filter: TaskFilter): boolean 
   return task.status === 'running' || activePhases.has(task.phase ?? '');
 }
 
+const DIMENSION_LABELS: Record<string, string> = {
+  completeness: '完整性',
+  accuracy: '准确性',
+  executability: '可执行性',
+  完整性: '完整性',
+  准确性: '准确性',
+  可执行性: '可执行性',
+};
+
+const DIMENSION_ORDER = ['完整性', '准确性', '可执行性'];
+
+export type ScoreTier = 'success' | 'warning' | 'error';
+
+export function normalizeDimensionName(name: string): string {
+  return DIMENSION_LABELS[name] ?? name;
+}
+
+export function scoreTier(score: number): ScoreTier {
+  if (score >= 80) return 'success';
+  if (score >= 60) return 'warning';
+  return 'error';
+}
+
+export function scoreTierLabel(score: number): string {
+  const tier = scoreTier(score);
+  if (tier === 'success') return '优秀';
+  if (tier === 'warning') return '尚可';
+  return '待改进';
+}
+
 export function collectDimensionScores(task: AgentTask): Record<string, number[]> {
   const out: Record<string, number[]> = {};
   for (const step of task.steps) {
@@ -161,7 +191,8 @@ export function collectDimensionScores(task: AgentTask): Record<string, number[]
     for (const [k, v] of Object.entries(dims)) {
       const num = typeof v === 'number' ? v : parseInt(String(v), 10);
       if (!Number.isFinite(num)) continue;
-      (out[k] ??= []).push(num);
+      const label = normalizeDimensionName(k);
+      (out[label] ??= []).push(num);
     }
   }
   return out;
@@ -169,8 +200,16 @@ export function collectDimensionScores(task: AgentTask): Record<string, number[]
 
 export function avgDimensionScores(task: AgentTask): { name: string; score: number }[] {
   const grouped = collectDimensionScores(task);
-  return Object.entries(grouped).map(([name, scores]) => ({
+  const items = Object.entries(grouped).map(([name, scores]) => ({
     name,
     score: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
   }));
+  return items.sort((a, b) => {
+    const ai = DIMENSION_ORDER.indexOf(a.name);
+    const bi = DIMENSION_ORDER.indexOf(b.name);
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 }

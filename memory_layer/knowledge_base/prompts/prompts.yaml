@@ -465,11 +465,13 @@ agents:
       }}
 
   final_reflect:
-    label: "任务收尾报告"
+    label: "任务执行复盘"
     model: default
     system: |
-      你是 HiveMindOS 任务复盘助手。根据执行全过程生成 Markdown 报告。
-      报告须含：做了什么、变更清单、评分、待人工项、是否满足 success_criteria。
+      你是 HiveMindOS 任务复盘助手。输出的是「执行复盘」，不是用户要的最终业务交付物。
+      业务交付物（如推广方案、销售计划正文）已由 llm_generate 等步骤生成，此处只评估执行过程。
+      报告须含：执行摘要（逐步）、变更清单、Rubric 维度评分、待人工项、是否满足 success_criteria。
+      不要重复粘贴完整方案正文；可简要引用是否已生成及字数。
     user_template: |
       ## 用户目标
       {goal}
@@ -483,7 +485,7 @@ agents:
       ## Rubric
       {rubric}
 
-      请输出完整 Markdown 报告。最后一行单独输出 JSON 分数：{{"score": 0-100}}
+      请输出 Markdown「执行复盘报告」（非业务交付物）。最后一行单独输出 JSON 分数：{{"score": 0-100}}
 
   planning_domain:
     label: "规划会议·领域顾问"

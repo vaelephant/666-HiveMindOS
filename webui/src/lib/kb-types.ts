@@ -109,6 +109,7 @@ export type AgentTask = {
   reflections?: Record<string, unknown>[];
   score?: number | null;
   result: string | null;
+  reflection_report?: string | null;
   error: string | null;
   pending_step_id?: string | null;
   experience_id?: string | null;

@@ -1,6 +1,9 @@
-# 企业执行知识库
+# 企业执行知识库（知识沉淀层）
 
-HiveMindOS `memory_layer` 的核心子模块。
+HiveMindOS `memory_layer` 的核心子模块 — **Wiki / 智慧 / 候选池 / Chat**，不是指挥中心。
+
+自主任务引擎（Plan → Execute → Reflect）已迁至顶层包 **`agent_engine/`**，见 `agent_engine/README.md`。  
+全仓库目录说明：[项目文档/0-程序目录结构.md](../../项目文档/0-程序目录结构.md)
 
 不是普通 RAG 问答，而是把企业原始资料**编译**成持续成长的知识网络。
 

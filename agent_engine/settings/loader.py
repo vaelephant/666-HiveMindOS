@@ -1,7 +1,4 @@
-"""知识沉淀层配置加载器（taxonomy / wiki / pipeline / tools / resolver / recall / automations）。
-
-自主任务引擎配置见 agent_engine/settings/。
-"""
+"""自主任务引擎配置加载器（委员会 / 工具白名单 / gate / rubrics）。"""
 
 from __future__ import annotations
 
@@ -18,13 +15,13 @@ _SETTINGS_DIR = Path(__file__).parent
 def load(name: str) -> dict[str, Any]:
     path = _SETTINGS_DIR / f"{name}.yaml"
     if not path.is_file():
-        raise FileNotFoundError(f"配置文件不存在: {path}")
+        raise FileNotFoundError(f"agent_engine 配置文件不存在: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return data
 
 
 def reload(name: str | None = None) -> None:
-    del name  # 当前实现统一清空缓存
+    del name
     load.cache_clear()
 
 

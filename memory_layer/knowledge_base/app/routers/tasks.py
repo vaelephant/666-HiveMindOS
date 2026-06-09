@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from agent_engine.domain.task_present import task_to_api_dict
+from agent_engine.models.task import Task
+from agent_engine.registry.task_registry import TaskRegistry
+from agent_engine.services.task_service import list_experiences, run_goal
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
-from memory_layer.knowledge_base.core.registry.task_registry import TaskRegistry
-from memory_layer.knowledge_base.core.services.task_service import list_experiences, run_goal
-from memory_layer.knowledge_base.models.task import Task
 
 router = APIRouter()
 log = get_logger("hivemind.tasks")
@@ -54,7 +55,7 @@ def create_task(org_id: str, req: TaskRequest, background_tasks: BackgroundTasks
 @router.get("/orgs/{org_id}/tasks")
 def list_tasks(org_id: str, limit: int = 20):
     tasks = _registry.list(org_id, limit)
-    return {"tasks": [asdict(t) for t in tasks]}
+    return {"tasks": [task_to_api_dict(t) for t in tasks]}
 
 
 @router.get("/orgs/{org_id}/tasks/{task_id}")
@@ -62,7 +63,7 @@ def get_task(org_id: str, task_id: str):
     task = _registry.get(task_id)
     if not task or task.org_id != org_id:
         raise HTTPException(status_code=404, detail="任务不存在")
-    return asdict(task)
+    return task_to_api_dict(task)
 
 
 @router.post("/orgs/{org_id}/tasks/{task_id}/approve")

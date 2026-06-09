@@ -26,9 +26,9 @@
 **Step 1: Write failing tests**
 
 ```python
-from memory_layer.knowledge_base.models.plan import Plan, QueueTask
-from memory_layer.knowledge_base.models.reflection import StepReflectResult
-from memory_layer.knowledge_base.models.task import Task
+from agent_engine.models.plan import Plan, QueueTask
+from agent_engine.models.reflection import StepReflectResult
+from agent_engine.models.task import Task
 
 def test_queue_task_from_dict():
     t = QueueTask.from_dict({
@@ -102,7 +102,7 @@ git commit -m "feat(tasks): add QueueTask, StepReflectResult, extend Goal/Task m
 **Step 1: Write failing test**
 
 ```python
-from memory_layer.knowledge_base.core.domain.rubric import load_rubric, match_task_type
+from agent_engine.domain.rubric import load_rubric, match_task_type
 
 def test_load_wiki_rubric():
     r = load_rubric("wiki_organize_decisions")

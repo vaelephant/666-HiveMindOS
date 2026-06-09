@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import {
   AlertTriangle,
+  BarChart3,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock,
   Loader2,
@@ -22,6 +25,7 @@ import {
   buildTimeline,
   formatStepSummary,
   getApprovalContext,
+  scoreTierLabel,
   type TimelineItem,
 } from '@/lib/task-display';
 
@@ -376,43 +380,160 @@ export function TaskApprovalPanel({
   );
 }
 
-export function TaskFinalReport({ task }: { task: AgentTask }) {
-  if (task.status !== 'done' || !task.result) return null;
+function stripTrailingScoreJson(md: string): string {
+  return md
+    .replace(/```json\s*\{[^{}]*"score"[^`]*```\s*$/s, '')
+    .replace(/\{[^{}]*"score"\s*:\s*\d+[^{}]*\}\s*$/s, '')
+    .trim();
+}
 
-  const dimensions = avgDimensionScores(task);
+function DimensionStat({ name, score }: { name: string; score: number }) {
+  const pct = Math.min(100, Math.max(0, score));
+  return (
+    <div className="rounded-xl border border-shell-border bg-shell-bg px-4 py-3">
+      <p className="text-[11px] text-shell-muted">{name}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-shell-text">{score}</p>
+      <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-brand-primary/10">
+        <div
+          className="h-full rounded-full bg-brand-primary transition-all"
+          style={{ width: `${pct}%`, opacity: 0.35 + (pct / 100) * 0.65 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TaskRecapPanel({
+  score,
+  dimensions,
+  experienceId,
+  recapMd,
+  open,
+  onToggle,
+}: {
+  score: number | null | undefined;
+  dimensions: { name: string; score: number }[];
+  experienceId?: string | null;
+  recapMd?: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const hasScore = score != null;
+  const canExpand = Boolean(recapMd?.trim());
 
   return (
-    <article className="rounded-2xl border border-shell-border bg-shell-panel shadow-sm">
+    <article className="overflow-hidden rounded-2xl border border-shell-border bg-shell-panel shadow-sm">
       <div className="border-b border-shell-border px-5 py-4 md:px-6">
-        <p className="text-[11px] font-medium uppercase tracking-wide text-shell-muted">最终报告</p>
-        {task.score != null && (
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <span className="text-2xl font-semibold tabular-nums text-brand-primary">{task.score}</span>
-            <span className="text-[13px] text-shell-muted">综合评分</span>
-            {task.experience_id && (
-              <span className="rounded-full bg-status-success/10 px-2.5 py-0.5 text-[11px] text-status-success">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-primary/10">
+              <BarChart3 className="size-4 text-brand-primary" strokeWidth={1.75} />
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-shell-text">执行复盘</p>
+              <p className="text-[11px] text-shell-muted">质量评估 · 逐步回顾 · 待办项</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            {experienceId && (
+              <span className="rounded-full border border-brand-primary/20 bg-brand-primary/8 px-2.5 py-0.5 text-[11px] font-medium text-brand-primary">
                 已沉淀经验
               </span>
             )}
-          </div>
-        )}
-        {dimensions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {dimensions.map((d) => (
-              <span
-                key={d.name}
-                className="rounded-lg border border-shell-border bg-shell-bg px-2.5 py-1 text-[11px] text-shell-muted"
+            {canExpand && (
+              <button
+                type="button"
+                onClick={onToggle}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-shell-muted transition-colors hover:bg-shell-bg hover:text-brand-primary"
               >
-                {d.name} <span className="font-medium text-shell-text">{d.score}</span>
-              </span>
-            ))}
+                {open ? '收起' : '详情'}
+                <ChevronDown
+                  className={`size-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
-      <div className="p-5 md:p-8">
-        <WikiMarkdown md={task.result} />
-      </div>
+
+      {(hasScore || dimensions.length > 0) && (
+        <div className="grid gap-3 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4 md:px-6">
+          {hasScore && (
+            <div className="rounded-xl border border-brand-primary/20 bg-brand-primary/5 px-4 py-3 sm:col-span-2 lg:col-span-1">
+              <p className="text-[11px] font-medium text-shell-muted">综合评分</p>
+              <div className="mt-1 flex items-baseline gap-2">
+                <span className="text-3xl font-semibold tabular-nums text-brand-primary">{score}</span>
+                <span className="text-[12px] text-shell-muted">{scoreTierLabel(score)}</span>
+              </div>
+            </div>
+          )}
+          {dimensions.map((d) => (
+            <DimensionStat key={d.name} name={d.name} score={d.score} />
+          ))}
+        </div>
+      )}
+
+      {canExpand && open && recapMd && (
+        <div className="border-t border-shell-border bg-shell-bg/50 px-5 pb-6 pt-4 md:px-8">
+          <WikiMarkdown md={recapMd} />
+        </div>
+      )}
     </article>
+  );
+}
+
+export function TaskFinalReport({ task }: { task: AgentTask }) {
+  const [recapOpen, setRecapOpen] = useState(false);
+  if (task.status !== 'done' || !task.result) return null;
+
+  const dimensions = avgDimensionScores(task);
+  const hasDeliverable = Boolean(task.reflection_report);
+  const recapMd = task.reflection_report
+    ? stripTrailingScoreJson(task.reflection_report)
+    : null;
+
+  return (
+    <div className="space-y-4">
+      <article className="rounded-2xl border border-shell-border bg-shell-panel shadow-sm">
+        <div className="border-b border-shell-border px-5 py-4 md:px-6">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-shell-muted">
+            {hasDeliverable ? '交付物' : '最终报告'}
+          </p>
+          {hasDeliverable && task.score != null && (
+            <p className="mt-1.5 text-[12px] text-shell-muted">
+              综合评分{' '}
+              <span className="font-medium text-brand-primary">{task.score}</span>
+              {task.experience_id ? ' · 已沉淀经验' : ''}
+            </p>
+          )}
+        </div>
+        <div className="p-5 md:p-8">
+          <WikiMarkdown md={task.result} />
+        </div>
+      </article>
+
+      {recapMd ? (
+        <TaskRecapPanel
+          score={task.score}
+          dimensions={dimensions}
+          experienceId={task.experience_id}
+          recapMd={recapMd}
+          open={recapOpen}
+          onToggle={() => setRecapOpen((o) => !o)}
+        />
+      ) : (
+        !hasDeliverable &&
+        task.score != null && (
+          <TaskRecapPanel
+            score={task.score}
+            dimensions={dimensions}
+            experienceId={task.experience_id}
+            open={false}
+            onToggle={() => {}}
+          />
+        )
+      )}
+    </div>
   );
 }
 
