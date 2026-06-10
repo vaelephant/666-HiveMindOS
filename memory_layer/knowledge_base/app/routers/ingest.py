@@ -3,13 +3,14 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.agents.ingest_agent import IngestAgent
+from memory_layer.knowledge_base.core.services.doc_memory_service import extract_memories_from_ingest
 from memory_layer.knowledge_base.core.domain.source_formats import (
     MEDIA_SOURCE_TYPES,
     source_type_from_filename,
@@ -153,7 +154,7 @@ def delete_source(org_id: str, source_id: str):
 # ── Step 2: Compile ──────────────────────────────────────────────────────────
 
 @router.post("/orgs/{org_id}/sources/{source_id}/compile")
-def compile_source(org_id: str, source_id: str):
+def compile_source(org_id: str, source_id: str, background_tasks: BackgroundTasks):
     """Trigger AI compilation for an uploaded source."""
     record = _registry.get(source_id)
     if not record:
@@ -208,6 +209,7 @@ def compile_source(org_id: str, source_id: str):
         log.error("[compile] error  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
+    background_tasks.add_task(extract_memories_from_ingest, org_id, source_id, result)
     return asdict(_registry.get(source_id))
 
 

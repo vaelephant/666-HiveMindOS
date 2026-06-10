@@ -7,7 +7,7 @@
   第二级 recap_session（会话复盘）
     → 总结、合并、去重、冲突检查、Wiki 建议
 
-Wiki 编译（上传资料）由 ingest 管线负责，不在此模块。
+Wiki 编译（上传资料）由 ingest 管线负责；编译成功后的 L3 文档智慧提炼见 doc_memory_service。
 """
 
 from __future__ import annotations

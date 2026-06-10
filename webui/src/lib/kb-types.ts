@@ -606,6 +606,8 @@ export type MemoryStats = {
   events_this_week: number;
   memories_this_week: number;
   vector_indexed?: number;
+  by_source_chat?: number;
+  by_source_ingest?: number;
 };
 
 export type GraphSnapshot = {

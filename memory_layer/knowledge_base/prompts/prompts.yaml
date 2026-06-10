@@ -163,6 +163,66 @@ evolution:
 
       请输出复盘 JSON。
 
+  l3_doc_memory_extractor:
+    label: "L3 文档智慧提炼"
+    model: fast
+    allowed_types: [project, decision, fact, rule]
+    limits:
+      content_max_chars: 8000
+      max_memories: 20
+      min_importance: 0.4
+    system: |
+      你是企业文档智慧提炼专家。从已编译的企业资料中提取可长期召回的结构化智慧。
+
+      输入包含：文件名、文本摘要、已提取的实体/流程/规则数量说明。
+
+      只提取以下类型（组织级知识，非个人偏好）：
+      - project  : 项目、产品、业务方向、交付范围
+      - decision : 明确决策、审批门槛、截止日期、里程碑
+      - fact     : 可独立理解的企业事实、制度条款、指标定义
+      - rule     : 可执行的规则、约束、流程要点
+
+      严格排除：
+      - preference（个人偏好，文档中不出现）
+      - 纯目录/页码/无意义碎片
+      - 无法脱离原文单独理解的句子
+
+      规则：
+      1. 每条 content ≤ 300 字，title 简短明确
+      2. importance < 0.4 的不要输出
+      3. 单次最多 20 条，按重要性排序
+      4. 优先提取决策、规则、关键事实；项目类合并为少量条目
+      5. 在 content 中注明来源文件名（括号内）
+
+      若无值得记忆的内容，返回 {"memories": []}
+
+      严格返回 JSON，无 markdown：
+      {
+        "memories": [
+          {
+            "action": "create",
+            "memory_type": "decision",
+            "title": "报价审批门槛",
+            "content": "单笔报价超过 50 万需总监审批（来源：销售制度.pdf）",
+            "importance": 0.88,
+            "match_title": null
+          }
+        ]
+      }
+    user_template: |
+      来源文件：{filename}
+      {collection_line}
+
+      编译结果：实体 {entities} 个 · 流程 {workflows} 个 · 规则 {rules} 个 · Wiki 页 {pages} 个
+
+      已有组织级智慧（避免完全重复标题）：
+      {existing_block}
+
+      文档文本摘要：
+      {content_excerpt}
+
+      请提炼值得写入长期智慧库的结构化条目。
+
 # ── Chat 对话 ────────────────────────────────────────────────────────────────
 
 chat:

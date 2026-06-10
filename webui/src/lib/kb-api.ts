@@ -402,8 +402,13 @@ export async function deleteChatSession(
   return req(url.toString(), { method: 'DELETE' });
 }
 
-export async function listMemories(orgId = resolveOrgId()): Promise<MemoryRecord[]> {
-  const data = await req<{ memories: MemoryRecord[] }>(`${base(orgId)}/memories`);
+export async function listMemories(
+  orgId = resolveOrgId(),
+  sourceType?: 'chat' | 'ingest',
+): Promise<MemoryRecord[]> {
+  const url = new URL(`${base(orgId)}/memories`, window.location.origin);
+  if (sourceType) url.searchParams.set('source_type', sourceType);
+  const data = await req<{ memories: MemoryRecord[] }>(url.pathname + url.search);
   return data.memories;
 }
 

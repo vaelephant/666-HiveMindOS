@@ -16,6 +16,10 @@ def p1_memory_types() -> tuple[str, ...]:
     return tuple(_cfg()["memory_types"]["p1"])
 
 
+def ingest_l3_memory_types() -> tuple[str, ...]:
+    return tuple(_cfg()["memory_types"]["ingest_l3"])
+
+
 def memory_type_label(memory_type: str) -> str:
     return _cfg()["memory_types"]["labels"].get(memory_type, memory_type)
 

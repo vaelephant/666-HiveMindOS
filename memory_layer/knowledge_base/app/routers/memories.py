@@ -17,10 +17,14 @@ _registry = MemoryRegistry()
 
 
 @router.get("/orgs/{org_id}/memories")
-def list_memories(org_id: str, user_id: str = "demo"):
+def list_memories(
+    org_id: str,
+    user_id: str = "demo",
+    source_type: str | None = Query(default=None, description="chat | ingest"),
+):
     """列出结构化长期记忆。"""
     try:
-        items = _registry.list_active(org_id, user_id)
+        items = _registry.list_active(org_id, user_id, source_type=source_type)
         return {"memories": [asdict(m) for m in items]}
     except Exception as exc:
         log.error("[memory] list failed: %s", exc)

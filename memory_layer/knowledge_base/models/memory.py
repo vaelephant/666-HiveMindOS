@@ -40,6 +40,8 @@ class MemoryStats:
     events_this_week: int
     memories_this_week: int
     vector_indexed: int = 0
+    by_source_chat: int = 0
+    by_source_ingest: int = 0
 
 
 @dataclass
