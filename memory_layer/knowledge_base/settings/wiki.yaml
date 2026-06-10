@@ -70,7 +70,11 @@ source_type_labels:
   pdf: PDF
   word: Word
   excel: Excel
+  ppt: PowerPoint
   text: 文本
+  image: 图片
+  video: 视频
+  audio: 音频
 
 # Wiki 页详情 — 管线阶段文案（count 由运行时计算）
 page_pipeline:

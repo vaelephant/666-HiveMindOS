@@ -5,21 +5,17 @@ import { Download, ExternalLink, FileQuestion, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { sourceFileUrl } from '@/lib/kb-api';
 import type { SourceRecord } from '@/lib/kb-types';
-
-const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']);
-const VIDEO_EXT = new Set(['mp4', 'mov', 'webm', 'avi', 'mkv']);
-const AUDIO_EXT = new Set(['mp3', 'wav', 'm4a', 'ogg', 'flac']);
-const TEXT_EXT = new Set(['txt', 'md', 'csv', 'json', 'log']);
+import { sourceTypeFromFilename } from '@/lib/source-file-formats';
 
 export type PreviewKind = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'other';
 
 export function previewKind(filename: string): PreviewKind {
-  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
-  if (IMAGE_EXT.has(ext)) return 'image';
-  if (VIDEO_EXT.has(ext)) return 'video';
-  if (AUDIO_EXT.has(ext)) return 'audio';
-  if (ext === 'pdf') return 'pdf';
-  if (TEXT_EXT.has(ext)) return 'text';
+  const type = sourceTypeFromFilename(filename);
+  if (type === 'image') return 'image';
+  if (type === 'video') return 'video';
+  if (type === 'audio') return 'audio';
+  if (type === 'pdf') return 'pdf';
+  if (type === 'text') return 'text';
   return 'other';
 }
 
@@ -161,7 +157,7 @@ export function SourcePreviewDialog({
                 <FileQuestion className="size-5 text-shell-muted" strokeWidth={1.5} />
               </div>
               <p className="text-[14px] font-medium text-shell-text">该格式暂不支持在线预览</p>
-              <p className="text-[12px] text-shell-muted">Word / Excel / PPT 等格式请下载后查看</p>
+              <p className="text-[12px] text-shell-muted">Word / Excel / PPT / WPS 等 Office 格式请下载后查看</p>
               <Button variant="outline" size="sm" className="mt-2" nativeButton={false} render={<a href={downloadUrl} />}>
                 <Download data-icon="inline-start" />
                 下载原文件

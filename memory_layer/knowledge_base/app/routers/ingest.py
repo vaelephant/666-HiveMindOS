@@ -3,12 +3,17 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.app.logging_config import get_logger
 from memory_layer.knowledge_base.core.agents.ingest_agent import IngestAgent
+from memory_layer.knowledge_base.core.domain.source_formats import (
+    MEDIA_SOURCE_TYPES,
+    source_type_from_filename,
+)
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRecord, SourceRegistry
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.wiki import wiki_meta
@@ -17,25 +22,28 @@ from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 router = APIRouter()
 log = get_logger("hivemind.ingest")
 
-_SUFFIX_TO_TYPE = {
-    # 文档
-    ".pdf": "pdf", ".docx": "word", ".doc": "word",
-    ".xlsx": "excel", ".xls": "excel",
-    ".pptx": "ppt", ".ppt": "ppt",
-    ".txt": "text", ".md": "text", ".csv": "text", ".json": "text",
-    # 图片
-    ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image",
-    ".webp": "image", ".svg": "image", ".bmp": "image",
-    # 视频
-    ".mp4": "video", ".mov": "video", ".webm": "video", ".avi": "video", ".mkv": "video",
-    # 音频
-    ".mp3": "audio", ".wav": "audio", ".m4a": "audio", ".ogg": "audio", ".flac": "audio",
-}
-
-# 仅可预览、不参与 AI 编译的媒体类型
-_MEDIA_TYPES = {"image", "video", "audio"}
+_MEDIA_TYPES = MEDIA_SOURCE_TYPES
 
 _registry = SourceRegistry(config.REGISTRY_DB)
+
+_COLLECTION_MAX_LEN = 64
+
+
+def _normalize_collection(value: str | None) -> str | None:
+    if value is None:
+        return None
+    name = value.strip()
+    if not name:
+        return None
+    if len(name) > _COLLECTION_MAX_LEN:
+        raise HTTPException(status_code=400, detail=f"集合名称不能超过 {_COLLECTION_MAX_LEN} 个字符")
+    if "/" in name or "\\" in name:
+        raise HTTPException(status_code=400, detail="集合名称不能包含斜杠")
+    return name
+
+
+class SourcePatch(BaseModel):
+    collection: str | None = Field(default=None)
 
 
 def _make_agent(org_id: str) -> IngestAgent:
@@ -47,24 +55,23 @@ def _make_agent(org_id: str) -> IngestAgent:
 # ── Step 1: Upload & save ────────────────────────────────────────────────────
 
 @router.post("/orgs/{org_id}/sources")
-async def upload_source(org_id: str, file: UploadFile = File(...)):
+async def upload_source(
+    org_id: str,
+    file: UploadFile = File(...),
+    collection: str | None = Form(None),
+):
     """Save the raw file and record it. No AI processing yet."""
+    collection = _normalize_collection(collection)
     content = await file.read()
-    suffix = Path(file.filename).suffix.lower()
-    source_type = _SUFFIX_TO_TYPE.get(suffix, "text")
-
-    # 视频/音频允许更大体积，文档/图片保持 20MB
-    is_av = source_type in ("video", "audio")
-    limit = config.MAX_MEDIA_SIZE_BYTES if is_av else config.MAX_FILE_SIZE_BYTES
-    if len(content) > limit:
-        limit_mb = limit // (1024 * 1024)
-        raise HTTPException(status_code=413, detail=f"文件超过 {limit_mb}MB 限制")
+    filename = file.filename or "upload"
+    source_type = source_type_from_filename(filename)
+    suffix = Path(filename).suffix.lower()
 
     raw_dir = config.RAW_ROOT / org_id
     raw_dir.mkdir(parents=True, exist_ok=True)
     source_id = str(uuid.uuid4())
-    stem = Path(file.filename).stem
-    save_path = raw_dir / file.filename
+    stem = Path(filename).stem
+    save_path = raw_dir / filename
     if save_path.exists():
         save_path = raw_dir / f"{stem}_{source_id[:8]}{suffix}"
     save_path.write_bytes(content)
@@ -72,15 +79,16 @@ async def upload_source(org_id: str, file: UploadFile = File(...)):
     record = SourceRecord(
         id=source_id,
         org_id=org_id,
-        filename=file.filename,
+        filename=filename,
         file_path=str(save_path),
         source_type=source_type,
         status="uploaded",
         created_at=SourceRegistry.now_iso(),
+        collection=collection,
     )
     _registry.add(record)
-    log.info("[upload] org=%s  file=%s  size=%d bytes  saved=%s",
-             org_id, file.filename, len(content), save_path.name)
+    log.info("[upload] org=%s  file=%s  collection=%s  size=%d bytes  saved=%s",
+             org_id, filename, collection or "-", len(content), save_path.name)
     return asdict(record)
 
 
@@ -89,6 +97,25 @@ async def upload_source(org_id: str, file: UploadFile = File(...)):
 @router.get("/orgs/{org_id}/sources")
 def list_sources(org_id: str):
     return {"sources": [asdict(r) for r in _registry.list(org_id)]}
+
+
+@router.get("/orgs/{org_id}/collections")
+def list_collections(org_id: str):
+    return {
+        "collections": _registry.list_collections(org_id),
+        "uncategorized": _registry.count_uncategorized(org_id),
+    }
+
+
+@router.patch("/orgs/{org_id}/sources/{source_id}")
+def patch_source(org_id: str, source_id: str, body: SourcePatch):
+    record = _registry.get(source_id)
+    if not record or record.org_id != org_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+    collection = _normalize_collection(body.collection)
+    _registry.update(source_id, collection=collection)
+    log.info("[patch] org=%s  source=%s  collection=%s", org_id, source_id[:8], collection or "-")
+    return asdict(_registry.get(source_id))
 
 
 # ── Delete source ─────────────────────────────────────────────────────────────

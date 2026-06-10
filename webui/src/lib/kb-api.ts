@@ -19,6 +19,8 @@ import type {
   MemoryStats,
   OverviewData,
   QueryResult,
+  SourceCollection,
+  SourceCollectionsResponse,
   SourceRecord,
   WikiCategory,
   WikiPage,
@@ -74,9 +76,16 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function uploadSource(file: File, orgId = resolveOrgId()): Promise<SourceRecord> {
+export async function uploadSource(
+  file: File,
+  options?: { orgId?: string; collection?: string | null },
+): Promise<SourceRecord> {
+  const orgId = resolveOrgId(options?.orgId);
   const form = new FormData();
   form.append('file', file);
+  if (options?.collection?.trim()) {
+    form.append('collection', options.collection.trim());
+  }
   return req(`${base(orgId)}/sources`, { method: 'POST', body: form });
 }
 
@@ -91,6 +100,22 @@ export async function compileSource(sourceId: string, orgId = resolveOrgId()): P
 
 export async function deleteSource(sourceId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/sources/${sourceId}`, { method: 'DELETE' });
+}
+
+export async function listSourceCollections(orgId = resolveOrgId()): Promise<SourceCollectionsResponse> {
+  return req(`${base(orgId)}/collections`);
+}
+
+export async function updateSourceCollection(
+  sourceId: string,
+  collection: string | null,
+  orgId = resolveOrgId(),
+): Promise<SourceRecord> {
+  return req(`${base(orgId)}/sources/${sourceId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ collection }),
+  });
 }
 
 export async function ingestFile(file: File, orgId = resolveOrgId()): Promise<IngestResult> {

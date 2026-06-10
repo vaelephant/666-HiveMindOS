@@ -186,7 +186,12 @@ class IngestAgent:
         }
 
     def _extract_text(self, file_path: Path, source_type: str) -> str:
-        extractors = {"pdf": self._pdf, "word": self._word, "excel": self._excel}
+        extractors = {
+            "pdf": self._pdf,
+            "word": self._word,
+            "excel": self._excel,
+            "ppt": self._ppt,
+        }
         return extractors.get(source_type, self._plain)(file_path)
 
     def _pdf(self, path: Path) -> str:
@@ -222,6 +227,30 @@ class IngestAgent:
         except Exception as e:
             log.warning("Excel extraction failed: %s", e)
             return ""
+
+    def _ppt(self, path: Path) -> str:
+        suffix = path.suffix.lower()
+        if suffix == ".pptx":
+            try:
+                from pptx import Presentation
+
+                prs = Presentation(str(path))
+                chunks = []
+                for i, slide in enumerate(prs.slides, 1):
+                    texts = []
+                    for shape in slide.shapes:
+                        text = getattr(shape, "text", "") or ""
+                        text = text.strip()
+                        if text:
+                            texts.append(text)
+                    if texts:
+                        chunks.append(f"[第{i}页]\n" + "\n".join(texts))
+                return "\n\n".join(chunks)
+            except Exception as e:
+                log.warning("PPTX extraction failed: %s", e)
+                return ""
+        log.warning("Legacy/binary PPT (%s); upload OK but text extraction skipped", path.name)
+        return ""
 
     def _plain(self, path: Path) -> str:
         return path.read_text(encoding="utf-8", errors="ignore")

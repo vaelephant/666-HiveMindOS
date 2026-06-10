@@ -22,6 +22,7 @@ class SourceRecord:
     workflows_extracted: Optional[int] = None
     wiki_pages_created: Optional[int] = None
     wiki_pages: list[str] = field(default_factory=list)
+    collection: Optional[str] = None  # 虚拟集合（逻辑分类，不改变 raw 物理路径）
 
 
 class SourceRegistry:
@@ -54,10 +55,14 @@ class SourceRegistry:
                 )
             """)
             # 兼容旧表：若列不存在则添加
-            try:
-                conn.execute("ALTER TABLE sources ADD COLUMN wiki_pages TEXT DEFAULT '[]'")
-            except sqlite3.OperationalError:
-                pass  # 列已存在
+            for ddl in (
+                "ALTER TABLE sources ADD COLUMN wiki_pages TEXT DEFAULT '[]'",
+                "ALTER TABLE sources ADD COLUMN collection TEXT DEFAULT NULL",
+            ):
+                try:
+                    conn.execute(ddl)
+                except sqlite3.OperationalError:
+                    pass  # 列已存在
 
     def add(self, record: SourceRecord) -> SourceRecord:
         with self._conn() as conn:
@@ -65,17 +70,43 @@ class SourceRegistry:
                 """INSERT INTO sources
                    (id, org_id, filename, file_path, source_type,
                     status, created_at, error, entities_extracted,
-                    workflows_extracted, wiki_pages_created, wiki_pages)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    workflows_extracted, wiki_pages_created, wiki_pages, collection)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     record.id, record.org_id, record.filename, record.file_path,
                     record.source_type, record.status, record.created_at,
                     record.error, record.entities_extracted,
                     record.workflows_extracted, record.wiki_pages_created,
                     json.dumps(record.wiki_pages, ensure_ascii=False),
+                    record.collection,
                 ),
             )
         return record
+
+    def list_collections(self, org_id: str) -> list[dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT collection, COUNT(*) AS cnt
+                FROM sources
+                WHERE org_id = ? AND collection IS NOT NULL AND collection != ''
+                GROUP BY collection
+                ORDER BY collection COLLATE NOCASE
+                """,
+                (org_id,),
+            ).fetchall()
+        return [{"name": r[0], "count": r[1]} for r in rows]
+
+    def count_uncategorized(self, org_id: str) -> int:
+        with self._conn() as conn:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) FROM sources
+                WHERE org_id = ? AND (collection IS NULL OR collection = '')
+                """,
+                (org_id,),
+            ).fetchone()
+        return int(row[0]) if row else 0
 
     def list(self, org_id: str) -> list[SourceRecord]:
         with self._conn() as conn:
@@ -117,6 +148,8 @@ class SourceRegistry:
     def _from_row(row: sqlite3.Row) -> SourceRecord:
         d = dict(row)
         d["wiki_pages"] = json.loads(d.get("wiki_pages") or "[]")
+        if "collection" not in d:
+            d["collection"] = None
         return SourceRecord(**d)
 
     @staticmethod

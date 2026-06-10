@@ -7,11 +7,11 @@ import type { NextConfig } from 'next';
  */
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
-  // Next.js 16 代理默认会截断较大的 multipart 请求体（PDF 等文档常 > 1MB）
+  // Next.js 16 代理默认会截断较大的 multipart 请求体，需放宽以支持大文件上传
   experimental: {
-    proxyClientMaxBodySize: '220mb',
+    proxyClientMaxBodySize: '4gb',
     serverActions: {
-      bodySizeLimit: '220mb',
+      bodySizeLimit: '4gb',
     },
   },
   async redirects() {

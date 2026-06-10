@@ -163,6 +163,18 @@ export type SourceRecord = {
   workflows_extracted: number | null;
   wiki_pages_created: number | null;
   wiki_pages?: string[];
+  /** 虚拟集合名（逻辑分类，不改变 raw 物理路径） */
+  collection?: string | null;
+};
+
+export type SourceCollection = {
+  name: string;
+  count: number;
+};
+
+export type SourceCollectionsResponse = {
+  collections: SourceCollection[];
+  uncategorized: number;
 };
 
 export type WikiPage = {

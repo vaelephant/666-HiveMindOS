@@ -30,9 +30,6 @@ TASK_DB:        Path = STORAGE_ROOT / "tasks.db"
 AUTOMATION_DB:  Path = STORAGE_ROOT / "automation_runs.db"
 LOG_DIR: Path = STORAGE_ROOT / "logs"
 
-MAX_FILE_SIZE_BYTES: int = 20 * 1024 * 1024  # 20MB（文档/图片）
-MAX_MEDIA_SIZE_BYTES: int = 200 * 1024 * 1024  # 200MB（视频/音频）
-
 # PostgreSQL — Memory Layer（Raw Chat + Structured Memory）
 # Qdrant — Layer 3 语义检索（智慧向量）
 QDRANT_URL: str = os.environ.get("QDRANT_URL", "http://localhost:6333")

@@ -425,14 +425,9 @@ def _resolve_sources(
 
 
 def _guess_source_type(filename: str) -> str:
-    lower = filename.lower()
-    if lower.endswith(".pdf"):
-        return "pdf"
-    if lower.endswith((".doc", ".docx")):
-        return "word"
-    if lower.endswith((".xls", ".xlsx")):
-        return "excel"
-    return "text"
+    from memory_layer.knowledge_base.core.domain.source_formats import source_type_from_filename
+
+    return source_type_from_filename(filename)
 
 
 def _source_dict(source) -> dict[str, Any]:

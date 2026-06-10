@@ -19,7 +19,7 @@ from memory_layer.knowledge_base.core.agents.lint_agent import LintAgent
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 
-_SUFFIX_MAP = {".pdf": "pdf", ".docx": "word", ".doc": "word", ".xlsx": "excel"}
+from memory_layer.knowledge_base.core.domain.source_formats import SUFFIX_TO_TYPE as _SUFFIX_MAP
 
 
 class KnowledgeBase:

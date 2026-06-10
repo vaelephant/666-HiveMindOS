@@ -23,26 +23,28 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react';
+import { useOrgReady } from '@/components/auth/OrgProvider';
 import { Button } from '@/components/ui/button';
-import { uploadSource, listSources, compileSource, deleteSource } from '@/lib/kb-api';
-import type { SourceRecord } from '@/lib/kb-types';
+import {
+  uploadSource,
+  listSources,
+  compileSource,
+  deleteSource,
+  listSourceCollections,
+  updateSourceCollection,
+} from '@/lib/kb-api';
+import type { SourceCollection, SourceRecord } from '@/lib/kb-types';
 import { cn } from '@/lib/utils';
 import {
   SourcePreviewDialog,
   isMediaFile,
-  previewKind,
 } from '@/components/knowledge-base/source-preview-dialog';
-
-const ACCEPT = [
-  // 文档
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.csv', '.json',
-  // 图片
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp',
-  // 视频
-  '.mp4', '.mov', '.webm', '.avi', '.mkv',
-  // 音频
-  '.mp3', '.wav', '.m4a', '.ogg', '.flac',
-].join(',');
+import { UPLOAD_ACCEPT, fileIconKind } from '@/lib/source-file-formats';
+import {
+  SourceCollectionsPanel,
+  collectionMatchesFilter,
+  type CollectionFilter,
+} from '@/components/knowledge-base/source-collections-panel';
 
 type FilterTab = 'all' | 'uploaded' | 'compiling' | 'done';
 
@@ -53,21 +55,10 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
   { key: 'done', label: '已完成' },
 ];
 
-function fileExt(name: string) {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  if (ext === 'pdf') return 'pdf';
-  if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return 'sheet';
-  if (ext === 'doc' || ext === 'docx') return 'doc';
-  if (ext === 'ppt' || ext === 'pptx') return 'ppt';
-  const media = previewKind(name);
-  if (media === 'image' || media === 'video' || media === 'audio') return media;
-  return 'text';
-}
-
 const FILE_ICONS = {
   pdf: FileType2,
   sheet: FileSpreadsheet,
-  doc: FileText,
+  word: FileText,
   ppt: Presentation,
   image: FileImage,
   video: FileVideo,
@@ -76,7 +67,7 @@ const FILE_ICONS = {
 } as const;
 
 function FileIcon({ filename }: { filename: string }) {
-  const Icon = FILE_ICONS[fileExt(filename)];
+  const Icon = FILE_ICONS[fileIconKind(filename)];
   return (
     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-primary/8 text-brand-primary/80">
       <Icon className="size-3.5" strokeWidth={1.75} />
@@ -135,14 +126,18 @@ function truncateError(msg: string, max = 72) {
 
 function SourceRow({
   source,
+  collections,
   onCompile,
   onDelete,
   onPreview,
+  onMoveCollection,
 }: {
   source: SourceRecord;
+  collections: SourceCollection[];
   onCompile: (id: string) => void;
   onDelete: (id: string) => void;
   onPreview: (source: SourceRecord) => void;
+  onMoveCollection: (id: string, collection: string | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasLongError = source.status === 'error' && source.error && source.error.length > 72;
@@ -166,7 +161,31 @@ function SourceRow({
               <span>{formatDate(source.created_at)}</span>
               <span className="text-shell-border">·</span>
               <span className="font-mono text-[11px]">{formatType(source.file_path)}</span>
+              {source.collection && (
+                <>
+                  <span className="text-shell-border">·</span>
+                  <span className="rounded bg-brand-primary/8 px-1.5 py-0.5 text-[10px] text-brand-primary/90">
+                    {source.collection}
+                  </span>
+                </>
+              )}
             </p>
+            <select
+              value={source.collection ?? ''}
+              onChange={(e) => onMoveCollection(source.id, e.target.value || null)}
+              className="mt-1.5 h-7 max-w-[160px] rounded-md border border-shell-border bg-shell-bg px-2 text-[11px] text-shell-subtext opacity-70 transition-opacity group-hover:opacity-100 focus:opacity-100 md:opacity-0"
+              aria-label="移动到集合"
+            >
+              <option value="">未分类</option>
+              {collections.map((c) => (
+                <option key={c.name} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+              {source.collection && !collections.some((c) => c.name === source.collection) && (
+                <option value={source.collection}>{source.collection}</option>
+              )}
+            </select>
           </div>
         </div>
 
@@ -274,27 +293,56 @@ function SourceRow({
 }
 
 export default function IngestPage() {
+  const { ready: orgReady, orgId } = useOrgReady();
   const [sources, setSources] = useState<SourceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
   const [preview, setPreview] = useState<SourceRecord | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [collectionFilter, setCollectionFilter] = useState<CollectionFilter>('all');
+  const [uploadTarget, setUploadTarget] = useState<string | null>(null);
+  const [collectionsMeta, setCollectionsMeta] = useState<{
+    collections: SourceCollection[];
+    uncategorized: number;
+  }>({ collections: [], uncategorized: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
+    if (!orgReady) return;
     setLoading(true);
-    listSources()
-      .then(setSources)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    setLoadError(null);
+    const [sourcesResult, collectionsResult] = await Promise.allSettled([
+      listSources(orgId),
+      listSourceCollections(orgId),
+    ]);
+    if (sourcesResult.status === 'fulfilled') {
+      setSources(sourcesResult.value);
+    } else {
+      setSources([]);
+      setLoadError('加载资料列表失败，请确认知识库后端已启动');
+    }
+    if (collectionsResult.status === 'fulfilled') {
+      setCollectionsMeta(collectionsResult.value);
+    } else if (sourcesResult.status === 'fulfilled') {
+      setCollectionsMeta({
+        collections: [],
+        uncategorized: sourcesResult.value.filter((s) => !s.collection?.trim()).length,
+      });
+    }
+    setLoading(false);
+  }, [orgId, orgReady]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (!orgReady) {
+      setLoading(true);
+      return;
+    }
+    void refresh();
+  }, [orgReady, refresh]);
 
   const stats = useMemo(() => {
     const done = sources.filter((s) => s.status === 'done');
@@ -308,7 +356,7 @@ export default function IngestPage() {
   }, [sources]);
 
   const filtered = useMemo(() => {
-    let list = sources;
+    let list = sources.filter((s) => collectionMatchesFilter(s, collectionFilter));
     if (filter === 'uploaded') list = list.filter((s) => s.status === 'uploaded');
     else if (filter === 'compiling') list = list.filter((s) => s.status === 'compiling');
     else if (filter === 'done') list = list.filter((s) => s.status === 'done');
@@ -316,7 +364,23 @@ export default function IngestPage() {
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((s) => s.filename.toLowerCase().includes(q));
     return list;
-  }, [sources, filter, search]);
+  }, [sources, filter, search, collectionFilter]);
+
+  function handleCreateCollection(name: string) {
+    setUploadTarget(name);
+    setCollectionFilter(name);
+  }
+
+  async function handleMoveCollection(sourceId: string, collection: string | null) {
+    try {
+      const updated = await updateSourceCollection(sourceId, collection, orgId);
+      setSources((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
+      const meta = await listSourceCollections(orgId);
+      setCollectionsMeta(meta);
+    } catch {
+      refresh();
+    }
+  }
 
   async function handleFiles(files: FileList | null) {
     if (!files || uploading) return;
@@ -325,7 +389,7 @@ export default function IngestPage() {
     const errors: string[] = [];
     for (const file of Array.from(files)) {
       try {
-        const record = await uploadSource(file);
+        const record = await uploadSource(file, { collection: uploadTarget, orgId });
         setSources((prev) => [record, ...prev]);
       } catch (err) {
         const msg = err instanceof Error ? err.message : '上传失败';
@@ -334,6 +398,9 @@ export default function IngestPage() {
     }
     if (errors.length > 0) {
       setUploadError(errors.join('\n'));
+    } else {
+      const meta = await listSourceCollections(orgId).catch(() => null);
+      if (meta) setCollectionsMeta(meta);
     }
     setUploading(false);
     if (inputRef.current) inputRef.current.value = '';
@@ -345,9 +412,10 @@ export default function IngestPage() {
     if (!window.confirm(`确认删除「${source.filename}」？\n关联的 Wiki 页面也会一并移除。`)) return;
     setSources((prev) => prev.filter((s) => s.id !== sourceId));
     try {
-      await deleteSource(sourceId);
+      await deleteSource(sourceId, orgId);
+      const meta = await listSourceCollections(orgId).catch(() => null);
+      if (meta) setCollectionsMeta(meta);
     } catch {
-      // 若失败则刷新恢复
       refresh();
     }
   }
@@ -357,7 +425,7 @@ export default function IngestPage() {
       prev.map((s) => (s.id === sourceId ? { ...s, status: 'compiling' } : s)),
     );
     try {
-      const updated = await compileSource(sourceId);
+      const updated = await compileSource(sourceId, orgId);
       setSources((prev) => prev.map((s) => (s.id === sourceId ? updated : s)));
     } catch (err) {
       setSources((prev) =>
@@ -394,8 +462,21 @@ export default function IngestPage() {
               <Upload className="size-5 text-brand-primary" strokeWidth={1.5} />
             </div>
             <p className="text-[15px] font-medium text-shell-text">松开以添加资料</p>
-            <p className="text-[12px] text-shell-muted">文档 · 图片 · 视频 · 音频</p>
+            <p className="text-[12px] text-shell-muted">PDF · Word · Excel · PPT · 图片 · 视频 · 音频</p>
           </div>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="mx-0 mb-2 rounded-lg border border-status-error/20 bg-status-error/5 px-4 py-3">
+          <p className="text-[13px] text-status-error">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void refresh()}
+            className="mt-2 text-[11px] text-status-error/70 hover:text-status-error"
+          >
+            重试
+          </button>
         </div>
       )}
 
@@ -429,12 +510,12 @@ export default function IngestPage() {
           </Button>
           <Button size="sm" onClick={() => !uploading && inputRef.current?.click()} disabled={uploading}>
             {uploading ? <Loader2 className="animate-spin" /> : <Plus />}
-            {uploading ? '上传中' : '添加资料'}
+            {uploading ? '上传中' : uploadTarget ? `添加到「${uploadTarget}」` : '添加资料'}
           </Button>
           <input
             ref={inputRef}
             type="file"
-            accept={ACCEPT}
+            accept={UPLOAD_ACCEPT}
             multiple
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
@@ -465,6 +546,53 @@ export default function IngestPage() {
       </section>
 
       <section className="py-6">
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+          {(['all', 'uncategorized'] as const).map((key) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setCollectionFilter(key)}
+              className={cn(
+                'shrink-0 rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                collectionFilter === key
+                  ? 'bg-brand-primary/10 text-brand-primary'
+                  : 'bg-shell-bg text-shell-muted',
+              )}
+            >
+              {key === 'all' ? `全部 (${sources.length})` : `未分类 (${collectionsMeta.uncategorized})`}
+            </button>
+          ))}
+          {collectionsMeta.collections.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => setCollectionFilter(c.name)}
+              className={cn(
+                'shrink-0 rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+                collectionFilter === c.name
+                  ? 'bg-brand-primary/10 text-brand-primary'
+                  : 'bg-shell-bg text-shell-muted',
+              )}
+            >
+              {c.name} ({c.count})
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-8">
+          <SourceCollectionsPanel
+            className="hidden w-44 shrink-0 lg:flex"
+            collections={collectionsMeta.collections}
+            uncategorized={collectionsMeta.uncategorized}
+            total={sources.length}
+            active={collectionFilter}
+            uploadTarget={uploadTarget}
+            onFilterChange={setCollectionFilter}
+            onUploadTargetChange={setUploadTarget}
+            onCreateCollection={handleCreateCollection}
+          />
+
+          <div className="min-w-0 flex-1">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative max-w-xs flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-shell-muted" />
@@ -506,12 +634,18 @@ export default function IngestPage() {
               <FolderOpen className="size-5 text-shell-muted" strokeWidth={1.5} />
             </div>
             <p className="mt-5 text-[15px] font-medium text-shell-text">
-              {search ? '没有匹配的文件' : filter === 'all' ? '资料库为空' : '该筛选下暂无记录'}
+              {search
+                ? '没有匹配的文件'
+                : collectionFilter !== 'all'
+                  ? '该集合下暂无资料'
+                  : filter === 'all'
+                    ? '资料库为空'
+                    : '该筛选下暂无记录'}
             </p>
             <p className="mt-1.5 text-[13px] text-shell-muted">
               {search ? '换个关键词试试' : '拖拽文件到页面，或点击「添加资料」'}
             </p>
-            {!search && filter === 'all' && (
+            {!search && filter === 'all' && collectionFilter === 'all' && (
               <Button variant="outline" size="sm" className="mt-6" onClick={() => inputRef.current?.click()}>
                 <Plus />
                 添加资料
@@ -531,9 +665,11 @@ export default function IngestPage() {
                 <SourceRow
                   key={s.id}
                   source={s}
+                  collections={collectionsMeta.collections}
                   onCompile={handleCompile}
                   onDelete={handleDelete}
                   onPreview={setPreview}
+                  onMoveCollection={handleMoveCollection}
                 />
               ))}
             </ul>
@@ -541,8 +677,10 @@ export default function IngestPage() {
         )}
 
         <p className="mt-8 text-[11px] text-shell-muted">
-          文档 / 图片 ≤ 20MB · 视频 / 音频 ≤ 200MB · 点击文件名可预览 · 文档编译需手动触发，媒体文件仅供预览
+          支持 PDF / Word / Excel / PPT / WPS / ODF / RTF 等常见格式 · 无文件大小限制 · 拖拽上传不受文件选择器限制
         </p>
+          </div>
+        </div>
       </section>
 
       <SourcePreviewDialog source={preview} onClose={() => setPreview(null)} />

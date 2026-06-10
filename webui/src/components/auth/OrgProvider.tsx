@@ -14,6 +14,12 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    // session 加载完成前不要写入 org，避免页面用 demo org 请求后不再刷新
+    if (status === 'loading') {
+      setClientOrgId(null);
+      setClientUserId(null);
+      return;
+    }
     setClientOrgId(orgId);
     setClientUserId(status === 'authenticated' ? session.user.id : null);
   }, [orgId, session, status]);
@@ -23,4 +29,11 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
 
 export function useOrgId(): string {
   return useContext(OrgContext);
+}
+
+/** session 就绪后再拉取 org 隔离数据（避免刷新时用 demo org 请求） */
+export function useOrgReady(): { ready: boolean; orgId: string } {
+  const { status } = useSession();
+  const orgId = useOrgId();
+  return { ready: status !== 'loading', orgId };
 }
