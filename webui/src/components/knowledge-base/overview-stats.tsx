@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { getOverviewData } from '@/lib/kb-api';
 import type { ActivityRecord, OverviewData, SourceActivityRecord } from '@/lib/kb-types';
-import { HIVEMIND_HOME_PATH } from '@/config/navigation';
+import { HIVEMIND_HOME_PATH, HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { CANDIDATE_STATUS_LABEL, MEMORY_TYPE_LABEL } from '@/lib/kb-labels';
 import { cn } from '@/lib/utils';
 
@@ -268,7 +268,7 @@ function ActivityRow({ item }: { item: ActivityRecord }) {
         <KindBadge kind="memory" />
         <div className="min-w-0 flex-1">
           <p className="text-[13px] text-shell-text">
-            <Link href="/memories" className="font-medium hover:text-brand-primary">
+            <Link href={HIVEMIND_MEMORIES_PATH} className="font-medium hover:text-brand-primary">
               {item.memory_title}
             </Link>
             <span className="text-shell-muted"> · {eventLabel}</span>

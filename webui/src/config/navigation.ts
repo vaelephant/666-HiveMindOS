@@ -186,6 +186,8 @@ export const KB_BASE_PATH = '/knowledge-base' as const;
 /** HiveMind 模块默认着陆页 */
 // 不用 /chat：会与 /api/kb/[orgId]/chat/sessions 在 Next.js 路由树里冲突
 export const HIVEMIND_HOME_PATH = '/hivemind-chat' as const;
+// 不用 /memories：会与 /api/kb/[orgId]/memories/* 在 Next.js 路由树里冲突
+export const HIVEMIND_MEMORIES_PATH = '/hivemind-memories' as const;
 
 export const KNOWLEDGE_BASE_CHILDREN: KnowledgeBaseChild[] = [
   { navKey: 'kb_overview', label: '概览',      href: `${KB_BASE_PATH}/overview`, icon: LayoutDashboard },
@@ -200,7 +202,7 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
 
   // ── HiveMind 核心模块 ────────────────────────────────────────────────────
   { navKey: 'chat',         label: 'Chat',       href: HIVEMIND_HOME_PATH,      icon: MessageSquare, factory: 'hivemind' },
-  { navKey: 'memories', label: '智慧进化', href: '/memories', icon: Brain, factory: 'hivemind' },
+  { navKey: 'memories', label: '智慧进化', href: HIVEMIND_MEMORIES_PATH, icon: Brain, factory: 'hivemind' },
   {
     navKey: 'task_center',
     label: '任务中心',
@@ -288,7 +290,7 @@ export function isPlatformPathAllowed(segments: string[] | undefined): boolean {
   if (path === '/automations' || path.startsWith('/automations/')) return true;
   if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return true;
   if (path === HIVEMIND_HOME_PATH || path === '/chat' || path === '/hivemind') return true;
-  if (path === '/memories') return true;
+  if (path === HIVEMIND_MEMORIES_PATH) return true;
   return false;
 }
 
@@ -320,7 +322,7 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/settings`)) return '设置';
   if (path.startsWith(`${IPFS_MONITOR_BASE_PATH}/`)) return 'IPFS 监控';
   if (path === HIVEMIND_HOME_PATH) return 'Chat';
-  if (path === '/memories') return '智慧进化';
+  if (path === HIVEMIND_MEMORIES_PATH) return '智慧进化';
   if (path === `${TASK_CENTER_BASE_PATH}/agent`) return '自主任务';
   if (path === `${TASK_CENTER_BASE_PATH}/ops`) return '定时运维';
   if (path === TASK_CENTER_BASE_PATH || path.startsWith(`${TASK_CENTER_BASE_PATH}/`)) return '任务中心';

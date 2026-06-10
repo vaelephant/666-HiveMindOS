@@ -502,7 +502,7 @@ export type ChatSource = {
   excerpt: string;
 };
 
-export type MemoryType = 'project' | 'preference' | 'decision';
+export type MemoryType = 'project' | 'preference' | 'decision' | 'fact' | 'rule';
 
 export type MemoryUsed = {
   id: number;

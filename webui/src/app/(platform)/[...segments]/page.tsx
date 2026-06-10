@@ -14,6 +14,10 @@ type PageProps = {
 export default async function PlatformCatchAllPage({ params }: PageProps) {
   const { segments: raw } = await params;
   const segments = raw ?? [];
+  // /api/* 应由 app/api 下的 Route Handler 处理，不应落到此 catch-all
+  if (segments[0] === 'api') {
+    notFound();
+  }
   if (!isPlatformPathAllowed(segments)) {
     notFound();
   }

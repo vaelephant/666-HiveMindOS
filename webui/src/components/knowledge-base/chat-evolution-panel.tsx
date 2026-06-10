@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight, Brain, Loader2 } from 'lucide-react';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { getSessionPipeline } from '@/lib/kb-api';
 import type { SessionPipeline } from '@/lib/kb-types';
 import { KnowledgePipelineSteps } from '@/components/knowledge-base/knowledge-pipeline-steps';
@@ -96,7 +97,7 @@ export function ChatEvolutionPanel({ sessionId, extracting = false }: Props) {
 
             <div className="flex flex-wrap gap-2 pt-0.5">
               <Link
-                href="/memories"
+                href={HIVEMIND_MEMORIES_PATH}
                 className="text-[10px] font-medium text-brand-primary hover:underline"
               >
                 智慧进化
@@ -182,7 +183,7 @@ export function TurnEvolutionHint({
         )}
       </p>
       <p className="mt-1 text-[11px] text-shell-muted">
-        <Link href="/memories" className="text-brand-primary hover:underline">
+        <Link href={HIVEMIND_MEMORIES_PATH} className="text-brand-primary hover:underline">
           查看智慧进化
         </Link>
         {' · '}

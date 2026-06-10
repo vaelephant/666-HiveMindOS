@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { KnowledgePipelineSteps } from '@/components/knowledge-base/knowledge-pipeline-steps';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { getOverviewData } from '@/lib/kb-api';
 import type { OverviewStats, PipelineStage } from '@/lib/kb-types';
 
@@ -64,7 +65,7 @@ export function KnowledgePipelineBanner() {
           </p>
         </div>
         <Link
-          href="/memories"
+          href={HIVEMIND_MEMORIES_PATH}
           className="text-[11px] font-medium text-brand-primary hover:underline"
         >
           查看智慧进化 →

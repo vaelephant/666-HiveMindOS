@@ -17,6 +17,8 @@ export const MEMORY_TYPE_LABEL: Record<string, string> = {
   project: '项目',
   preference: '偏好',
   decision: '决策',
+  fact: '事实',
+  rule: '规则',
 };
 
 export const KIND_BADGE: Record<string, string> = {

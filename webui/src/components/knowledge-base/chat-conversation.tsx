@@ -7,6 +7,7 @@ import { TurnEvolutionHint } from '@/components/knowledge-base/chat-evolution-pa
 import { ChatUpgradeSessionBanner, ChatUpgradeTurnHint } from '@/components/knowledge-base/chat-upgrade-hint';
 import type { ChatTurn, MemoryUsed, SessionPipeline } from '@/lib/kb-types';
 import type { UpgradeSuggestion } from '@/lib/chat-task-upgrade';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { MEMORY_TYPE_LABEL } from '@/lib/kb-labels';
 import { wikiHref } from '@/lib/wiki-links';
 import { cn } from '@/lib/utils';
@@ -166,7 +167,7 @@ function SourcePill({ source, index }: { source: ChatTurn['sources'][number]; in
 function MemoryPill({ memory }: { memory: MemoryUsed }) {
   return (
     <Link
-      href="/memories"
+      href={HIVEMIND_MEMORIES_PATH}
       className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full border border-violet-500/25 bg-violet-500/5 px-2.5 py-1 text-[11px] text-violet-700 transition-colors hover:border-violet-500/40 dark:text-violet-300"
       title={memory.content}
     >

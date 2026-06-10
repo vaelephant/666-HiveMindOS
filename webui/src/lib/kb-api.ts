@@ -57,6 +57,9 @@ export function resolveUserId(explicit?: string): string {
 const base = (orgId: string) => `/api/kb/${orgId}`;
 
 function parseApiError(text: string, status: number): string {
+  if (text.trimStart().startsWith('<!DOCTYPE') || text.includes('__next_error__')) {
+    return `请求失败 (HTTP ${status})：接口返回了页面而非 JSON，请确认知识库后端已启动并刷新页面`;
+  }
   try {
     const body = JSON.parse(text) as { detail?: string; error?: string };
     if (typeof body.detail === 'string') return body.detail;
@@ -67,8 +70,13 @@ function parseApiError(text: string, status: number): string {
   return text || `HTTP ${status}`;
 }
 
+const API_FETCH_INIT: RequestInit = {
+  credentials: 'same-origin',
+  headers: { Accept: 'application/json' },
+};
+
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, { ...API_FETCH_INIT, ...init });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(parseApiError(text, res.status));
@@ -406,9 +414,8 @@ export async function listMemories(
   orgId = resolveOrgId(),
   sourceType?: 'chat' | 'ingest',
 ): Promise<MemoryRecord[]> {
-  const url = new URL(`${base(orgId)}/memories`, window.location.origin);
-  if (sourceType) url.searchParams.set('source_type', sourceType);
-  const data = await req<{ memories: MemoryRecord[] }>(url.pathname + url.search);
+  const path = `${base(orgId)}/memories${sourceType ? `?source_type=${encodeURIComponent(sourceType)}` : ''}`;
+  const data = await req<{ memories: MemoryRecord[] }>(path);
   return data.memories;
 }
 
@@ -416,9 +423,9 @@ export async function listMemoryEvents(
   orgId = resolveOrgId(),
   limit = 50,
 ): Promise<MemoryEventRecord[]> {
-  const url = new URL(`${base(orgId)}/memories/events`, window.location.origin);
-  url.searchParams.set('limit', String(limit));
-  const data = await req<{ events: MemoryEventRecord[] }>(url.toString());
+  const data = await req<{ events: MemoryEventRecord[] }>(
+    `${base(orgId)}/memories/events?limit=${encodeURIComponent(String(limit))}`,
+  );
   return data.events;
 }
 

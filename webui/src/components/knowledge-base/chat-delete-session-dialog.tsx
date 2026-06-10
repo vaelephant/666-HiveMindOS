@@ -12,6 +12,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { deleteChatSession } from '@/lib/kb-api';
 import type { SessionRecapResult } from '@/lib/kb-types';
 import { CATEGORY_LABEL } from '@/lib/kb-labels';
@@ -281,7 +282,7 @@ function RecapResultView({
       )}
 
       <p className="mt-4 text-[11px] text-shell-muted">
-        <Link href="/memories" className="text-brand-primary hover:underline">
+        <Link href={HIVEMIND_MEMORIES_PATH} className="text-brand-primary hover:underline">
           智慧进化
         </Link>
         {' · '}

@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/chat', destination: '/hivemind-chat', permanent: false },
       { source: '/chat/:path*', destination: '/hivemind-chat/:path*', permanent: false },
+      { source: '/memories', destination: '/hivemind-memories', permanent: false },
+      { source: '/memories/:path*', destination: '/hivemind-memories/:path*', permanent: false },
     ];
   },
   images: {

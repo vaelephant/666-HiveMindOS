@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import {
   AlertTriangle,
   ArrowRight,
@@ -422,7 +423,7 @@ export function HumanReviewView() {
                   <div>
                     <p className="text-[11px] font-medium text-shell-muted">关联智慧</p>
                     <Link
-                      href="/memories"
+                      href={HIVEMIND_MEMORIES_PATH}
                       className="mt-1 inline-flex items-center gap-1 text-[13px] text-brand-primary hover:underline"
                     >
                       查看智慧进化 #{selected.memory_id}

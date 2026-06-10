@@ -4,7 +4,7 @@ import { WikiCategoryCatalog } from '@/components/knowledge-base/wiki-category-c
 import { CandidateQueue } from '@/components/knowledge-base/candidate-queue';
 import { KnowledgePipelineBanner } from '@/components/knowledge-base/knowledge-pipeline-banner';
 import { OverviewStats, RecentActivity } from '@/components/knowledge-base/overview-stats';
-import { HIVEMIND_HOME_PATH } from '@/config/navigation';
+import { HIVEMIND_HOME_PATH, HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 
 const QUICK_ACTIONS = [
   {
@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
     tone: 'brand' as const,
   },
   {
-    href: '/memories',
+    href: HIVEMIND_MEMORIES_PATH,
     label: '智慧进化',
     desc: '查看对话沉淀的智慧',
     icon: Brain,

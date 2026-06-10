@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import {
   ArrowRight,
   Brain,
@@ -479,7 +480,7 @@ export function AutomationsView() {
                 )}
                 {job.id === 'recap_sessions' && (
                   <Link
-                    href="/memories"
+                    href={HIVEMIND_MEMORIES_PATH}
                     className="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-brand-primary hover:underline"
                   >
                     查看智慧进化

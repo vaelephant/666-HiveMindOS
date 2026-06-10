@@ -24,7 +24,7 @@ function isProtectedPath(pathname: string): boolean {
     pathname.startsWith('/tasks') ||
     pathname.startsWith('/knowledge-base') ||
     pathname.startsWith('/hivemind') ||
-    pathname.startsWith('/memories') ||
+    pathname.startsWith('/hivemind-memories') ||
     pathname.startsWith('/workflows') ||
     pathname.startsWith('/tools') ||
     pathname.startsWith('/audit') ||

@@ -15,7 +15,7 @@ import {
   Rocket,
   Sparkles,
 } from 'lucide-react';
-import { HIVEMIND_HOME_PATH, KB_BASE_PATH } from '@/config/navigation';
+import { HIVEMIND_HOME_PATH, HIVEMIND_MEMORIES_PATH, KB_BASE_PATH } from '@/config/navigation';
 import PlatformHomeFlowAnimation from '@/components/platform/PlatformHomeFlowAnimation';
 import { getOverviewData, listTasks } from '@/lib/kb-api';
 import type { ActivityRecord, AgentTask, OverviewData } from '@/lib/kb-types';
@@ -34,7 +34,7 @@ const QUICK_LINKS = [
     icon: MessageSquare,
   },
   {
-    href: '/memories',
+    href: HIVEMIND_MEMORIES_PATH,
     label: '智慧进化',
     desc: '从对话提炼的可复用智慧',
     icon: Brain,
