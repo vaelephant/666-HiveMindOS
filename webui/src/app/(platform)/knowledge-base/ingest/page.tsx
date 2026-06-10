@@ -5,14 +5,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpRight,
   BookOpen,
+  Eye,
+  FileAudio,
+  FileImage,
   FileSpreadsheet,
   FileText,
   FileType2,
+  FileVideo,
   FolderOpen,
   Loader2,
   Network,
   Play,
   Plus,
+  Presentation,
   RefreshCw,
   Search,
   Trash2,
@@ -22,8 +27,22 @@ import { Button } from '@/components/ui/button';
 import { uploadSource, listSources, compileSource, deleteSource } from '@/lib/kb-api';
 import type { SourceRecord } from '@/lib/kb-types';
 import { cn } from '@/lib/utils';
+import {
+  SourcePreviewDialog,
+  isMediaFile,
+  previewKind,
+} from '@/components/knowledge-base/source-preview-dialog';
 
-const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.txt';
+const ACCEPT = [
+  // 文档
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.csv', '.json',
+  // 图片
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp',
+  // 视频
+  '.mp4', '.mov', '.webm', '.avi', '.mkv',
+  // 音频
+  '.mp3', '.wav', '.m4a', '.ogg', '.flac',
+].join(',');
 
 type FilterTab = 'all' | 'uploaded' | 'compiling' | 'done';
 
@@ -37,14 +56,27 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 function fileExt(name: string) {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'pdf') return 'pdf';
-  if (ext === 'xls' || ext === 'xlsx') return 'sheet';
+  if (ext === 'xls' || ext === 'xlsx' || ext === 'csv') return 'sheet';
   if (ext === 'doc' || ext === 'docx') return 'doc';
+  if (ext === 'ppt' || ext === 'pptx') return 'ppt';
+  const media = previewKind(name);
+  if (media === 'image' || media === 'video' || media === 'audio') return media;
   return 'text';
 }
 
+const FILE_ICONS = {
+  pdf: FileType2,
+  sheet: FileSpreadsheet,
+  doc: FileText,
+  ppt: Presentation,
+  image: FileImage,
+  video: FileVideo,
+  audio: FileAudio,
+  text: FileText,
+} as const;
+
 function FileIcon({ filename }: { filename: string }) {
-  const kind = fileExt(filename);
-  const Icon = kind === 'sheet' ? FileSpreadsheet : kind === 'pdf' ? FileType2 : FileText;
+  const Icon = FILE_ICONS[fileExt(filename)];
   return (
     <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-primary/8 text-brand-primary/80">
       <Icon className="size-3.5" strokeWidth={1.75} />
@@ -105,23 +137,31 @@ function SourceRow({
   source,
   onCompile,
   onDelete,
+  onPreview,
 }: {
   source: SourceRecord;
   onCompile: (id: string) => void;
   onDelete: (id: string) => void;
+  onPreview: (source: SourceRecord) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasLongError = source.status === 'error' && source.error && source.error.length > 72;
+  const media = isMediaFile(source.filename);
 
   return (
     <li className="group">
-      <div className="grid items-center gap-x-4 gap-y-2 px-1 py-4 transition-colors hover:bg-foreground/[0.02] md:grid-cols-[minmax(0,1fr)_108px_128px_96px] lg:grid-cols-[minmax(0,1fr)_108px_128px_112px]">
+      <div className="grid items-center gap-x-4 gap-y-2 px-1 py-4 transition-colors hover:bg-foreground/[0.02] md:grid-cols-[minmax(0,1fr)_108px_128px_136px] lg:grid-cols-[minmax(0,1fr)_108px_128px_152px]">
         <div className="flex min-w-0 items-center gap-3">
           <FileIcon filename={source.filename} />
           <div className="min-w-0">
-            <p className="truncate text-[14px] font-medium text-shell-text" title={source.filename}>
+            <button
+              type="button"
+              onClick={() => onPreview(source)}
+              className="block max-w-full truncate text-left text-[14px] font-medium text-shell-text transition-colors hover:text-brand-primary"
+              title={`预览 ${source.filename}`}
+            >
               {source.filename}
-            </p>
+            </button>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-shell-muted">
               <span>{formatDate(source.created_at)}</span>
               <span className="text-shell-border">·</span>
@@ -158,13 +198,25 @@ function SourceRow({
         </div>
 
         <div className="flex items-center justify-end gap-1.5">
-          {source.status === 'uploaded' && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPreview(source)}
+            className="text-shell-muted opacity-0 transition-opacity hover:text-shell-text group-hover:opacity-100"
+            aria-label="预览"
+          >
+            <Eye className="size-3.5" />
+          </Button>
+          {source.status === 'uploaded' && !media && (
             <Button variant="outline" size="sm" onClick={() => onCompile(source.id)}>
               <Play data-icon="inline-start" />
               编译
             </Button>
           )}
-          {source.status === 'error' && (
+          {source.status === 'uploaded' && media && (
+            <span className="px-2 text-[12px] text-shell-muted">仅预览</span>
+          )}
+          {source.status === 'error' && !media && (
             <Button variant="outline" size="sm" onClick={() => onCompile(source.id)}>
               重试
             </Button>
@@ -228,6 +280,8 @@ export default function IngestPage() {
   const [uploading, setUploading] = useState(false);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [search, setSearch] = useState('');
+  const [preview, setPreview] = useState<SourceRecord | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -246,7 +300,7 @@ export default function IngestPage() {
     const done = sources.filter((s) => s.status === 'done');
     return {
       total: sources.length,
-      pending: sources.filter((s) => s.status === 'uploaded').length,
+      pending: sources.filter((s) => s.status === 'uploaded' && !isMediaFile(s.filename)).length,
       compiling: sources.filter((s) => s.status === 'compiling').length,
       entities: done.reduce((n, s) => n + (s.entities_extracted ?? 0), 0),
       pages: done.reduce((n, s) => n + (s.wiki_pages_created ?? 0), 0),
@@ -267,15 +321,22 @@ export default function IngestPage() {
   async function handleFiles(files: FileList | null) {
     if (!files || uploading) return;
     setUploading(true);
+    setUploadError(null);
+    const errors: string[] = [];
     for (const file of Array.from(files)) {
       try {
         const record = await uploadSource(file);
         setSources((prev) => [record, ...prev]);
-      } catch {
-        // individual file errors don't block the batch
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : '上传失败';
+        errors.push(`${file.name}: ${msg}`);
       }
     }
+    if (errors.length > 0) {
+      setUploadError(errors.join('\n'));
+    }
     setUploading(false);
+    if (inputRef.current) inputRef.current.value = '';
   }
 
   async function handleDelete(sourceId: string) {
@@ -333,8 +394,23 @@ export default function IngestPage() {
               <Upload className="size-5 text-brand-primary" strokeWidth={1.5} />
             </div>
             <p className="text-[15px] font-medium text-shell-text">松开以添加资料</p>
-            <p className="text-[12px] text-shell-muted">PDF · Word · Excel · TXT</p>
+            <p className="text-[12px] text-shell-muted">文档 · 图片 · 视频 · 音频</p>
           </div>
+        </div>
+      )}
+
+      {uploadError && (
+        <div className="mx-0 mb-2 rounded-lg border border-status-error/20 bg-status-error/5 px-4 py-3">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-status-error">
+            {uploadError}
+          </p>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="mt-2 text-[11px] text-status-error/70 hover:text-status-error"
+          >
+            关闭
+          </button>
         </div>
       )}
 
@@ -444,7 +520,7 @@ export default function IngestPage() {
           </div>
         ) : (
           <div className="mt-2">
-            <div className="hidden border-b border-shell-border px-1 pb-2.5 text-[11px] font-medium tracking-wide text-shell-muted md:grid md:grid-cols-[minmax(0,1fr)_108px_128px_96px] md:gap-x-4 lg:grid-cols-[minmax(0,1fr)_108px_128px_112px]">
+            <div className="hidden border-b border-shell-border px-1 pb-2.5 text-[11px] font-medium tracking-wide text-shell-muted md:grid md:grid-cols-[minmax(0,1fr)_108px_128px_136px] md:gap-x-4 lg:grid-cols-[minmax(0,1fr)_108px_128px_152px]">
               <span>文件名</span>
               <span>状态</span>
               <span>编译结果</span>
@@ -452,16 +528,24 @@ export default function IngestPage() {
             </div>
             <ul className="divide-y divide-shell-border">
               {filtered.map((s) => (
-                <SourceRow key={s.id} source={s} onCompile={handleCompile} onDelete={handleDelete} />
+                <SourceRow
+                  key={s.id}
+                  source={s}
+                  onCompile={handleCompile}
+                  onDelete={handleDelete}
+                  onPreview={setPreview}
+                />
               ))}
             </ul>
           </div>
         )}
 
         <p className="mt-8 text-[11px] text-shell-muted">
-          PDF · Word · Excel · TXT · 单文件 ≤ 20MB · 上传仅保存原始文件，编译需手动触发
+          文档 / 图片 ≤ 20MB · 视频 / 音频 ≤ 200MB · 点击文件名可预览 · 文档编译需手动触发，媒体文件仅供预览
         </p>
       </section>
+
+      <SourcePreviewDialog source={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }

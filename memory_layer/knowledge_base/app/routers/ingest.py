@@ -1,3 +1,4 @@
+import mimetypes
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -17,16 +18,22 @@ router = APIRouter()
 log = get_logger("hivemind.ingest")
 
 _SUFFIX_TO_TYPE = {
+    # 文档
     ".pdf": "pdf", ".docx": "word", ".doc": "word",
-    ".xlsx": "excel", ".xls": "excel", ".txt": "text",
+    ".xlsx": "excel", ".xls": "excel",
+    ".pptx": "ppt", ".ppt": "ppt",
+    ".txt": "text", ".md": "text", ".csv": "text", ".json": "text",
+    # 图片
+    ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image",
+    ".webp": "image", ".svg": "image", ".bmp": "image",
+    # 视频
+    ".mp4": "video", ".mov": "video", ".webm": "video", ".avi": "video", ".mkv": "video",
+    # 音频
+    ".mp3": "audio", ".wav": "audio", ".m4a": "audio", ".ogg": "audio", ".flac": "audio",
 }
 
-_MEDIA = {
-    "pdf": "application/pdf",
-    "word": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "text": "text/plain",
-}
+# 仅可预览、不参与 AI 编译的媒体类型
+_MEDIA_TYPES = {"image", "video", "audio"}
 
 _registry = SourceRegistry(config.REGISTRY_DB)
 
@@ -43,11 +50,15 @@ def _make_agent(org_id: str) -> IngestAgent:
 async def upload_source(org_id: str, file: UploadFile = File(...)):
     """Save the raw file and record it. No AI processing yet."""
     content = await file.read()
-    if len(content) > config.MAX_FILE_SIZE_BYTES:
-        raise HTTPException(status_code=413, detail="文件超过 20MB 限制")
-
     suffix = Path(file.filename).suffix.lower()
     source_type = _SUFFIX_TO_TYPE.get(suffix, "text")
+
+    # 视频/音频允许更大体积，文档/图片保持 20MB
+    is_av = source_type in ("video", "audio")
+    limit = config.MAX_MEDIA_SIZE_BYTES if is_av else config.MAX_FILE_SIZE_BYTES
+    if len(content) > limit:
+        limit_mb = limit // (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"文件超过 {limit_mb}MB 限制")
 
     raw_dir = config.RAW_ROOT / org_id
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -120,6 +131,8 @@ def compile_source(org_id: str, source_id: str):
     record = _registry.get(source_id)
     if not record:
         raise HTTPException(status_code=404, detail="Source not found")
+    if record.source_type in _MEDIA_TYPES:
+        raise HTTPException(status_code=400, detail="图片 / 视频 / 音频文件仅支持预览，暂不支持编译")
     if record.status == "done":
         raise HTTPException(status_code=409, detail="已编译完成，无需重复处理")
     if record.status == "compiling":
@@ -172,14 +185,19 @@ def compile_source(org_id: str, source_id: str):
 
 
 @router.get("/orgs/{org_id}/sources/{source_id}/file")
-def download_source_file(org_id: str, source_id: str):
-    """Download original uploaded file for preview."""
+def download_source_file(org_id: str, source_id: str, download: bool = False):
+    """Serve original uploaded file. Default inline (preview); ?download=true forces attachment."""
     record = _registry.get(source_id)
     if not record or record.org_id != org_id:
         raise HTTPException(status_code=404, detail="Source not found")
     path = Path(record.file_path)
     if not path.exists():
         raise HTTPException(status_code=404, detail="原始文件不存在")
-    media = _MEDIA.get(record.source_type, "application/octet-stream")
-    return FileResponse(path, media_type=media, filename=record.filename)
+    media, _ = mimetypes.guess_type(record.filename)
+    return FileResponse(
+        path,
+        media_type=media or "application/octet-stream",
+        filename=record.filename,
+        content_disposition_type="attachment" if download else "inline",
+    )
 

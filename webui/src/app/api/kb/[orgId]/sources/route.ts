@@ -17,11 +17,23 @@ export async function POST(
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   const { orgId } = await params;
-  const formData = await req.formData();
+  const contentType = req.headers.get('content-type');
+  if (!contentType?.includes('multipart/form-data')) {
+    return NextResponse.json({ error: '需要 multipart/form-data' }, { status: 400 });
+  }
+
+  const headers: Record<string, string> = { 'content-type': contentType };
+  const contentLength = req.headers.get('content-length');
+  if (contentLength) headers['content-length'] = contentLength;
+
+  // 流式透传，避免 Next.js 解析/缓冲整个 FormData（大 PDF 会被截断）
   const res = await fetch(`${BACKEND}/api/v1/orgs/${orgId}/sources`, {
     method: 'POST',
-    body: formData,
-  });
+    headers,
+    body: req.body,
+    // Node fetch 流式上传需要 duplex
+    duplex: 'half',
+  } as RequestInit);
   const data = await res.json().catch(() => ({ error: 'upload failed' }));
   return NextResponse.json(data, { status: res.status });
 }

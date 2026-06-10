@@ -25,7 +25,7 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import type { ViewType } from '@/types';
 import { ModeToggle } from '@/components/mode-toggle';
-import { UserMenu } from '@/components/auth/UserMenu';
+import { SidebarUser } from '@/components/auth/SidebarUser';
 
 const navItems: { id: ViewType; label: string; icon: typeof LayoutDashboard; href: string }[] = [
   { id: 'dashboard', label: '运营总览', icon: LayoutDashboard, href: '/dashboard' },
@@ -110,24 +110,8 @@ export default function FleetShell({ children }: { children: React.ReactNode }) 
           })}
         </nav>
 
-        <div className="mt-auto border-t border-shell-border-dim px-2 py-4">
-          <div
-            className={`flex items-center ${navCollapsed ? 'justify-center' : 'space-x-3 px-2'}`}
-          >
-            <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-shell-border">
-              <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCW3bAXJ7skhqod5esmAXGWLeNuMb-lqZw6Wl4lwlEWpHS1FuTt4BD4fGu_YgdRJUpH5pXCOHyUYXeg4Q3TC7GrWhYdT3D82BJHKsL_-QY4MEUxk2BpV2QjmBuNS37ZdQEswJ90_5rOAbv1-NwFfrXOz8sl3IpdLxh1iADP4cjUjh4bXrWD-TiMbz1VKWRBchSGFuL9yOsn4vJ6Cp9gYgqErTA93vANgxZXx526R3KUL9iOkLA6g-e_FE2wNTU9S5pu89c3628KPdbM"
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            </div>
-            {!navCollapsed ? (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-bold text-shell-text">Marcus Thorne</p>
-                <p className="truncate text-[10px] text-shell-muted">Ops Manager</p>
-              </div>
-            ) : null}
-          </div>
+        <div className="mt-auto shrink-0 border-t border-shell-border-dim px-2 py-3">
+          <SidebarUser collapsed={navCollapsed} />
         </div>
       </motion.aside>
 
@@ -171,7 +155,6 @@ export default function FleetShell({ children }: { children: React.ReactNode }) 
               >
                 <Calendar className="w-5 h-5" />
               </button>
-              <UserMenu />
             </div>
           </div>
         </header>

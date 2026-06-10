@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import {
   Activity,
   ArrowRight,
@@ -132,7 +131,6 @@ function buildStats(overview: OverviewData | null, tasks: AgentTask[]): StatCard
 }
 
 export default function PlatformHomeDashboard() {
-  const { data: session } = useSession();
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,29 +147,19 @@ export default function PlatformHomeDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const displayName =
-    session?.user?.name || session?.user?.email?.split('@')[0] || '用户';
-
   const stats = useMemo(() => buildStats(overview, tasks), [overview, tasks]);
   const recent = overview?.recent_activity?.slice(0, 5) ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-10 p-6 pb-12 md:p-10">
-      <header className="flex flex-col gap-6 border-b border-shell-border pb-8 md:flex-row md:items-end md:justify-between">
+    <div className="w-full space-y-8 px-6 py-6 md:px-8 md:py-8 lg:px-10">
+      <header className="flex flex-col gap-6 border-b border-shell-border pb-6 md:flex-row md:items-end md:justify-between">
         <div className="space-y-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-shell-muted">
             HiveMind OS · 企业自动执行系统
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-shell-text md:text-3xl">
-              你好，{displayName}
-            </h1>
-            {session?.user?.orgId ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-brand-primary/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-brand-bright">
-                {session.user.orgId}
-              </span>
-            ) : null}
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-shell-text md:text-[28px]">
+            工作台
+          </h1>
           <p className="max-w-xl text-sm leading-relaxed text-shell-subtext">
             说出业务目标，系统自动规划、执行、复盘。下方是你的任务脉搏、知识沉淀与最近动态。
           </p>

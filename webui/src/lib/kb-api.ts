@@ -54,11 +54,22 @@ export function resolveUserId(explicit?: string): string {
 
 const base = (orgId: string) => `/api/kb/${orgId}`;
 
+function parseApiError(text: string, status: number): string {
+  try {
+    const body = JSON.parse(text) as { detail?: string; error?: string };
+    if (typeof body.detail === 'string') return body.detail;
+    if (typeof body.error === 'string') return body.error;
+  } catch {
+    // not JSON
+  }
+  return text || `HTTP ${status}`;
+}
+
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `HTTP ${res.status}`);
+    throw new Error(parseApiError(text, res.status));
   }
   return res.json() as Promise<T>;
 }

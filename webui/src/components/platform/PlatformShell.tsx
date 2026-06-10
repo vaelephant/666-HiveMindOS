@@ -9,7 +9,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  UserCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -27,7 +26,7 @@ import {
 } from '@/config/navigation';
 import { IPFS_MONITOR_BASE_PATH } from '@/config/ipfs-monitor';
 import { ModeToggle } from '@/components/mode-toggle';
-import { UserMenu } from '@/components/auth/UserMenu';
+import { SidebarUser } from '@/components/auth/SidebarUser';
 
 const NAV_EXPANDED_PX = 260;
 const NAV_COLLAPSED_PX = 64;
@@ -376,23 +375,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           })}
         </nav>
 
-        {/* User */}
-        <div className="relative mt-auto px-2.5 py-3">
-          <div
-            className={`flex items-center rounded-xl border border-shell-border-dim bg-shell-panel-hover/60 ${
-              navCollapsed ? 'justify-center p-2' : 'gap-3 p-2.5'
-            }`}
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-primary to-brand-dim text-brand-on-primary shadow-sm shadow-brand-primary/20">
-              <UserCircle className="h-5 w-5" />
-            </div>
-            {!navCollapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[12px] font-semibold text-shell-text">演示用户</p>
-                <p className="truncate text-[10px] text-shell-muted">HiveMindOS · Dev</p>
-              </div>
-            )}
-          </div>
+        <div className="relative mt-auto shrink-0 border-t border-shell-border-dim px-2.5 py-3">
+          <SidebarUser collapsed={navCollapsed} />
         </div>
       </motion.aside>
 
@@ -442,7 +426,6 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <Bell className="h-4 w-4" />
               <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-bright ring-2 ring-shell-sidebar" />
             </button>
-            <UserMenu />
           </div>
         </header>
 
