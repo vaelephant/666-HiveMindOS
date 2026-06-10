@@ -80,8 +80,11 @@ export const proxy = auth((req) => {
   return NextResponse.next();
 });
 
-export const proxyConfig = {
+export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|ico)$).*)',
+    // Page routes: login guard + auth-page redirect (exclude API so NextAuth handlers work)
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4|ico)$).*)',
+    // KB API: org-id guard
+    '/api/kb/:path*',
   ],
 };
