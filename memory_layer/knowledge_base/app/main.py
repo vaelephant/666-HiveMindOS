@@ -28,14 +28,20 @@ async def lifespan(_app: FastAPI):
     log.info("━" * 50)
     log.info("  HiveMindOS · Knowledge Base  v0.1.0")
     log.info("━" * 50)
-    log.info("model        = %s", config.DEFAULT_MODEL)
-    log.info("fast_model   = %s", config.FAST_MODEL)
+    log.info("model        = %s (%s)", config.DEFAULT_MODEL, "default")
+    log.info("fast_model   = %s (%s)", config.FAST_MODEL, "fast")
+    log.info("embedding    = %s dim=%s", config.EMBEDDING_MODEL, config.EMBEDDING_DIM)
     log.info("storage      = %s", config.STORAGE_ROOT)
     log.info("wiki         = %s", config.WIKI_ROOT)
     log.info("registry_db  = %s", config.REGISTRY_DB)
     db_host = config.DATABASE_URL.split("@")[-1] if "@" in config.DATABASE_URL else config.DATABASE_URL
     log.info("postgres     = %s", db_host)
-    log.info("openai_key   = %s", "✓ set" if config.OPENAI_API_KEY else "✗ missing — AI calls will fail")
+    log.info("openai_key   = %s", "✓ set" if config.OPENAI_API_KEY else "✗ missing")
+    log.info("anthropic_key= %s", "✓ set" if config.ANTHROPIC_API_KEY else "✗ missing")
+    from model_layer.registry import startup_report
+
+    for warning in startup_report():
+        log.warning("[models] %s", warning)
     log.info("log_dir      = %s", config.LOG_DIR)
     log.info("━" * 50)
 

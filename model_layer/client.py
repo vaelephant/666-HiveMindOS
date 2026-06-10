@@ -1,86 +1,55 @@
-import json
-import os
-from typing import Callable, Optional
-from openai import OpenAI
+"""统一 LLM / Embedding 门面 — 按 profile 分发至各 provider SDK。"""
 
-_client: Optional[OpenAI] = None
+from __future__ import annotations
 
-def _get_client() -> OpenAI:
-    global _client
-    if _client is None:
-        _client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", ""))
-    return _client
+from collections.abc import Iterator
+from typing import Callable
 
-DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "gpt-4o")
-FAST_MODEL = os.environ.get("FAST_MODEL", "gpt-4o-mini")
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+from model_layer import registry
 
 
-def embed(text: str, model: str | None = None) -> list[float]:
-    """Single-text embedding via OpenAI-compatible API."""
-    text = text.strip()
-    if not text:
-        raise ValueError("embed: empty text")
-    response = _get_client().embeddings.create(
-        model=model or EMBEDDING_MODEL,
-        input=text,
-    )
-    return response.data[0].embedding
+def embed(text: str, profile: str | None = None) -> list[float]:
+    resolved = registry.resolve_embed(profile)
+    mod = registry.get_embed_module(resolved.provider)
+    return mod.embed(text=text, model=resolved.model)
 
 
-def embed_batch(texts: list[str], model: str | None = None) -> list[list[float]]:
-    """Batch embedding; preserves input order."""
-    cleaned = [t.strip() for t in texts]
-    if not cleaned:
-        return []
-    response = _get_client().embeddings.create(
-        model=model or EMBEDDING_MODEL,
-        input=cleaned,
-    )
-    return [row.embedding for row in sorted(response.data, key=lambda d: d.index)]
+def embed_batch(texts: list[str], profile: str | None = None) -> list[list[float]]:
+    resolved = registry.resolve_embed(profile)
+    mod = registry.get_embed_module(resolved.provider)
+    return mod.embed_batch(texts=texts, model=resolved.model)
 
 
 def complete(
     prompt: str,
-    system: Optional[str] = None,
-    model: Optional[str] = None,
-    max_tokens: int = 8192,
+    system: str | None = None,
+    profile: str | None = None,
+    max_tokens: int | None = None,
 ) -> str:
-    model = model or DEFAULT_MODEL
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
-    response = _get_client().chat.completions.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=messages,
+    resolved = registry.resolve_chat(profile)
+    mod = registry.get_chat_module(resolved.provider)
+    return mod.complete(
+        prompt=prompt,
+        system=system,
+        model=resolved.model,
+        max_tokens=max_tokens or resolved.max_tokens,
     )
-    return response.choices[0].message.content or ""
 
 
 def complete_stream(
     prompt: str,
-    system: Optional[str] = None,
-    model: Optional[str] = None,
-    max_tokens: int = 8192,
-):
-    """Yield text deltas from a streaming chat completion."""
-    model = model or DEFAULT_MODEL
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
-    stream = _get_client().chat.completions.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=messages,
-        stream=True,
+    system: str | None = None,
+    profile: str | None = None,
+    max_tokens: int | None = None,
+) -> Iterator[str]:
+    resolved = registry.resolve_chat(profile)
+    mod = registry.get_chat_module(resolved.provider)
+    yield from mod.complete_stream(
+        prompt=prompt,
+        system=system,
+        model=resolved.model,
+        max_tokens=max_tokens or resolved.max_tokens,
     )
-    for chunk in stream:
-        delta = chunk.choices[0].delta.content if chunk.choices else None
-        if delta:
-            yield delta
 
 
 def agentic_loop(
@@ -88,42 +57,20 @@ def agentic_loop(
     user_message: str,
     tools_schema: list[dict],
     tool_executor: Callable[[str, dict], str],
-    model: Optional[str] = None,
+    profile: str | None = None,
+    max_tokens: int | None = None,
     max_iterations: int = 10,
-    on_step: Optional[Callable[[dict], None]] = None,
+    on_step: Callable[[dict], None] | None = None,
 ) -> tuple[str, list[dict]]:
-    """Tool-calling agent loop. Returns (final_answer, steps)."""
-    messages: list[dict] = [
-        {"role": "system", "content": system},
-        {"role": "user", "content": user_message},
-    ]
-    steps: list[dict] = []
-
-    for _ in range(max_iterations):
-        response = _get_client().chat.completions.create(
-            model=model or DEFAULT_MODEL,
-            messages=messages,
-            tools=tools_schema,
-            tool_choice="auto",
-        )
-        choice = response.choices[0]
-        msg = choice.message
-
-        if choice.finish_reason == "tool_calls" and msg.tool_calls:
-            messages.append(msg.to_dict())
-            for tc in msg.tool_calls:
-                args = json.loads(tc.function.arguments)
-                result = tool_executor(tc.function.name, args)
-                step = {"tool": tc.function.name, "args": args, "result": result}
-                steps.append(step)
-                if on_step:
-                    on_step(step)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": str(result),
-                })
-        else:
-            return msg.content or "", steps
-
-    return "（已达最大步骤数，结果可能不完整）", steps
+    resolved = registry.resolve_chat(profile)
+    mod = registry.get_chat_module(resolved.provider)
+    return mod.agentic_loop(
+        system=system,
+        user_message=user_message,
+        tools_schema=tools_schema,
+        tool_executor=tool_executor,
+        model=resolved.model,
+        max_tokens=max_tokens or resolved.max_tokens,
+        max_iterations=max_iterations,
+        on_step=on_step,
+    )

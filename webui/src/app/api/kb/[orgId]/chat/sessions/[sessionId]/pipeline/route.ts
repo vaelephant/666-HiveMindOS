@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
-
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8006';
+import { kbBackendUrl } from '@/lib/kb-backend';
 
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: Promise<{ orgId: string; sessionId: string }> },
 ) {
   const { orgId, sessionId } = await params;
-  const url = new URL(req.url);
-  const qs = url.searchParams.toString();
   const res = await fetch(
-    `${BACKEND}/api/v1/orgs/${orgId}/chat/sessions/${sessionId}/pipeline${qs ? `?${qs}` : ''}`,
+    await kbBackendUrl(orgId, `/chat/sessions/${sessionId}/pipeline`),
     { cache: 'no-store' },
   );
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => ({ pipeline: null }));
   return NextResponse.json(data, { status: res.status });
 }

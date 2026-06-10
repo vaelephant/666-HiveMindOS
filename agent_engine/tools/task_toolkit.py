@@ -199,7 +199,7 @@ class TaskToolExecutor:
             category=category,
             context=context,
         )
-        raw = llm.complete(prompt, system=_EXTRACT.system, model=_EXTRACT.resolve_model(config))
+        raw = llm.complete(prompt, system=_EXTRACT.system, profile=_EXTRACT.resolve_profile())
         data = parse_json_object(raw)
         facts = data.get("facts") or []
         return {"count": len(facts), "facts": facts, "category": category}
@@ -276,6 +276,7 @@ class TaskToolExecutor:
         text = llm.complete(
             full,
             system="你是 HiveMindOS 企业任务助手，输出清晰、可执行、结构化的 Markdown。",
+            profile="default",
         )
         return {"chars": len(text), "count": 1, "text": text}
 

@@ -270,7 +270,7 @@ class PlanningCommittee:
             return None
 
         prompt = render(f"agents.{role.prompt}", **kwargs)
-        raw = llm.complete(prompt, system=prompt_cfg.system, model=prompt_cfg.resolve_model(config))
+        raw = llm.complete(prompt, system=prompt_cfg.system, profile=prompt_cfg.resolve_profile())
         return parse_json_object(raw)
 
     def _chair_round(
@@ -297,7 +297,7 @@ class PlanningCommittee:
                 tools=format_tools_for_prompt(),
                 experience=experience,
             )
-            raw = llm.complete(prompt, system=prompt_cfg.system, model=prompt_cfg.resolve_model(config))
+            raw = llm.complete(prompt, system=prompt_cfg.system, profile=prompt_cfg.resolve_profile())
             data = parse_json_object(raw)
             if validate_plan(data):
                 return data

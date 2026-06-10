@@ -29,7 +29,7 @@ class QueryAgent:
         answer = llm.complete(
             prompt,
             system=_QUERY.system,
-            model=_QUERY.resolve_model(config),
+            profile=_QUERY.resolve_profile(),
         )
         return {"question": question, "answer": answer, "source_pages": source_pages}
 

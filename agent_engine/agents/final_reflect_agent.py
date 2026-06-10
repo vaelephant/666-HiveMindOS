@@ -66,7 +66,7 @@ class FinalReflectAgent:
                 execution_summary=summary,
                 rubric=format_rubric_for_prompt(rubric),
             )
-            report = llm.complete(prompt, system=_FINAL.system, model=_FINAL.resolve_model(config))
+            report = llm.complete(prompt, system=_FINAL.system, profile=_FINAL.resolve_profile())
             score = _extract_score(report)
             report = report.strip()
             report = re.sub(r'```json\s*\{[^{}]*"score"[^`]*```\s*$', "", report, flags=re.DOTALL)

@@ -39,7 +39,7 @@ class SessionRecapAgent:
         raw = llm.complete(
             prompt=prompt,
             system=_L2.system,
-            model=_L2.resolve_model(config),
+            profile=_L2.resolve_profile(),
         )
         return self._parse(raw)
 

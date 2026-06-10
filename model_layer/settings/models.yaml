@@ -1,0 +1,62 @@
+label: 模型注册表
+description: |
+  OpenAI 为主模型（default / fast / chat_tools / embedding）。
+  其他 provider 按需新增 profile，在 prompts.yaml 的 model 字段引用 profile id 即可。
+
+providers:
+  openai:
+    api_key_env: OPENAI_API_KEY
+    capabilities: [chat, stream, tools, embed]
+
+  anthropic:
+    api_key_env: ANTHROPIC_API_KEY
+    capabilities: [chat, stream, tools]
+
+profiles:
+  default:
+    kind: chat
+    provider: openai
+    model: gpt-4o
+    max_tokens: 8192
+
+  fast:
+    kind: chat
+    provider: openai
+    model: gpt-4o-mini
+    max_tokens: 4096
+
+  chat_tools:
+    kind: chat
+    provider: openai
+    model: gpt-4o
+    max_tokens: 8192
+
+  embedding:
+    kind: embed
+    provider: openai
+    model: text-embedding-3-small
+    dim: 1536
+
+  # 按需启用：在 prompts.yaml 写 model: anthropic_strong
+  anthropic_strong:
+    kind: chat
+    provider: anthropic
+    model: claude-opus-4-7
+    max_tokens: 8192
+    optional: true
+
+  anthropic_fast:
+    kind: chat
+    provider: anthropic
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+    optional: true
+
+env_overrides:
+  default: DEFAULT_MODEL
+  fast: FAST_MODEL
+  embedding: EMBEDDING_MODEL
+
+defaults:
+  chat: default
+  embed: embedding

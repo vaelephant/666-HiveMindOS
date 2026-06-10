@@ -1,16 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8006';
+import { NextResponse } from 'next/server';
+import { kbBackendUrl } from '@/lib/kb-backend';
 
 export async function GET(
-  req: NextRequest,
+  req: Request,
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   const { orgId } = await params;
-  const limit = req.nextUrl.searchParams.get('limit');
-  const url = new URL(`${BACKEND}/api/v1/orgs/${orgId}/memories/events`);
-  if (limit) url.searchParams.set('limit', limit);
-  const res = await fetch(url.toString(), { cache: 'no-store' });
+  const incoming = new URL(req.url).searchParams;
+  const res = await fetch(await kbBackendUrl(orgId, '/memories/events', { searchParams: incoming }), {
+    cache: 'no-store',
+  });
   const data = await res.json().catch(() => ({ events: [] }));
   return NextResponse.json(data, { status: res.status });
 }

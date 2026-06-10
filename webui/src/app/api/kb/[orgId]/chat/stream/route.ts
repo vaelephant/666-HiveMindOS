@@ -1,12 +1,12 @@
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8006';
+import { kbBackendUrl, mergeUserIntoJsonBody } from '@/lib/kb-backend';
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   const { orgId } = await params;
-  const body = await req.text();
-  const res = await fetch(`${BACKEND}/api/v1/orgs/${orgId}/chat/stream`, {
+  const body = await mergeUserIntoJsonBody(await req.text());
+  const res = await fetch(await kbBackendUrl(orgId, '/chat/stream', { withUserId: false }), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body,

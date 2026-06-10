@@ -41,7 +41,7 @@ class MemoryExtractor:
         raw = llm.complete(
             prompt=prompt,
             system=_L1.system,
-            model=_L1.resolve_model(config),
+            profile=_L1.resolve_profile(),
         )
         items = parse_memory_items(raw)
         if not items and raw.strip():

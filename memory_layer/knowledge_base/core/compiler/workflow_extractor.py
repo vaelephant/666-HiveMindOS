@@ -20,7 +20,7 @@ def extract_workflows(content: str) -> dict:
     raw = llm.complete(
         prompt,
         system=_WORKFLOW.system,
-        model=_WORKFLOW.resolve_model(config),
+        profile=_WORKFLOW.resolve_profile(),
     )
     log.debug("workflow extractor raw response length=%d", len(raw))
     try:

@@ -76,7 +76,7 @@ class ChatAgent:
         for delta in llm.complete_stream(
             prompt=prompt,
             system=_CHAT_SYNTHESIS_STREAM.system,
-            model=_CHAT_SYNTHESIS_STREAM.resolve_model(config),
+            profile=_CHAT_SYNTHESIS_STREAM.resolve_profile(),
         ):
             chunks.append(delta)
             yield {"type": "token", "text": delta}
@@ -116,7 +116,7 @@ class ChatAgent:
             user_message=self._build_user_message(message, history),
             tools_schema=tool_schemas(),
             tool_executor=track_executor,
-            model=_CHAT_GATHER.resolve_model(config),
+            profile=_CHAT_GATHER.resolve_profile(),
             max_iterations=_RT.get("gather_max_iterations", 6),
         )
         return read_pages, steps
@@ -173,7 +173,7 @@ class ChatAgent:
                 answer=answer[:ans_max],
             ),
             system=_CHAT_FOLLOW_UPS.system,
-            model=_CHAT_FOLLOW_UPS.resolve_model(config),
+            profile=_CHAT_FOLLOW_UPS.resolve_profile(),
             max_tokens=_CHAT_FOLLOW_UPS.limit("max_tokens", 256),
         )
         try:
@@ -194,7 +194,7 @@ class ChatAgent:
         raw = llm.complete(
             prompt=prompt,
             system=_CHAT_SYNTHESIS.system,
-            model=_CHAT_SYNTHESIS.resolve_model(config),
+            profile=_CHAT_SYNTHESIS.resolve_profile(),
         )
         return self._parse_synthesis(raw)
 

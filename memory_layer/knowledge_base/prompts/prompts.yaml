@@ -168,7 +168,7 @@ evolution:
 chat:
   gather:
     label: "Chat 检索阶段"
-    model: fast
+    model: chat_tools
     system: |
       你是企业知识库检索助手。
       任务：检索与用户问题相关的知识库内容。

@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
-
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8006';
+import { kbBackendUrl } from '@/lib/kb-backend';
 
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   const { orgId } = await params;
-  const url = new URL(req.url);
-  const qs = url.searchParams.toString();
-  const res = await fetch(
-    `${BACKEND}/api/v1/orgs/${orgId}/candidates/stats${qs ? `?${qs}` : ''}`,
-    { cache: 'no-store' },
-  );
+  const incoming = new URL(req.url).searchParams;
+  const res = await fetch(await kbBackendUrl(orgId, '/candidates/stats', { searchParams: incoming }), {
+    cache: 'no-store',
+  });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });
 }

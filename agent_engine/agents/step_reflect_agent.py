@@ -187,7 +187,7 @@ class StepReflectAgent:
                 result=json.dumps(result, ensure_ascii=False)[:6000],
                 rubric=format_rubric_for_prompt(rubric),
             )
-            raw = llm.complete(prompt, system=_REFLECT.system, model=_REFLECT.resolve_model(config))
+            raw = llm.complete(prompt, system=_REFLECT.system, profile=_REFLECT.resolve_profile())
             return StepReflectResult.from_dict(parse_json_object(raw))
         except Exception as exc:
             log.warning("[step_reflect] LLM failed: %s", exc)

@@ -28,6 +28,30 @@ import type {
 
 export const DEFAULT_ORG = process.env.NEXT_PUBLIC_KB_DEFAULT_ORG ?? 'demo';
 
+let _clientOrgId: string | null = null;
+let _clientUserId: string | null = null;
+
+/** 由 OrgProvider 在客户端注入当前登录用户的 orgId / userId */
+export function setClientOrgId(orgId: string | null): void {
+  _clientOrgId = orgId;
+}
+
+export function setClientUserId(userId: string | null): void {
+  _clientUserId = userId;
+}
+
+export function resolveOrgId(explicit?: string): string {
+  if (explicit) return explicit;
+  if (typeof window !== 'undefined' && _clientOrgId) return _clientOrgId;
+  return DEFAULT_ORG;
+}
+
+export function resolveUserId(explicit?: string): string {
+  if (explicit) return explicit;
+  if (typeof window !== 'undefined' && _clientUserId) return _clientUserId;
+  return 'demo';
+}
+
 const base = (orgId: string) => `/api/kb/${orgId}`;
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -39,32 +63,32 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function uploadSource(file: File, orgId = DEFAULT_ORG): Promise<SourceRecord> {
+export async function uploadSource(file: File, orgId = resolveOrgId()): Promise<SourceRecord> {
   const form = new FormData();
   form.append('file', file);
   return req(`${base(orgId)}/sources`, { method: 'POST', body: form });
 }
 
-export async function listSources(orgId = DEFAULT_ORG): Promise<SourceRecord[]> {
+export async function listSources(orgId = resolveOrgId()): Promise<SourceRecord[]> {
   const data = await req<{ sources: SourceRecord[] }>(`${base(orgId)}/sources`);
   return data.sources;
 }
 
-export async function compileSource(sourceId: string, orgId = DEFAULT_ORG): Promise<SourceRecord> {
+export async function compileSource(sourceId: string, orgId = resolveOrgId()): Promise<SourceRecord> {
   return req(`${base(orgId)}/sources/${sourceId}/compile`, { method: 'POST' });
 }
 
-export async function deleteSource(sourceId: string, orgId = DEFAULT_ORG): Promise<void> {
+export async function deleteSource(sourceId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/sources/${sourceId}`, { method: 'DELETE' });
 }
 
-export async function ingestFile(file: File, orgId = DEFAULT_ORG): Promise<IngestResult> {
+export async function ingestFile(file: File, orgId = resolveOrgId()): Promise<IngestResult> {
   const form = new FormData();
   form.append('file', file);
   return req(`${base(orgId)}/ingest`, { method: 'POST', body: form });
 }
 
-export async function queryKnowledge(question: string, orgId = DEFAULT_ORG): Promise<QueryResult> {
+export async function queryKnowledge(question: string, orgId = resolveOrgId()): Promise<QueryResult> {
   return req(`${base(orgId)}/query`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -76,7 +100,7 @@ export async function createTask(
   input: string,
   options?: { orgId?: string; constraints?: Record<string, unknown> },
 ): Promise<AgentTask> {
-  const orgId = options?.orgId ?? DEFAULT_ORG;
+  const orgId = resolveOrgId(options?.orgId);
   return req(`${base(orgId)}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -87,23 +111,23 @@ export async function createTask(
   });
 }
 
-export async function listTasks(orgId = DEFAULT_ORG): Promise<AgentTask[]> {
+export async function listTasks(orgId = resolveOrgId()): Promise<AgentTask[]> {
   const data = await req<{ tasks: AgentTask[] }>(`${base(orgId)}/tasks`);
   return data.tasks;
 }
 
-export async function getTask(taskId: string, orgId = DEFAULT_ORG): Promise<AgentTask> {
+export async function getTask(taskId: string, orgId = resolveOrgId()): Promise<AgentTask> {
   return req(`${base(orgId)}/tasks/${taskId}`);
 }
 
-export async function deleteTask(taskId: string, orgId = DEFAULT_ORG): Promise<void> {
+export async function deleteTask(taskId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/tasks/${taskId}`, { method: 'DELETE' });
 }
 
 export async function approveTask(
   taskId: string,
   fromTask?: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<AgentTask> {
   return req(`${base(orgId)}/tasks/${taskId}/approve`, {
     method: 'POST',
@@ -112,12 +136,12 @@ export async function approveTask(
   });
 }
 
-export async function cancelTask(taskId: string, orgId = DEFAULT_ORG): Promise<void> {
+export async function cancelTask(taskId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/tasks/${taskId}/cancel`, { method: 'POST' });
 }
 
 export async function listExperiences(
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   taskType?: string,
   limit = 5,
 ): Promise<AgentExperience[]> {
@@ -128,14 +152,14 @@ export async function listExperiences(
   return data.experiences;
 }
 
-export async function listAutomations(orgId = DEFAULT_ORG): Promise<AutomationJob[]> {
+export async function listAutomations(orgId = resolveOrgId()): Promise<AutomationJob[]> {
   const data = await req<{ jobs: AutomationJob[] }>(`${base(orgId)}/automations`);
   return data.jobs;
 }
 
 export async function listAutomationRuns(
   jobId?: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   limit = 50,
 ): Promise<AutomationRun[]> {
   const url = new URL(`${base(orgId)}/automations/runs`, window.location.origin);
@@ -148,7 +172,7 @@ export async function listAutomationRuns(
 export async function runAutomation(
   jobId: string,
   params?: Record<string, number>,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<{ ok: boolean; run: AutomationRun }> {
   return req(`${base(orgId)}/automations/${jobId}/run`, {
     method: 'POST',
@@ -160,7 +184,7 @@ export async function runAutomation(
 export async function updateAutomation(
   jobId: string,
   patch: AutomationJobUpdate,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<AutomationJob> {
   const data = await req<{ job: AutomationJob }>(`${base(orgId)}/automations/${jobId}`, {
     method: 'PUT',
@@ -170,11 +194,11 @@ export async function updateAutomation(
   return data.job;
 }
 
-export async function deleteAutomation(jobId: string, orgId = DEFAULT_ORG): Promise<void> {
+export async function deleteAutomation(jobId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/automations/${jobId}`, { method: 'DELETE' });
 }
 
-export async function reseedAutomations(orgId = DEFAULT_ORG): Promise<AutomationJob[]> {
+export async function reseedAutomations(orgId = resolveOrgId()): Promise<AutomationJob[]> {
   const data = await req<{ restored: AutomationJob[]; count: number }>(
     `${base(orgId)}/automations/reseed`,
     { method: 'POST' },
@@ -182,24 +206,24 @@ export async function reseedAutomations(orgId = DEFAULT_ORG): Promise<Automation
   return data.restored;
 }
 
-export async function restoreAutomation(jobId: string, orgId = DEFAULT_ORG): Promise<AutomationJob> {
+export async function restoreAutomation(jobId: string, orgId = resolveOrgId()): Promise<AutomationJob> {
   const data = await req<{ job: AutomationJob }>(`${base(orgId)}/automations/${jobId}/restore`, {
     method: 'POST',
   });
   return data.job;
 }
 
-export async function deleteAutomationRun(runId: string, orgId = DEFAULT_ORG): Promise<void> {
+export async function deleteAutomationRun(runId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/automations/runs/${runId}`, { method: 'DELETE' });
 }
 
-export async function getOverviewData(orgId = DEFAULT_ORG): Promise<OverviewData> {
+export async function getOverviewData(orgId = resolveOrgId()): Promise<OverviewData> {
   return req(`${base(orgId)}/overview`);
 }
 
 export async function listCandidates(
   status?: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   limit = 100,
 ): Promise<KnowledgeCandidate[]> {
   const url = new URL(`${base(orgId)}/candidates`, window.location.origin);
@@ -209,14 +233,14 @@ export async function listCandidates(
   return data.candidates;
 }
 
-export async function getCandidateStats(orgId = DEFAULT_ORG): Promise<CandidateStats> {
+export async function getCandidateStats(orgId = resolveOrgId()): Promise<CandidateStats> {
   const data = await req<{ stats: CandidateStats }>(`${base(orgId)}/candidates/stats`);
   return data.stats;
 }
 
 export async function resolveCandidates(
   limit = 20,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<{ resolved: unknown[]; count: number }> {
   return req(`${base(orgId)}/candidates/resolve`, {
     method: 'POST',
@@ -227,7 +251,7 @@ export async function resolveCandidates(
 
 export async function compileCandidates(
   limit = 20,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<{ compiled: unknown[]; count: number }> {
   return req(`${base(orgId)}/candidates/compile`, {
     method: 'POST',
@@ -239,7 +263,7 @@ export async function compileCandidates(
 export async function approveCandidate(
   candidateId: number,
   reason = '',
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<void> {
   await req(`${base(orgId)}/candidates/${candidateId}/approve`, {
     method: 'POST',
@@ -251,7 +275,7 @@ export async function approveCandidate(
 export async function rejectCandidate(
   candidateId: number,
   reason = '',
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<void> {
   await req(`${base(orgId)}/candidates/${candidateId}/reject`, {
     method: 'POST',
@@ -260,22 +284,22 @@ export async function rejectCandidate(
   });
 }
 
-export async function migrateWiki(orgId = DEFAULT_ORG, force = false): Promise<{ migrated: number; skipped: number; total: number }> {
+export async function migrateWiki(orgId = resolveOrgId(), force = false): Promise<{ migrated: number; skipped: number; total: number }> {
   const url = new URL(`${base(orgId)}/wiki/migrate`, window.location.origin);
   if (force) url.searchParams.set('force', 'true');
   return req(url.toString(), { method: 'POST' });
 }
 
-export function sourceFileUrl(sourceId: string, orgId = DEFAULT_ORG): string {
+export function sourceFileUrl(sourceId: string, orgId = resolveOrgId()): string {
   return `${base(orgId)}/sources/${sourceId}/file`;
 }
 
-export async function listWikiCategories(orgId = DEFAULT_ORG): Promise<WikiCategory[]> {
+export async function listWikiCategories(orgId = resolveOrgId()): Promise<WikiCategory[]> {
   const data = await req<{ categories: WikiCategory[] }>(`${base(orgId)}/wiki/categories`);
   return data.categories;
 }
 
-export async function listWikiPages(orgId = DEFAULT_ORG, category?: string): Promise<WikiPage[]> {
+export async function listWikiPages(orgId = resolveOrgId(), category?: string): Promise<WikiPage[]> {
   const url = new URL(`${base(orgId)}/wiki`, window.location.origin);
   if (category) url.searchParams.set('category', category);
   const data = await req<{ pages: WikiPage[] }>(url.toString());
@@ -284,7 +308,7 @@ export async function listWikiPages(orgId = DEFAULT_ORG, category?: string): Pro
 
 export async function getWikiPage(
   path: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   detail = false,
 ): Promise<WikiPageResponse> {
   const url = new URL(`${base(orgId)}/wiki/${path}`, window.location.origin);
@@ -293,7 +317,7 @@ export async function getWikiPage(
 }
 
 export async function listEntities(
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   entityType?: string,
 ) {
   const url = new URL(`${base(orgId)}/graph/entities`, window.location.origin);
@@ -304,27 +328,27 @@ export async function listEntities(
 
 export async function getEntityDetail(
   name: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<EntityDetail> {
   return req(`${base(orgId)}/graph/entity/${encodeURIComponent(name)}`);
 }
 
-export async function getGraphSnapshot(orgId = DEFAULT_ORG): Promise<GraphSnapshot> {
+export async function getGraphSnapshot(orgId = resolveOrgId()): Promise<GraphSnapshot> {
   return req(`${base(orgId)}/graph/snapshot`);
 }
 
-export async function listChatSessions(orgId = DEFAULT_ORG): Promise<ChatSessionSummary[]> {
+export async function listChatSessions(orgId = resolveOrgId()): Promise<ChatSessionSummary[]> {
   const data = await req<{ sessions: ChatSessionSummary[] }>(`${base(orgId)}/chat/sessions`);
   return data.sessions;
 }
 
-export async function getChatSession(sessionId: string, orgId = DEFAULT_ORG): Promise<ChatSession> {
+export async function getChatSession(sessionId: string, orgId = resolveOrgId()): Promise<ChatSession> {
   return req(`${base(orgId)}/chat/sessions/${sessionId}`);
 }
 
 export async function getSessionPipeline(
   sessionId: string,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<SessionPipeline> {
   const data = await req<{ pipeline: SessionPipeline }>(
     `${base(orgId)}/chat/sessions/${sessionId}/pipeline`,
@@ -335,20 +359,20 @@ export async function getSessionPipeline(
 export async function deleteChatSession(
   sessionId: string,
   options?: { recap?: boolean },
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<DeleteSessionResponse> {
   const url = new URL(`${base(orgId)}/chat/sessions/${sessionId}`, window.location.origin);
   if (options?.recap) url.searchParams.set('recap', 'true');
   return req(url.toString(), { method: 'DELETE' });
 }
 
-export async function listMemories(orgId = DEFAULT_ORG): Promise<MemoryRecord[]> {
+export async function listMemories(orgId = resolveOrgId()): Promise<MemoryRecord[]> {
   const data = await req<{ memories: MemoryRecord[] }>(`${base(orgId)}/memories`);
   return data.memories;
 }
 
 export async function listMemoryEvents(
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   limit = 50,
 ): Promise<MemoryEventRecord[]> {
   const url = new URL(`${base(orgId)}/memories/events`, window.location.origin);
@@ -357,12 +381,12 @@ export async function listMemoryEvents(
   return data.events;
 }
 
-export async function getMemoryStats(orgId = DEFAULT_ORG): Promise<MemoryStats> {
+export async function getMemoryStats(orgId = resolveOrgId()): Promise<MemoryStats> {
   const data = await req<{ stats: MemoryStats }>(`${base(orgId)}/memories/stats`);
   return data.stats;
 }
 
-export async function syncMemoryVectors(orgId = DEFAULT_ORG): Promise<{
+export async function syncMemoryVectors(orgId = resolveOrgId()): Promise<{
   synced: number;
   total: number;
   available: boolean;
@@ -374,12 +398,16 @@ export async function syncMemoryVectors(orgId = DEFAULT_ORG): Promise<{
 export async function sendChatMessage(
   message: string,
   sessionId?: string | null,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
 ): Promise<ChatSendResponse> {
   return req(`${base(orgId)}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
+    body: JSON.stringify({
+      message,
+      session_id: sessionId ?? undefined,
+      user_id: resolveUserId(),
+    }),
   });
 }
 
@@ -397,13 +425,17 @@ export async function sendChatMessageStream(
   message: string,
   sessionId: string | null | undefined,
   handlers: ChatStreamHandlers,
-  orgId = DEFAULT_ORG,
+  orgId = resolveOrgId(),
   signal?: AbortSignal,
 ): Promise<ChatSendResponse> {
   const res = await fetch(`${base(orgId)}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, session_id: sessionId ?? undefined }),
+    body: JSON.stringify({
+      message,
+      session_id: sessionId ?? undefined,
+      user_id: resolveUserId(),
+    }),
     signal,
   });
 

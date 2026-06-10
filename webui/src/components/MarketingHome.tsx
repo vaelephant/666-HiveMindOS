@@ -165,7 +165,7 @@ export default function MarketingHome() {
               Sign in
             </Link>
             <Link
-              href="/dashboard"
+              href="/auth/login?callbackUrl=/dashboard"
               className="rounded-full border border-white/[0.12] bg-shell-panel/[0.04] px-4 py-2 text-[13px] font-semibold text-zinc-100 transition-colors hover:bg-shell-panel/[0.08]"
             >
               仓储演示
@@ -212,7 +212,7 @@ export default function MarketingHome() {
                   <ArrowRight className="h-4 w-4" strokeWidth={2} />
                 </Link>
                 <Link
-                  href="/dashboard"
+                  href="/auth/login?callbackUrl=/dashboard"
                   className="inline-flex items-center gap-2 rounded-full border border-white/[0.2] px-6 py-3 text-[14px] font-medium text-zinc-200 transition-colors hover:border-white/[0.35] hover:bg-shell-panel/[0.06]"
                 >
                   WareMind 仓储演示
@@ -435,7 +435,7 @@ export default function MarketingHome() {
                 AI 中台 →
               </Link>
               <Link
-                href="/dashboard"
+                href="/auth/login?callbackUrl=/dashboard"
                 className="inline-flex items-center justify-center rounded-full px-9 py-3.5 text-[14px] font-medium text-zinc-500 transition-colors hover:text-zinc-200"
               >
                 仓储演示 →

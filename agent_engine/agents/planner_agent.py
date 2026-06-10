@@ -159,7 +159,7 @@ class PlannerAgent:
 
         plan_dict: dict | None = None
         try:
-            raw = llm.complete(prompt, system=_PLANNER.system, model=_PLANNER.resolve_model(config))
+            raw = llm.complete(prompt, system=_PLANNER.system, profile=_PLANNER.resolve_profile())
             plan_dict = parse_json_object(raw)
             if not validate_plan(plan_dict):
                 log.warning("[planner] invalid plan from LLM, using fallback")

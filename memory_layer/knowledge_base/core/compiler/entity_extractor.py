@@ -20,7 +20,7 @@ def extract_entities(content: str) -> list[dict]:
     raw = llm.complete(
         prompt,
         system=_ENTITY.system,
-        model=_ENTITY.resolve_model(config),
+        profile=_ENTITY.resolve_profile(),
     )
     log.debug("entity extractor raw response length=%d", len(raw))
     try:

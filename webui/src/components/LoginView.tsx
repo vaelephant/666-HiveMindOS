@@ -2,16 +2,20 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { Eye, EyeOff, Lock, Mail, Warehouse, ArrowRight, Loader2 } from 'lucide-react';
+import { AuthBrandPanel } from '@/components/auth/AuthBrandPanel';
 
 /** Background video from /public (URL-encoded for non-ASCII filename) */
 const LOGIN_BG_VIDEO = encodeURI('/ware.mp4');
 
 export default function LoginView() {
   const router = useRouter();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') ?? '/home';
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,44 +25,40 @@ export default function LoginView() {
     setError(null);
     setSubmitting(true);
     try {
-      // Demo: no backend — accept any non-empty and go to dashboard
-      await new Promise((r) => setTimeout(r, 650));
-      if (!username.trim() || !password) {
-        setError('Please enter username and password.');
+      if (!email.trim() || !password) {
+        setError('请输入邮箱和密码');
         setSubmitting(false);
         return;
       }
-      router.push('/dashboard');
+
+      const result = await signIn('credentials', {
+        email: email.trim(),
+        password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError('邮箱或密码错误');
+        setSubmitting(false);
+        return;
+      }
+
+      router.push(callbackUrl.startsWith('/') ? callbackUrl : '/home');
+      router.refresh();
     } catch {
-      setError('Something went wrong. Try again.');
+      setError('登录失败，请稍后重试');
       setSubmitting(false);
     }
   }
 
   return (
     <div className="relative flex min-h-screen min-h-[100dvh] flex-col lg:flex-row">
-      <div className="relative hidden w-1/2 flex-col justify-between bg-gradient-to-br from-auth-deep via-auth-mid to-shell-panel p-12 lg:flex">
-        <div className="flex items-center gap-3">
-        
-          <div>
-            <p className="text-sm font tracking-tight text-white">WareMind</p>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-auth-accent-soft/80">
-             管理仓库更简单
-            </p>
-          </div>
-        </div>
-        <div className="w-full min-w-0 space-y-4">
-          <h2 className="whitespace-nowrap text-3xl font leading-tight tracking-tight text-white">
-            管理仓库更简单，一眼看清入出库与库存。
-          </h2>
-          <p className="text-sm font-medium leading-relaxed text-shell-subtext">
-            主数据、波次、设备与 AI 决策同屏协作——演示环境一键进入。
-          </p>
-        </div>
-        <p className="text-[11px] font-medium text-white/35">
-          © {new Date().getFullYear()} WareMind · 演示登录
-        </p>
-      </div>
+      <AuthBrandPanel
+        brand="HiveMind OS"
+        kicker="欢迎回来"
+        title="企业自动执行系统"
+        description="说出业务目标，系统自动规划、执行、复盘——你定方向，复杂流程跑通，交付物持续落地。"
+      />
 
       <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10">
         <video
@@ -86,42 +86,36 @@ export default function LoginView() {
           </div>
 
           <div className="w-full max-w-[400px] rounded-2xl border border-brand-primary/30 bg-auth-deep/45 p-8 shadow-2xl shadow-brand-primary/10 backdrop-blur-md">
-          <h1 className="text-xl font text-white tracking-tight">Sign in</h1>
+          <h1 className="text-xl font text-white tracking-tight">登录</h1>
           <p className="mt-1 text-[13px] font-medium text-shell-muted">
-            Demo defaults: <span className="font-mono text-shell-subtext">admin / admin</span>
+            使用注册邮箱登录 HiveMind OS
           </p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label htmlFor="username" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-shell-muted">
-                Username
+              <label htmlFor="email" className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-shell-muted">
+                邮箱
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-shell-muted" />
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="input-field w-full py-3 pl-10 pr-4 text-[14px] font-medium text-white"
-                  placeholder="admin"
+                  placeholder="you@company.com"
                 />
               </div>
             </div>
             <div>
               <div className="mb-1.5 flex items-center justify-between">
                 <label htmlFor="password" className="text-[11px] font-bold uppercase tracking-wider text-shell-muted">
-                  Password
+                  密码
                 </label>
-                <button
-                  type="button"
-                  className="text-[11px] font-bold text-auth-accent-soft hover:text-brand-bright"
-                  onClick={() => {}}
-                >
-                  Forgot?
-                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-shell-muted" />
@@ -133,7 +127,7 @@ export default function LoginView() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input-field w-full py-3 pl-10 pr-11 text-[14px] font-medium text-white"
-                  placeholder="admin"
+                  placeholder="••••••••"
                 />
                 <button
                   type="button"
@@ -161,7 +155,7 @@ export default function LoginView() {
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
                 <>
-                  Continue
+                  登录
                   <ArrowRight className="h-4 w-4" />
                 </>
               )}
@@ -169,19 +163,16 @@ export default function LoginView() {
           </form>
 
           <p className="mt-8 text-center text-[12px] font-medium text-shell-muted">
-            想了解产品？{' '}
+            还没有账号？{' '}
+            <Link href="/auth/register" className="font-bold text-auth-accent-soft hover:text-brand-bright">
+              立即注册
+            </Link>
+            {' · '}
             <Link href="/auth/invite" className="font-bold text-auth-accent-soft hover:text-brand-bright">
-              查看推广页
+              了解产品
             </Link>
           </p>
           </div>
-
-          <Link
-            href="/dashboard"
-            className="mt-8 text-[12px] font-bold text-shell-muted underline-offset-4 hover:text-white hover:underline"
-          >
-            Skip sign-in (demo) →
-          </Link>
         </div>
       </div>
     </div>

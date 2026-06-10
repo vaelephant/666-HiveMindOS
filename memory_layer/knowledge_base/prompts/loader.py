@@ -24,12 +24,22 @@ class PromptSpec:
     user_template: str | None = None
     limits: dict[str, Any] | None = None
     allowed_types: frozenset[str] | None = None
-    model: str | None = None  # fast | default
+    model: str | None = None  # fast | default | chat_tools | profile id
 
-    def resolve_model(self, config_module) -> str:
-        if self.model == "default":
-            return config_module.DEFAULT_MODEL
-        return config_module.FAST_MODEL
+    def resolve_profile(self) -> str:
+        raw = self.model
+        if raw in (None, "fast"):
+            return "fast"
+        if raw == "default":
+            return "default"
+        return raw
+
+    def resolve_model(self, config_module=None) -> str:
+        """Deprecated — 返回 profile 解析后的 model id。"""
+        del config_module
+        from model_layer.registry import resolve_chat
+
+        return resolve_chat(self.resolve_profile()).model
 
     def limit(self, name: str, default: Any = None) -> Any:
         if not self.limits:

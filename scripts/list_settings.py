@@ -14,6 +14,8 @@ if ROOT not in sys.path:
 from agent_engine.settings import load as load_agent
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.settings import load as load_kb
+from model_layer.registry import list_profiles, startup_report
+from model_layer.settings.loader import load as load_models
 
 
 def _print_cfg(label: str, name: str, cfg: dict) -> None:
@@ -29,6 +31,20 @@ def _print_cfg(label: str, name: str, cfg: dict) -> None:
 
 
 def main() -> None:
+    print("=== model_layer (模型注册表) ===\n")
+    models_cfg = load_models("models")
+    _print_cfg("Model", "models", models_cfg)
+    print("Resolved profiles:")
+    for pid, prof in sorted(list_profiles().items()):
+        extra = f" dim={prof.dim}" if prof.dim else ""
+        print(f"  {pid}: {prof.provider}/{prof.model}{extra}")
+    warnings = startup_report()
+    if warnings:
+        print("\nWarnings:")
+        for w in warnings:
+            print(f"  ! {w}")
+    print()
+
     print("=== memory_layer (知识沉淀) ===\n")
     for path in sorted(config.SETTINGS_DIR.glob("*.yaml")):
         _print_cfg("KB", path.stem, load_kb(path.stem))

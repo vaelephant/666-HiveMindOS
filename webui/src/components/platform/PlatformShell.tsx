@@ -27,6 +27,7 @@ import {
 } from '@/config/navigation';
 import { IPFS_MONITOR_BASE_PATH } from '@/config/ipfs-monitor';
 import { ModeToggle } from '@/components/mode-toggle';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 const NAV_EXPANDED_PX = 260;
 const NAV_COLLAPSED_PX = 64;
@@ -441,12 +442,7 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
               <Bell className="h-4 w-4" />
               <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-bright ring-2 ring-shell-sidebar" />
             </button>
-            <Link
-              href="/dashboard"
-              className="hidden rounded-lg border border-shell-border px-2.5 py-1.5 text-[11px] font-medium text-shell-muted transition-colors hover:bg-shell-panel-hover hover:text-shell-text sm:inline"
-            >
-              WareMind 演示
-            </Link>
+            <UserMenu />
           </div>
         </header>
 

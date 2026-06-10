@@ -11,8 +11,12 @@ except ImportError:
     pass
 
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
-DEFAULT_MODEL: str = os.environ.get("DEFAULT_MODEL", "claude-opus-4-7")
-FAST_MODEL: str = os.environ.get("FAST_MODEL", "claude-sonnet-4-6")
+ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
+
+from model_layer.registry import resolve_chat, resolve_embed
+
+DEFAULT_MODEL: str = resolve_chat("default").model
+FAST_MODEL: str = resolve_chat("fast").model
 
 _BASE = Path(__file__).parent
 PROMPTS_FILE: Path = _BASE / "prompts" / "prompts.yaml"
@@ -34,8 +38,8 @@ QDRANT_URL: str = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY: str = os.environ.get("QDRANT_API_KEY", "")
 QDRANT_COLLECTION: str = os.environ.get("QDRANT_COLLECTION", "hivemind_memories")
 EXPERIENCE_COLLECTION: str = os.environ.get("EXPERIENCE_COLLECTION", "hivemind_experiences")
-EMBEDDING_MODEL: str = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
-EMBEDDING_DIM: int = int(os.environ.get("EMBEDDING_DIM", "1536"))
+EMBEDDING_MODEL: str = resolve_embed("embedding").model
+EMBEDDING_DIM: int = resolve_embed("embedding").dim or 1536
 QDRANT_ENABLED: bool = os.environ.get("QDRANT_ENABLED", "true").lower() in ("1", "true", "yes")
 
 DATABASE_URL: str = os.environ.get(

@@ -20,12 +20,12 @@ import {
   Search,
   Settings,
   Warehouse,
-  UserCircle,
   Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { ViewType } from '@/types';
 import { ModeToggle } from '@/components/mode-toggle';
+import { UserMenu } from '@/components/auth/UserMenu';
 
 const navItems: { id: ViewType; label: string; icon: typeof LayoutDashboard; href: string }[] = [
   { id: 'dashboard', label: '运营总览', icon: LayoutDashboard, href: '/dashboard' },
@@ -171,12 +171,7 @@ export default function FleetShell({ children }: { children: React.ReactNode }) 
               >
                 <Calendar className="w-5 h-5" />
               </button>
-              <button
-                type="button"
-                className="p-1.5 text-shell-muted hover:bg-shell-bg rounded transition-colors"
-              >
-                <UserCircle className="w-5 h-5" />
-              </button>
+              <UserMenu />
             </div>
           </div>
         </header>

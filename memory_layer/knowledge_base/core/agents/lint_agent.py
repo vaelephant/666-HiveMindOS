@@ -41,7 +41,7 @@ class LintAgent:
                 feedback = llm.complete(
                     render("agents.lint", content=sample_content[:max_chars]),
                     system=_LINT.system,
-                    model=_LINT.resolve_model(config),
+                    profile=_LINT.resolve_profile(),
                 )
                 issues.append({
                     "type": "ai_review",

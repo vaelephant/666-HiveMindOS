@@ -1,9 +1,9 @@
-import { DEFAULT_ORG } from '@/lib/kb-api';
+import { resolveOrgId } from '@/lib/kb-api';
 import type { ChatSessionSummary } from '@/lib/kb-types';
 
 const KEY = (orgId: string) => `hivemind-chat-sessions:${orgId}`;
 
-export function readCachedSessions(orgId = DEFAULT_ORG): ChatSessionSummary[] {
+export function readCachedSessions(orgId = resolveOrgId()): ChatSessionSummary[] {
   if (typeof window === 'undefined') return [];
   try {
     const raw = sessionStorage.getItem(KEY(orgId));
@@ -15,7 +15,7 @@ export function readCachedSessions(orgId = DEFAULT_ORG): ChatSessionSummary[] {
   }
 }
 
-export function writeCachedSessions(sessions: ChatSessionSummary[], orgId = DEFAULT_ORG): void {
+export function writeCachedSessions(sessions: ChatSessionSummary[], orgId = resolveOrgId()): void {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.setItem(KEY(orgId), JSON.stringify(sessions));

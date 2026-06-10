@@ -19,7 +19,7 @@ def main() -> None:
         model = spec.model or "fast"
         print(f"{key}")
         print(f"  label: {spec.label}")
-        print(f"  model: {model}")
+        print(f"  model: {model} (profile)")
         if limits:
             print(f"  limits: {limits}")
         if spec.allowed_types:
