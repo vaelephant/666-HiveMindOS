@@ -11,7 +11,9 @@ from memory_layer.knowledge_base.app.routers import (
     ingest,
     memories,
     overview,
+    playbook,
     query,
+    skills,
     tasks,
     wiki,
 )
@@ -80,6 +82,8 @@ app.include_router(query.router,    prefix="/api/v1", tags=["query"])
 app.include_router(tasks.router,        prefix="/api/v1", tags=["tasks"])
 app.include_router(automations.router,  prefix="/api/v1", tags=["automations"])
 app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
+app.include_router(skills.router,       prefix="/api/v1", tags=["skills"])
+app.include_router(playbook.router,     prefix="/api/v1", tags=["playbook"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])
 

@@ -31,9 +31,9 @@ export function useOrgId(): string {
   return useContext(OrgContext);
 }
 
-/** session 就绪后再拉取 org 隔离数据（避免刷新时用 demo org 请求） */
+/** session 就绪后再拉取 org 隔离数据（避免未登录或 loading 时用 demo org 请求） */
 export function useOrgReady(): { ready: boolean; orgId: string } {
   const { status } = useSession();
   const orgId = useOrgId();
-  return { ready: status !== 'loading', orgId };
+  return { ready: status === 'authenticated', orgId };
 }

@@ -13,6 +13,8 @@ import {
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ANNOTATION_CHILDREN,
+  INTEGRATIONS_BASE_PATH,
+  INTEGRATIONS_CHILDREN,
   IPFS_MONITOR_CHILDREN,
   KB_BASE_PATH,
   KNOWLEDGE_BASE_CHILDREN,
@@ -60,6 +62,10 @@ function isTaskCenterItem(item: PrimaryNavItem): item is Extract<PrimaryNavItem,
   return item.navKey === 'task_center';
 }
 
+function isIntegrationsItem(item: PrimaryNavItem): item is Extract<PrimaryNavItem, { navKey: 'integrations' }> {
+  return item.navKey === 'integrations';
+}
+
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -71,6 +77,9 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
       pathname.startsWith(TASK_CENTER_BASE_PATH) ||
       pathname.startsWith('/agent-tasks') ||
       pathname.startsWith('/automations'),
+  );
+  const [integrationsOpen, setIntegrationsOpen] = useState(() =>
+    pathname.startsWith(INTEGRATIONS_BASE_PATH),
   );
 
   useEffect(() => {
@@ -93,6 +102,10 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
     ) {
       setTaskCenterOpen(true);
     }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname.startsWith(INTEGRATIONS_BASE_PATH)) setIntegrationsOpen(true);
   }, [pathname]);
 
   const navLinkClass = (active: boolean, collapsed: boolean) =>
@@ -341,6 +354,56 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                       >
                         <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
                           {TASK_CENTER_CHILDREN.map((child) => {
+                            const active =
+                              pathname === child.href || pathname.startsWith(`${child.href}/`);
+                            return (
+                              <Link key={child.navKey} href={child.href} className={subNavLinkClass(active)}>
+                                <child.icon className="mr-2 h-4 w-4 shrink-0 opacity-80" />
+                                <span className="truncate">{child.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            } else if (isIntegrationsItem(item)) {
+              const integrationsActive = pathname.startsWith(INTEGRATIONS_BASE_PATH);
+              el = navCollapsed ? (
+                <Link
+                  key={item.navKey}
+                  href={`${INTEGRATIONS_BASE_PATH}/wechat-work`}
+                  title={item.label}
+                  className={navLinkClass(integrationsActive, true)}
+                >
+                  <item.icon className="h-[18px] w-[18px] shrink-0" />
+                </Link>
+              ) : (
+                <div key={item.navKey} className="space-y-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setIntegrationsOpen((o) => !o)}
+                    className={navLinkClass(integrationsActive, false)}
+                  >
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 text-shell-muted transition-transform ${integrationsOpen ? 'rotate-0' : '-rotate-90'}`}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {integrationsOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="ml-3 space-y-0.5 border-l border-shell-border py-1 pl-2.5">
+                          {INTEGRATIONS_CHILDREN.map((child) => {
                             const active =
                               pathname === child.href || pathname.startsWith(`${child.href}/`);
                             return (

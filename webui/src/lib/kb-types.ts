@@ -136,7 +136,7 @@ export type AutomationJob = {
   category: string;
   category_label: string;
   cron_hint: string;
-  defaults: Record<string, number>;
+  defaults: Record<string, number | boolean | string>;
   builtin?: boolean;
   updated_at?: string | null;
   last_run: AutomationRun | null;
@@ -147,7 +147,49 @@ export type AutomationJobUpdate = {
   description?: string;
   category?: string;
   cron_hint?: string;
-  defaults?: Record<string, number>;
+  defaults?: Record<string, number | boolean | string>;
+};
+
+export type AgentSkillSummary = {
+  name: string;
+  path: string;
+  preview: string;
+};
+
+export type AgentSkillDetail = {
+  name: string;
+  path: string;
+  content: string;
+};
+
+export type AgentSkillCreate = {
+  title: string;
+  description: string;
+  steps: string[];
+  scenario?: string[];
+};
+
+export type OrgPlaybook = {
+  source: 'default' | 'override';
+  content: string;
+  default_title: string;
+  default_preview: string;
+  pinned_sessions_cleared?: number;
+};
+
+export type OrgPlaybookPreview = {
+  block: string;
+  char_count: number;
+  char_limit: number;
+  truncated: boolean;
+  memories_count: number;
+  memories: {
+    id: number;
+    title: string;
+    memory_type: string;
+    memory_type_label: string;
+    importance: number;
+  }[];
 };
 
 export type SourceRecord = {
@@ -504,6 +546,13 @@ export type ChatSource = {
 
 export type MemoryType = 'project' | 'preference' | 'decision' | 'fact' | 'rule';
 
+export type SkillUsed = {
+  name: string;
+  description: string;
+  score: number;
+  path?: string;
+};
+
 export type MemoryUsed = {
   id: number;
   memory_type: MemoryType;
@@ -518,6 +567,7 @@ export type ChatTurn = {
   sources: ChatSource[];
   follow_ups: string[];
   memories_used?: MemoryUsed[];
+  skills_used?: SkillUsed[];
 };
 
 export type ChatSessionSummary = {
@@ -567,6 +617,7 @@ export type ChatSendResponse = {
   sources: ChatSource[];
   follow_ups: string[];
   memories_used?: MemoryUsed[];
+  skills_used?: SkillUsed[];
   turn: ChatTurn;
 };
 

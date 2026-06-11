@@ -144,6 +144,21 @@ def run_goal(task_id: str, org_id: str, *, resume_from: str | None = None) -> No
                 reflection={"reflections": outcome.get("reflections")},
                 final_output=(deliverable or reflection_report)[:500],
             )
+            try:
+                from agent_engine.skills.experience_to_skill import write_skill_from_experience
+
+                write_skill_from_experience(
+                    org_id,
+                    task_type=plan.task_type,
+                    goal=task.input,
+                    score=score,
+                    workflow=outcome.get("workflow") or [],
+                    reflection={"reflections": outcome.get("reflections")},
+                    final_output=(deliverable or reflection_report)[:500],
+                    experience_id=exp_id,
+                )
+            except Exception as skill_exc:
+                log.warning("[task] skill write skipped  id=%s  err=%s", task_id[:8], skill_exc)
 
         _registry.update(
             task_id,

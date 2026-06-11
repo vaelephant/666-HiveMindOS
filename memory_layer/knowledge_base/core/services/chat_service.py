@@ -44,6 +44,21 @@ def delete_session(org_id: str, session_id: str) -> bool:
     return _registry.delete_session(session_id, org_id)
 
 
+def search_history(org_id: str, user_id: str, query: str) -> dict:
+    from memory_layer.knowledge_base.core.services.context_builder import (
+        format_session_search_block,
+        search_session_messages,
+    )
+
+    hits = search_session_messages(org_id, user_id, query)
+    return {
+        "query": query,
+        "count": len(hits),
+        "hits": hits,
+        "formatted": format_session_search_block(hits),
+    }
+
+
 def send_message(
     org_id: str,
     message: str,
@@ -75,7 +90,9 @@ def send_message(
     # Exclude the message we just saved from history passed to agent
     prior = history[:-1] if history else []
 
-    memory_block, memories_used = build_context(org_id, user_id, message)
+    memory_block, memories_used, skills_used = build_context(
+        org_id, user_id, message, session_id=session_id,
+    )
 
     wiki, graph = _wiki_and_graph(org_id)
     result = ChatAgent(wiki, graph).run(message, prior, org_id, memory_context=memory_block)
@@ -91,8 +108,8 @@ def send_message(
     )
 
     log.info(
-        "[chat] turn saved  org=%s  session=%s  sources=%d  memories=%d",
-        org_id, session_id[:8], len(result.get("sources") or []), len(memories_used),
+        "[chat] turn saved  org=%s  session=%s  sources=%d  memories=%d  skills=%d",
+        org_id, session_id[:8], len(result.get("sources") or []), len(memories_used), len(skills_used),
     )
 
     return {
@@ -101,12 +118,14 @@ def send_message(
         "sources": result.get("sources") or [],
         "follow_ups": result.get("follow_ups") or [],
         "memories_used": memories_used,
+        "skills_used": skills_used,
         "turn": {
             "question": message,
             "answer": result["answer"],
             "sources": result.get("sources") or [],
             "follow_ups": result.get("follow_ups") or [],
             "memories_used": memories_used,
+            "skills_used": skills_used,
         },
     }
 
@@ -116,8 +135,8 @@ def _prepare_turn(
     message: str,
     session_id: str | None,
     user_id: str,
-) -> tuple[str, list[dict], str, list]:
-    """Save user message, return (session_id, prior_history, memory_block, memories_used)."""
+) -> tuple[str, list[dict], str, list[dict], list[dict]]:
+    """Save user message, return (session_id, prior_history, memory_block, memories_used, skills_used)."""
     message = message.strip()
     if not message:
         raise ValueError("消息不能为空")
@@ -132,8 +151,10 @@ def _prepare_turn(
 
     history = _registry.get_history(session_id)
     prior = history[:-1] if history else []
-    memory_block, memories_used = build_context(org_id, user_id, message)
-    return session_id, prior, memory_block, memories_used
+    memory_block, memories_used, skills_used = build_context(
+        org_id, user_id, message, session_id=session_id,
+    )
+    return session_id, prior, memory_block, memories_used, skills_used
 
 
 def send_message_stream(
@@ -148,7 +169,7 @@ def send_message_stream(
     每行格式：data: {json}\n\n
     cancel_check 返回 True 时中止流，不保存 assistant 消息、不发送 done。
     """
-    session_id, prior, memory_block, memories_used = _prepare_turn(
+    session_id, prior, memory_block, memories_used, skills_used = _prepare_turn(
         org_id, message, session_id, user_id,
     )
     wiki, graph = _wiki_and_graph(org_id)
@@ -193,8 +214,8 @@ def send_message_stream(
         follow_ups=follow_ups,
     )
     log.info(
-        "[chat] stream saved  org=%s  session=%s  sources=%d  memories=%d",
-        org_id, session_id[:8], len(sources), len(memories_used),
+        "[chat] stream saved  org=%s  session=%s  sources=%d  memories=%d  skills=%d",
+        org_id, session_id[:8], len(sources), len(memories_used), len(skills_used),
     )
 
     done = {
@@ -204,12 +225,14 @@ def send_message_stream(
         "sources": sources,
         "follow_ups": follow_ups,
         "memories_used": memories_used,
+        "skills_used": skills_used,
         "turn": {
             "question": message,
             "answer": answer,
             "sources": sources,
             "follow_ups": follow_ups,
             "memories_used": memories_used,
+            "skills_used": skills_used,
         },
     }
     yield f"data: {json.dumps(done, ensure_ascii=False)}\n\n"

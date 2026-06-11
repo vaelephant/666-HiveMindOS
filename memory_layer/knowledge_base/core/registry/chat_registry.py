@@ -25,6 +25,14 @@ def _title_from_message(message: str) -> str:
     return f"{t[:_TITLE_MAX]}…"
 
 
+def _search_terms(query: str) -> list[str]:
+    import re
+    cjk = re.findall(r"[\u4e00-\u9fff]{2,}", query)
+    latin = re.findall(r"[a-zA-Z0-9]{2,}", query.lower())
+    terms = cjk + latin
+    return terms[:6]
+
+
 def _rows_to_turns(rows: list[dict]) -> list[dict]:
     """Pair user/assistant message rows into frontend ChatTurn objects."""
     turns: list[dict] = []
@@ -288,6 +296,99 @@ class ChatRegistry:
             )
             conn.commit()
             return cur.rowcount > 0
+
+    def archive_session(self, session_id: str, org_id: str) -> bool:
+        with pg_conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE chat_sessions
+                SET status = 'archived', updated_at = NOW()
+                WHERE id = %s::uuid AND org_id = %s AND status = 'active'
+                """,
+                (session_id, org_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+    def get_pinned_context(self, session_id: str, org_id: str) -> str | None:
+        with pg_conn() as conn:
+            row = conn.execute(
+                """
+                SELECT pinned_context FROM chat_sessions
+                WHERE id = %s::uuid AND org_id = %s
+                """,
+                (session_id, org_id),
+            ).fetchone()
+        if not row or not row[0]:
+            return None
+        return row[0]
+
+    def set_pinned_context(self, session_id: str, org_id: str, block: str) -> None:
+        with pg_conn() as conn:
+            conn.execute(
+                """
+                UPDATE chat_sessions
+                SET pinned_context = %s, updated_at = NOW()
+                WHERE id = %s::uuid AND org_id = %s
+                """,
+                (block, session_id, org_id),
+            )
+            conn.commit()
+
+    def clear_pinned_context_for_org(self, org_id: str) -> int:
+        """Drop frozen playbook blocks so next message rebuilds from latest playbook."""
+        with pg_conn() as conn:
+            cur = conn.execute(
+                """
+                UPDATE chat_sessions
+                SET pinned_context = NULL, updated_at = NOW()
+                WHERE org_id = %s AND pinned_context IS NOT NULL
+                """,
+                (org_id,),
+            )
+            conn.commit()
+            return cur.rowcount
+
+    def search_messages(
+        self,
+        org_id: str,
+        user_id: str,
+        query: str,
+        *,
+        limit: int = 8,
+    ) -> list[dict]:
+        """Keyword search across past chat messages (session_search)."""
+        terms = _search_terms(query)
+        if not terms:
+            return []
+
+        patterns = [f"%{t}%" for t in terms]
+        with pg_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT m.role, m.content, s.title, s.id::text, m.created_at::text
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.org_id = %s AND s.user_id = %s
+                  AND m.role IN ('user', 'assistant')
+                  AND (
+                    """ + " OR ".join(["m.content ILIKE %s"] * len(patterns)) + """
+                  )
+                ORDER BY m.created_at DESC
+                LIMIT %s
+                """,
+                (org_id, user_id, *patterns, limit),
+            ).fetchall()
+        return [
+            {
+                "role": r[0],
+                "content": r[1],
+                "session_title": r[2],
+                "session_id": r[3],
+                "created_at": r[4],
+            }
+            for r in rows
+        ]
 
     def add_message(
         self,

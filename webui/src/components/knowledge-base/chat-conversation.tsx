@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUp, Bot, Brain, ChevronDown, Loader2, Sparkles, User } from 'lucide-react';
+import { ArrowUp, Bot, Brain, ChevronDown, Loader2, Sparkles, User, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { TurnEvolutionHint } from '@/components/knowledge-base/chat-evolution-panel';
 import { ChatUpgradeSessionBanner, ChatUpgradeTurnHint } from '@/components/knowledge-base/chat-upgrade-hint';
-import type { ChatTurn, MemoryUsed, SessionPipeline } from '@/lib/kb-types';
+import type { ChatTurn, MemoryUsed, SessionPipeline, SkillUsed } from '@/lib/kb-types';
 import type { UpgradeSuggestion } from '@/lib/chat-task-upgrade';
 import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
+import { skillDetailHref } from '@/lib/skill-links';
 import { MEMORY_TYPE_LABEL } from '@/lib/kb-labels';
 import { wikiHref } from '@/lib/wiki-links';
 import { cn } from '@/lib/utils';
@@ -180,13 +181,32 @@ function MemoryPill({ memory }: { memory: MemoryUsed }) {
   );
 }
 
+function SkillPill({ skill }: { skill: SkillUsed }) {
+  const label = skill.description
+    ? skill.description.split('：').pop()?.slice(0, 40) || skill.name
+    : skill.name;
+  return (
+    <Link
+      href={skillDetailHref(skill.name)}
+      className="inline-flex max-w-[240px] items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/5 px-2.5 py-1 text-[11px] text-amber-800 transition-colors hover:border-amber-500/40 dark:text-amber-300"
+      title={skill.description || skill.name}
+    >
+      <Wrench className="size-3 shrink-0" />
+      <span className="truncate">{label}</span>
+      <span className="shrink-0 rounded bg-amber-500/10 px-1 text-[9px]">Skill</span>
+    </Link>
+  );
+}
+
 function ContextChips({ turn }: { turn: ChatTurn }) {
   const [open, setOpen] = useState(false);
   const hasMemories = (turn.memories_used?.length ?? 0) > 0;
+  const hasSkills = (turn.skills_used?.length ?? 0) > 0;
   const hasSources = turn.sources.length > 0;
-  const count = (turn.memories_used?.length ?? 0) + turn.sources.length;
+  const count =
+    (turn.memories_used?.length ?? 0) + (turn.skills_used?.length ?? 0) + turn.sources.length;
 
-  if (!hasMemories && !hasSources) return null;
+  if (!hasMemories && !hasSkills && !hasSources) return null;
 
   return (
     <div className="mt-3">
@@ -202,6 +222,9 @@ function ContextChips({ turn }: { turn: ChatTurn }) {
         <div className="mt-2 flex flex-wrap gap-1.5">
           {turn.memories_used?.map((m) => (
             <MemoryPill key={m.id} memory={m} />
+          ))}
+          {turn.skills_used?.map((s) => (
+            <SkillPill key={s.name} skill={s} />
           ))}
           {turn.sources.map((s, i) => (
             <SourcePill key={s.path} source={s} index={i + 1} />

@@ -96,6 +96,16 @@ def delete_session(
     return out
 
 
+@router.get("/orgs/{org_id}/chat/search")
+def search_chat_history(org_id: str, q: str = Query(..., min_length=1), user_id: str = "demo"):
+    """Search past chat messages (session_search)."""
+    try:
+        return chat_service.search_history(org_id, user_id, q)
+    except Exception as exc:
+        log.error("[chat] search failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"搜索不可用: {exc}") from exc
+
+
 @router.post("/orgs/{org_id}/chat/stream")
 async def stream_message(
     org_id: str,

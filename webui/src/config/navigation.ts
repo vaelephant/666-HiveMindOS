@@ -103,6 +103,22 @@ export type TaskCenterChild = {
   icon: LucideIcon;
 };
 
+export type IntegrationsNavKey = 'integrations_wechat' | 'integrations_playbook';
+
+export type IntegrationsChild = {
+  navKey: IntegrationsNavKey;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+};
+
+export const INTEGRATIONS_BASE_PATH = '/integrations' as const;
+
+export const INTEGRATIONS_CHILDREN: IntegrationsChild[] = [
+  { navKey: 'integrations_wechat', label: '企业微信', href: `${INTEGRATIONS_BASE_PATH}/wechat-work`, icon: Plug },
+  { navKey: 'integrations_playbook', label: 'Playbook', href: `${INTEGRATIONS_BASE_PATH}/playbook`, icon: BookOpen },
+];
+
 export const TASK_CENTER_BASE_PATH = '/tasks' as const;
 
 export const TASK_CENTER_CHILDREN: TaskCenterChild[] = [
@@ -125,7 +141,10 @@ export type IpfsMonitorChild = {
 
 export type PrimaryNavItem =
   | {
-      navKey: Exclude<PrimaryNavKey, 'annotation' | 'ipfs_monitor' | 'knowledge_base' | 'task_center'>;
+      navKey: Exclude<
+        PrimaryNavKey,
+        'annotation' | 'ipfs_monitor' | 'knowledge_base' | 'task_center' | 'integrations'
+      >;
       label: string;
       href: string;
       icon: LucideIcon;
@@ -158,6 +177,13 @@ export type PrimaryNavItem =
       icon: LucideIcon;
       factory: FactoryDomain;
       children: TaskCenterChild[];
+    }
+  | {
+      navKey: 'integrations';
+      label: string;
+      icon: LucideIcon;
+      factory: FactoryDomain;
+      children: IntegrationsChild[];
     };
 
 export const ANNOTATION_CHILDREN: AnnotationChild[] = [
@@ -214,7 +240,13 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   },
   { navKey: 'workflows', label: '工作流', href: '/workflows', icon: GitBranch, factory: 'hivemind' },
   { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
-  { navKey: 'integrations', label: '集成',       href: '/integrations/wechat-work', icon: Plug,   factory: 'hivemind' },
+  {
+    navKey: 'integrations',
+    label: '集成',
+    icon: Plug,
+    factory: 'hivemind',
+    children: INTEGRATIONS_CHILDREN,
+  },
   { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
   { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
 
@@ -265,7 +297,8 @@ export function collectStaticPlatformPaths(): Set<string> {
       item.navKey === 'annotation' ||
       item.navKey === 'ipfs_monitor' ||
       item.navKey === 'knowledge_base' ||
-      item.navKey === 'task_center'
+      item.navKey === 'task_center' ||
+      item.navKey === 'integrations'
     ) {
       for (const child of item.children) paths.add(child.href);
     } else {
@@ -286,6 +319,7 @@ export function isPlatformPathAllowed(segments: string[] | undefined): boolean {
   if (path === IPFS_MONITOR_BASE_PATH || path.startsWith(`${IPFS_MONITOR_BASE_PATH}/`)) return true;
   if (path === KB_BASE_PATH || path.startsWith(`${KB_BASE_PATH}/`)) return true;
   if (path.startsWith('/workflows/')) return true;
+  if (path.startsWith('/integrations/')) return true;
   if (path.startsWith('/tools/')) return true;
   if (path.startsWith('/audit/')) return true;
   if (path.startsWith('/human-review/')) return true;
@@ -313,6 +347,9 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
     } else if (item.navKey === 'task_center') {
       for (const c of item.children) { if (c.href === path) return c.label; }
       if (path === TASK_CENTER_BASE_PATH || path.startsWith(`${TASK_CENTER_BASE_PATH}/`)) return item.label;
+    } else if (item.navKey === 'integrations') {
+      for (const c of item.children) { if (c.href === path) return c.label; }
+      if (path === INTEGRATIONS_BASE_PATH || path.startsWith(`${INTEGRATIONS_BASE_PATH}/`)) return item.label;
     } else if (item.href === path) {
       return item.label;
     }
@@ -333,6 +370,10 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return '自主任务';
   if (path.startsWith('/workflows/')) return '工作流';
   if (path.startsWith('/tools/')) return '工具箱';
+  if (path === '/tools') return 'Agent Skills';
+  if (path.startsWith('/integrations/playbook')) return 'Playbook';
+  if (path.startsWith('/integrations/wechat-work')) return '企业微信';
+  if (path.startsWith('/integrations/')) return '集成';
   if (path.startsWith('/audit/')) return '审计日志';
   if (path.startsWith('/human-review/')) return '人工审核';
   if (path.startsWith('/knowledge-base/tasks')) return '自主任务';

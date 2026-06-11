@@ -30,6 +30,7 @@ _KNOWN_HANDLERS = frozenset({
     "sync_vectors",
     "resolve_candidates",
     "compile_candidates",
+    "daily_digest",
 })
 
 
@@ -199,4 +200,63 @@ def _execute(job_id: str, org_id: str, user_id: str, params: dict[str, Any]) -> 
         merged = sum(1 for r in results if r.get("status") == "merged")
         return {"compiled": len(results), "merged": merged, "items": results}
 
+    if job_id == "daily_digest":
+        return _run_daily_digest(org_id, user_id, params)
+
     raise ValueError(f"未实现的任务: {job_id}")
+
+
+def _run_daily_digest(org_id: str, user_id: str, params: dict[str, Any]) -> dict:
+    """Agent-style digest: summarize recent memories + chat activity."""
+    from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
+    from memory_layer.knowledge_base.core.registry.memory_registry import MemoryRegistry
+    from model_layer import client as llm
+
+    days = int(params.get("days") or 1)
+    mem_reg = MemoryRegistry()
+    chat_reg = ChatRegistry()
+    memories = mem_reg.list_active(org_id, user_id, limit=15)
+    stats = chat_reg.get_org_stats(org_id, user_id)
+
+    mem_lines = [
+        f"- [{m.memory_type}] {m.title}: {m.content[:120]}"
+        for m in memories[:10]
+    ]
+    prompt = f"""你是 HiveMind 每日摘要助手。根据以下数据写一段 150~300 字的中文摘要，面向企业用户，突出新智慧与使用概况。
+
+统计（近 {days} 天语境）：
+- 活跃会话数：{stats.get('session_count', 0)}
+- 消息总数：{stats.get('message_count', 0)}
+- 近 7 日新会话：{stats.get('sessions_week', 0)}
+
+近期智慧（最多 10 条）：
+{chr(10).join(mem_lines) if mem_lines else "（暂无）"}
+
+只输出摘要正文，不要标题。"""
+
+    digest = llm.complete(prompt=prompt, profile="fast").strip()
+    result: dict[str, Any] = {
+        "digest": digest,
+        "memories_count": len(memories),
+        "stats": stats,
+    }
+
+    if params.get("deliver_wechat") and params.get("wechat_userid"):
+        try:
+            from integrations.wechat_work.client import WeChatWorkClient
+            from integrations.wechat_work.registry import WeChatWorkRegistry
+
+            wx_reg = WeChatWorkRegistry()
+            cfg = wx_reg.get_org_config(org_id)
+            if cfg and cfg.enabled:
+                client = WeChatWorkClient(cfg.corp_id, cfg.secret)
+                client.send_text(cfg.agent_id, str(params["wechat_userid"]), digest[:2000])
+                result["wechat_delivered"] = True
+            else:
+                result["wechat_delivered"] = False
+                result["wechat_error"] = "企微未启用"
+        except Exception as exc:
+            result["wechat_delivered"] = False
+            result["wechat_error"] = str(exc)
+
+    return result

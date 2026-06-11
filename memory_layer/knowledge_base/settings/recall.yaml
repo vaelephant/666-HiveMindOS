@@ -21,3 +21,28 @@ hints:
 keyword_threshold: 0.55
 semantic_threshold: 0.42
 max_memories: 5
+
+# 常驻块（会话级冻结，类似 Hermes MEMORY.md + USER.md）
+pinned:
+  char_limit: 2200
+  min_importance: 0.65
+  memory_types: [preference, decision, project]
+  max_entries: 12
+
+# 历史对话检索（session_search）
+session_search_hints:
+  - 上次聊
+  - 讨论过
+  - 我们说过
+  - 什么时候说过
+  - 哪次对话
+  - 之前问过
+session_search_limit: 8
+session_search_snippet_chars: 200
+
+# Agent Skills（SKILL.md）动态召回
+skills:
+  enabled: true
+  max_skills: 2
+  keyword_threshold: 0.35
+  excerpt_chars: 650

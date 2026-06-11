@@ -34,6 +34,16 @@ jobs:
     defaults:
       limit: 20
 
+  - id: daily_digest
+    label: 每日智慧摘要
+    description: Agent 汇总近期智慧与对话，生成简短报告（可选企微推送）
+    category: memory
+    cron_hint: "0 9 * * *"
+    defaults:
+      days: 1
+      deliver_wechat: false
+      wechat_userid: ""
+
 category_labels:
   memory: 智慧进化
   wiki: 知识晋升

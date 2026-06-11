@@ -1,5 +1,8 @@
 import type {
   AgentExperience,
+  AgentSkillCreate,
+  AgentSkillDetail,
+  AgentSkillSummary,
   AgentTask,
   AutomationJob,
   AutomationJobUpdate,
@@ -18,6 +21,8 @@ import type {
   MemoryRecord,
   MemoryStats,
   OverviewData,
+  OrgPlaybook,
+  OrgPlaybookPreview,
   QueryResult,
   SourceCollection,
   SourceCollectionsResponse,
@@ -215,7 +220,7 @@ export async function listAutomationRuns(
 
 export async function runAutomation(
   jobId: string,
-  params?: Record<string, number>,
+  params?: Record<string, number | boolean | string>,
   orgId = resolveOrgId(),
 ): Promise<{ ok: boolean; run: AutomationRun }> {
   return req(`${base(orgId)}/automations/${jobId}/run`, {
@@ -608,5 +613,56 @@ export async function bindWeChatWorkUser(
 export async function unbindWeChatWorkUser(bindingId: number, orgId?: string): Promise<{ ok: boolean }> {
   return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work/bindings/${bindingId}`, {
     method: 'DELETE',
+  });
+}
+
+// ── Agent Skills ─────────────────────────────────────────────────────────────
+
+export async function listAgentSkills(orgId = resolveOrgId()): Promise<AgentSkillSummary[]> {
+  const data = await req<{ skills: AgentSkillSummary[] }>(`${base(orgId)}/skills`);
+  return data.skills;
+}
+
+export async function getAgentSkill(skillName: string, orgId = resolveOrgId()): Promise<AgentSkillDetail> {
+  return req(`${base(orgId)}/skills/${encodeURIComponent(skillName)}`);
+}
+
+export async function createAgentSkill(
+  payload: AgentSkillCreate,
+  orgId = resolveOrgId(),
+): Promise<AgentSkillDetail> {
+  return req(`${base(orgId)}/skills`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── Org Playbook ───────────────────────────────────────────────────────────────
+
+export async function getOrgPlaybook(orgId = resolveOrgId()): Promise<OrgPlaybook> {
+  return req(`${base(orgId)}/playbook`);
+}
+
+export async function saveOrgPlaybook(content: string, orgId = resolveOrgId()): Promise<OrgPlaybook> {
+  return req(`${base(orgId)}/playbook`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function resetOrgPlaybook(orgId = resolveOrgId()): Promise<OrgPlaybook> {
+  return req(`${base(orgId)}/playbook`, { method: 'DELETE' });
+}
+
+export async function previewOrgPlaybook(
+  content: string,
+  orgId = resolveOrgId(),
+): Promise<OrgPlaybookPreview> {
+  return req(`${base(orgId)}/playbook/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
   });
 }

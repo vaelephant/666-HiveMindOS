@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from integrations.wechat_work.adapter import WeChatWorkAdapter
 from integrations.wechat_work.config import UNBOUND_REPLY
+from integrations.gateway.commands import RESET_OK, HELP_TEXT
 
 
 def test_unbound_user_gets_guide_message():
@@ -60,3 +61,23 @@ def test_creates_session_when_none_active():
         "org1", "", user_id="platform_u1",
         channel="wechat_work", external_session_id="wx_u1",
     )
+
+
+def test_slash_help():
+    wx_reg = MagicMock()
+    wx_reg.resolve_platform_user_id.return_value = "platform_u1"
+    adapter = WeChatWorkAdapter(wx_registry=wx_reg, chat_registry=MagicMock())
+    assert adapter.handle_inbound_text("org1", "wx_u1", "/help") == HELP_TEXT
+
+
+def test_slash_reset_archives_session():
+    wx_reg = MagicMock()
+    wx_reg.resolve_platform_user_id.return_value = "platform_u1"
+    chat_reg = MagicMock()
+    chat_reg.find_active_session.return_value = "sess-old"
+    adapter = WeChatWorkAdapter(wx_registry=wx_reg, chat_registry=chat_reg)
+
+    reply = adapter.handle_inbound_text("org1", "wx_u1", "/new")
+    chat_reg.archive_session.assert_called_once_with("sess-old", "org1")
+    assert reply == RESET_OK
+
