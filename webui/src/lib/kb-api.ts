@@ -541,3 +541,72 @@ export async function sendChatMessageStream(
     reader.releaseLock();
   }
 }
+
+// ── WeChat Work integration ───────────────────────────────────────────────────
+
+export type WeChatWorkConfig = {
+  configured: boolean;
+  org_id?: string;
+  corp_id?: string;
+  agent_id?: string;
+  secret?: string;
+  token?: string;
+  encoding_aes_key?: string;
+  enabled?: boolean;
+};
+
+export type WeChatWorkBinding = {
+  id: number;
+  org_id: string;
+  platform_user_id: string;
+  wechat_userid: string;
+  wechat_name: string | null;
+  bound_at: string;
+};
+
+export async function getWeChatWorkConfig(orgId?: string): Promise<WeChatWorkConfig> {
+  return req<WeChatWorkConfig>(`${base(resolveOrgId(orgId))}/integrations/wechat-work`);
+}
+
+export async function saveWeChatWorkConfig(
+  payload: {
+    corp_id: string;
+    agent_id: string;
+    secret: string;
+    token: string;
+    encoding_aes_key: string;
+    enabled: boolean;
+  },
+  orgId?: string,
+): Promise<{ ok: boolean }> {
+  return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testWeChatWorkConnection(orgId?: string): Promise<{ ok: boolean; token_prefix?: string }> {
+  return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work/test`, { method: 'POST' });
+}
+
+export async function listWeChatWorkBindings(orgId?: string): Promise<{ bindings: WeChatWorkBinding[] }> {
+  return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work/bindings`);
+}
+
+export async function bindWeChatWorkUser(
+  payload: { platform_user_id: string; wechat_userid: string; wechat_name?: string },
+  orgId?: string,
+): Promise<{ ok: boolean; id: number }> {
+  return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work/bindings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function unbindWeChatWorkUser(bindingId: number, orgId?: string): Promise<{ ok: boolean }> {
+  return req(`${base(resolveOrgId(orgId))}/integrations/wechat-work/bindings/${bindingId}`, {
+    method: 'DELETE',
+  });
+}

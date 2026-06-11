@@ -215,21 +215,67 @@ class ChatRegistry:
             turns=_rows_to_turns(messages),
         )
 
+    def find_active_session(
+        self,
+        org_id: str,
+        user_id: str,
+        *,
+        channel: str = "web",
+        external_session_id: str | None = None,
+    ) -> str | None:
+        """Return active session_id for channel; wechat uses external_session_id."""
+        with pg_conn() as conn:
+            if channel == "wechat_work" and external_session_id:
+                row = conn.execute(
+                    """
+                    SELECT id::text FROM chat_sessions
+                    WHERE org_id = %s AND user_id = %s AND channel = %s
+                      AND external_session_id = %s AND status = 'active'
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (org_id, user_id, channel, external_session_id),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    """
+                    SELECT id::text FROM chat_sessions
+                    WHERE org_id = %s AND user_id = %s AND channel = %s
+                      AND status = 'active'
+                    ORDER BY updated_at DESC
+                    LIMIT 1
+                    """,
+                    (org_id, user_id, channel),
+                ).fetchone()
+        return row[0] if row else None
+
     def create_session(
         self,
         org_id: str,
         title: str,
         user_id: str = _DEFAULT_USER,
+        *,
+        channel: str = "web",
+        external_session_id: str | None = None,
     ) -> str:
         session_id = str(uuid.uuid4())
         now = _now()
         with pg_conn() as conn:
             conn.execute(
                 """
-                INSERT INTO chat_sessions (id, org_id, user_id, title, status, created_at, updated_at)
-                VALUES (%s::uuid, %s, %s, %s, 'active', %s::timestamptz, %s::timestamptz)
+                INSERT INTO chat_sessions (
+                    id, org_id, user_id, title, status, channel,
+                    external_session_id, created_at, updated_at
+                )
+                VALUES (
+                    %s::uuid, %s, %s, %s, 'active', %s,
+                    %s, %s::timestamptz, %s::timestamptz
+                )
                 """,
-                (session_id, org_id, user_id, title, now, now),
+                (
+                    session_id, org_id, user_id, title, channel,
+                    external_session_id, now, now,
+                ),
             )
             conn.commit()
         return session_id

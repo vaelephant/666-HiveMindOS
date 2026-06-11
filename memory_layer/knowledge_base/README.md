@@ -242,7 +242,7 @@ storage/
 | Phase 1 | Markdown Wiki：上传 → 编译 → 问答 | 骨架完成 |
 | Phase 2 | Knowledge Compiler：结构化提取 + 增量更新 + chromadb | 待开发 |
 | Phase 3 | Memory Graph：实体关系图谱 + 知识复利 | 待开发 |
-| Phase 4 | Workflow Execution：企业微信等执行能力 | 待开发 |
+| Phase 4 | Workflow Execution：企业微信聊天 + Agent 出站消息 | 聊天入站已接入（`integrations/wechat_work/`） |
 
 ---
 

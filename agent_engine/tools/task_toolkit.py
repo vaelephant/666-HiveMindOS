@@ -19,6 +19,7 @@ from memory_layer.knowledge_base.core.services.candidate_service import (
 )
 from memory_layer.knowledge_base.core.tools.kb_toolkit import WikiToolExecutor, tool_runtime
 from agent_engine.tools.web_tools import read_url, web_search
+from agent_engine.tools.wechat_work import send_wechat_work_message
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.models.knowledge_candidate import CandidateInput
 from memory_layer.knowledge_base.core.registry.candidate_registry import CandidateRegistry
@@ -291,3 +292,11 @@ class TaskToolExecutor:
         if isinstance(url, dict):
             url = url.get("first_url") or url.get("url") or ""
         return read_url(url, max_chars=int(params.get("max_chars") or 8000))
+
+    def _action_wechat_work_send(self, params: dict) -> dict:
+        return send_wechat_work_message(
+            self._org_id,
+            params.get("to_user") or "",
+            params.get("content") or "",
+            msg_type=(params.get("msg_type") or "text").strip(),
+        )

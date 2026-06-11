@@ -10,7 +10,7 @@ class PermissionConfig:
 
 _DEFAULT = PermissionConfig(
     auto_allowed=["web_search", "file_read", "crm_read", "wiki_query"],
-    require_approval=["wechat_work_send", "email_send", "crm_write", "contract_generate"],
+    require_approval=["email_send", "crm_write", "contract_generate"],
     always_forbidden=["delete_customer", "modify_financial_records"],
 )
 

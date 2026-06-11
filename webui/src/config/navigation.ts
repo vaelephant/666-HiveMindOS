@@ -22,6 +22,7 @@ import {
   ListTodo,
   MessageSquare,
   Network,
+  Plug,
   Timer,
   Rocket,
   ScrollText,
@@ -47,6 +48,7 @@ export type PrimaryNavKey =
   | 'memories'
   | 'workflows'
   | 'tools'
+  | 'integrations'
   | 'audit'
   | 'human_review'
   // 知识管理
@@ -212,6 +214,7 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   },
   { navKey: 'workflows', label: '工作流', href: '/workflows', icon: GitBranch, factory: 'hivemind' },
   { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
+  { navKey: 'integrations', label: '集成',       href: '/integrations/wechat-work', icon: Plug,   factory: 'hivemind' },
   { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
   { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
 

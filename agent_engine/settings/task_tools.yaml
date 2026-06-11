@@ -90,3 +90,11 @@ actions:
     params:
       url: { type: string, required: true }
       max_chars: { type: integer, optional: true, default: 8000 }
+
+  - name: wechat_work_send
+    domain: communicate
+    description: 向企业微信成员发送文本或 Markdown 消息（需已配置并启用企微集成）
+    params:
+      to_user: { type: string, required: true, description: 企微成员 userid }
+      content: { type: string, required: true }
+      msg_type: { type: string, optional: true, default: text, enum: [text, markdown] }

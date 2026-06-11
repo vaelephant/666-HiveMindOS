@@ -15,6 +15,8 @@ from memory_layer.knowledge_base.app.routers import (
     tasks,
     wiki,
 )
+from memory_layer.knowledge_base.app.routers.integrations import wechat_work as integrations_wechat_work
+from memory_layer.knowledge_base.app.routers.webhooks import wechat_work as webhooks_wechat_work
 from memory_layer.knowledge_base import config
 from memory_layer.knowledge_base.core.db.postgres import close_pool, pg_conn
 from memory_layer.knowledge_base.core.db.sequences import repair_serial_sequences
@@ -78,6 +80,8 @@ app.include_router(query.router,    prefix="/api/v1", tags=["query"])
 app.include_router(tasks.router,        prefix="/api/v1", tags=["tasks"])
 app.include_router(automations.router,  prefix="/api/v1", tags=["automations"])
 app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
+app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
+app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])
 
 
 @app.get("/health")
