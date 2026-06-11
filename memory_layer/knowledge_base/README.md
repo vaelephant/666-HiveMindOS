@@ -1,4 +1,4 @@
-# 企业执行知识库（知识沉淀层）
+# HiveMindOS 执行引擎（知识沉淀层）
 
 HiveMindOS `memory_layer` 的核心子模块 — **Wiki / 智慧 / 候选池 / Chat**，不是指挥中心。
 

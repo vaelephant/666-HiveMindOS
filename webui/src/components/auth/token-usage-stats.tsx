@@ -1,10 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Coins, Loader2, RefreshCw } from 'lucide-react';
+import { Clock, Coins, Loader2, RefreshCw } from 'lucide-react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useOrgReady } from '@/components/auth/OrgProvider';
 import { getLlmUsageStats } from '@/lib/kb-api';
 import type { LlmUsageStats } from '@/lib/kb-types';
+import { themeVars } from '@/lib/theme-vars';
 import { cn } from '@/lib/utils';
 
 const PERIOD_OPTIONS = [7, 30, 90] as const;
@@ -19,8 +31,184 @@ const SOURCE_LABELS: Record<string, string> = {
   unknown: '其他',
 };
 
+const OPERATION_LABELS: Record<string, string> = {
+  chat: '对话生成',
+  embed: '向量嵌入',
+  agentic: '工具调用',
+};
+
 function formatTokens(n: number): string {
   return n.toLocaleString('zh-CN');
+}
+
+function formatHitRate(rate: number | null | undefined): string {
+  if (rate == null) return '—';
+  return `${(rate * 100).toFixed(1)}%`;
+}
+
+function formatCost(usd: number | null | undefined): string {
+  if (usd == null || usd <= 0) return '$0.00';
+  if (usd < 0.01) return '<$0.01';
+  return `$${usd.toFixed(2)}`;
+}
+
+type ChartPoint = {
+  label: string;
+  tokens: number;
+  requests: number;
+};
+
+function tzLabel(tz?: string): string {
+  if (tz === 'Asia/Shanghai') return '北京时间 (UTC+8)';
+  return tz ?? '本地时区';
+}
+
+function formatAxisTick(value: number): string {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return String(value);
+}
+
+type UsageTooltipProps = {
+  active?: boolean;
+  payload?: readonly { payload?: ChartPoint; value?: number }[];
+  label?: string | number;
+};
+
+function UsageChartTooltip({ active, payload, label }: UsageTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload as ChartPoint | undefined;
+  if (!row) return null;
+  return (
+    <div className="rounded-lg border border-shell-border bg-shell-panel px-3 py-2 text-[12px] shadow-lg">
+      <p className="font-medium text-shell-text">{label}</p>
+      <p className="mt-1 tabular-nums text-shell-muted">
+        Token <span className="font-semibold text-brand-primary">{formatTokens(row.tokens)}</span>
+      </p>
+      <p className="tabular-nums text-shell-subtext">{row.requests} 次调用</p>
+    </div>
+  );
+}
+
+function UsageAreaChart({
+  data,
+  gradientId,
+  emptyTitle,
+  emptyHint,
+}: {
+  data: ChartPoint[];
+  gradientId: string;
+  emptyTitle: string;
+  emptyHint: string;
+}) {
+  const hasData = data.some((d) => d.tokens > 0);
+  if (!hasData) {
+    return (
+      <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-shell-border bg-shell-bg/40">
+        <div className="text-center">
+          <p className="text-[14px] font-medium text-shell-text">{emptyTitle}</p>
+          <p className="mt-1 text-[13px] text-shell-muted">{emptyHint}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[220px] w-full">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <AreaChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={themeVars.brandPrimary} stopOpacity={0.35} />
+              <stop offset="95%" stopColor={themeVars.brandPrimary} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={themeVars.chartGrid} />
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: themeVars.chartAxis }}
+            interval="preserveStartEnd"
+            minTickGap={28}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: themeVars.chartAxis }}
+            tickFormatter={formatAxisTick}
+            width={44}
+          />
+          <Tooltip content={<UsageChartTooltip />} cursor={{ stroke: themeVars.brandPrimary, strokeOpacity: 0.2 }} />
+          <Area
+            type="monotone"
+            dataKey="tokens"
+            stroke={themeVars.brandPrimary}
+            strokeWidth={2.5}
+            fill={`url(#${gradientId})`}
+            dot={{ r: 3, fill: themeVars.brandPrimary, strokeWidth: 0 }}
+            activeDot={{ r: 5, fill: themeVars.brandPrimary, stroke: themeVars.chartTooltipBg, strokeWidth: 2 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function UsageBarChart({
+  data,
+  emptyTitle,
+  emptyHint,
+}: {
+  data: ChartPoint[];
+  emptyTitle: string;
+  emptyHint: string;
+}) {
+  const hasData = data.some((d) => d.tokens > 0);
+  if (!hasData) {
+    return (
+      <div className="flex h-[220px] items-center justify-center rounded-xl border border-dashed border-shell-border bg-shell-bg/40">
+        <div className="text-center">
+          <p className="text-[14px] font-medium text-shell-text">{emptyTitle}</p>
+          <p className="mt-1 text-[13px] text-shell-muted">{emptyHint}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[220px] w-full">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <BarChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }} barCategoryGap="28%" maxBarSize={28}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={themeVars.chartGrid} />
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: themeVars.chartAxis }}
+            interval="preserveStartEnd"
+            minTickGap={28}
+          />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 11, fill: themeVars.chartAxis }}
+            tickFormatter={formatAxisTick}
+            width={44}
+          />
+          <Tooltip
+            content={<UsageChartTooltip />}
+            cursor={{ fill: themeVars.chartGrid, opacity: 0.35 }}
+          />
+          <Bar
+            dataKey="tokens"
+            fill={themeVars.brandPrimary}
+            radius={[4, 4, 0, 0]}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 function StatCard({
@@ -67,10 +255,31 @@ export function TokenUsageStats() {
     void load();
   }, [load]);
 
-  const maxDayTokens = useMemo(
-    () => Math.max(1, ...(stats?.by_day.map((d) => d.total_tokens) ?? [1])),
-    [stats],
+  const hourChartData = useMemo<ChartPoint[]>(
+    () =>
+      (stats?.by_hour ?? []).map((b) => ({
+        label: `${b.hour}:00`,
+        tokens: b.total_tokens,
+        requests: b.request_count,
+      })),
+    [stats?.by_hour],
   );
+
+  const dayChartData = useMemo<ChartPoint[]>(
+    () =>
+      (stats?.by_day ?? []).map((d) => ({
+        label: d.date.slice(5),
+        tokens: d.total_tokens,
+        requests: d.request_count,
+      })),
+    [stats?.by_day],
+  );
+
+  const peakHour = useMemo(() => {
+    const buckets = stats?.by_hour ?? [];
+    if (!buckets.length) return null;
+    return buckets.reduce((best, b) => (b.total_tokens > best.total_tokens ? b : best), buckets[0]);
+  }, [stats?.by_hour]);
 
   if (!ready) {
     return (
@@ -133,7 +342,12 @@ export function TokenUsageStats() {
 
       {stats ? (
         <>
-          <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4">
+            <StatCard
+              label="预估费用"
+              value={formatCost(stats.summary.estimated_cost_usd)}
+              hint={`${stats.currency ?? 'USD'} · 按模型单价估算`}
+            />
             <StatCard
               label="总 Token"
               value={formatTokens(stats.summary.total_tokens)}
@@ -142,43 +356,124 @@ export function TokenUsageStats() {
             <StatCard label="输入 Token" value={formatTokens(stats.summary.prompt_tokens)} />
             <StatCard label="输出 Token" value={formatTokens(stats.summary.completion_tokens)} />
             <StatCard label="调用次数" value={formatTokens(stats.summary.request_count)} />
+            <StatCard
+              label="KV 缓存命中"
+              value={formatHitRate(stats.summary.cache_hit_rate)}
+              hint={
+                stats.summary.cached_prompt_tokens
+                  ? `${formatTokens(stats.summary.cached_prompt_tokens)} tokens 来自缓存`
+                  : '需 Provider 返回 cache 字段'
+              }
+            />
+            <StatCard
+              label="缓存写入"
+              value={formatTokens(stats.summary.cache_creation_tokens ?? 0)}
+              hint="Anthropic cache_creation"
+            />
           </section>
 
           <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
-            <div className="mb-4 flex items-center gap-2">
+            <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-brand-primary" />
+                <div>
+                  <p className="text-[14px] font-semibold text-shell-text">按时段分布</p>
+                  <p className="text-[12px] text-shell-muted">
+                    统计周期内 24 小时累计 · {tzLabel(stats.timezone)}
+                  </p>
+                </div>
+              </div>
+              {peakHour && peakHour.total_tokens > 0 ? (
+                <span className="rounded-full bg-brand-primary/8 px-3 py-1 text-[11px] font-medium text-brand-primary">
+                  高峰 {peakHour.hour}:00 · {formatTokens(peakHour.total_tokens)} tokens
+                </span>
+              ) : null}
+            </div>
+            <UsageAreaChart
+              data={hourChartData}
+              gradientId="usage-hour-gradient"
+              emptyTitle="暂无时段数据"
+              emptyHint="累计多次调用后将展示 24 小时用量曲线"
+            />
+          </section>
+
+          <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
+            <div className="mb-1 flex items-center gap-2">
               <Coins className="size-4 text-brand-primary" />
               <div>
                 <p className="text-[14px] font-semibold text-shell-text">每日趋势</p>
                 <p className="text-[12px] text-shell-muted">按自然日汇总 Token 消耗</p>
               </div>
             </div>
-            {stats.by_day.length === 0 ? (
-              <div className="py-12 text-center">
-                <p className="text-[14px] font-medium text-shell-text">暂无用量记录</p>
-                <p className="mt-1 text-[13px] text-shell-muted">
-                  发起 Chat 对话后，数据会自动累计到此页。
-                </p>
-              </div>
-            ) : (
-              <div className="flex h-36 items-end gap-1 overflow-x-auto pb-1">
-                {stats.by_day.map((day) => {
-                  const height = Math.max(6, Math.round((day.total_tokens / maxDayTokens) * 128));
-                  return (
-                    <div
-                      key={day.date}
-                      className="group flex min-w-[32px] flex-1 flex-col items-center gap-1.5"
-                      title={`${day.date}: ${formatTokens(day.total_tokens)} tokens`}
+            <UsageBarChart
+              data={dayChartData}
+              emptyTitle="暂无用量记录"
+              emptyHint="发起 Chat 对话后，数据会自动累计到此页"
+            />
+          </section>
+
+          <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-2xl border border-shell-border bg-shell-panel p-5">
+              <p className="text-[14px] font-semibold text-shell-text">按调用类型</p>
+              <p className="mt-0.5 text-[12px] text-shell-muted">chat / embed / agentic</p>
+              {stats.by_operation.length === 0 ? (
+                <p className="mt-6 text-[13px] text-shell-muted">暂无数据</p>
+              ) : (
+                <ul className="mt-4 space-y-2.5">
+                  {stats.by_operation.map((row) => (
+                    <li
+                      key={row.operation}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-shell-border bg-shell-bg/50 px-3 py-2.5 text-[13px]"
                     >
-                      <div
-                        className="w-full max-w-[40px] rounded-t-md bg-brand-primary/75 transition-colors group-hover:bg-brand-primary"
-                        style={{ height }}
-                      />
-                      <span className="text-[10px] tabular-nums text-shell-muted">{day.date.slice(5)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      <span className="font-medium text-shell-text">
+                        {OPERATION_LABELS[row.operation] ?? row.operation}
+                      </span>
+                      <span className="tabular-nums text-shell-muted">{formatTokens(row.total_tokens)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-shell-border bg-shell-panel p-5">
+              <p className="text-[14px] font-semibold text-shell-text">按 Profile</p>
+              <p className="mt-0.5 text-[12px] text-shell-muted">default / fast / 自定义等</p>
+              {(stats.by_profile ?? []).length === 0 ? (
+                <p className="mt-6 text-[13px] text-shell-muted">暂无数据</p>
+              ) : (
+                <ul className="mt-4 space-y-2.5">
+                  {(stats.by_profile ?? []).map((row) => (
+                    <li
+                      key={row.profile_id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-shell-border bg-shell-bg/50 px-3 py-2.5 text-[13px]"
+                    >
+                      <span className="font-mono text-[12px] text-shell-text">{row.profile_id}</span>
+                      <span className="tabular-nums text-shell-muted">{formatTokens(row.total_tokens)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-shell-border bg-shell-panel p-5">
+              <p className="text-[14px] font-semibold text-shell-text">按提供商</p>
+              <p className="mt-0.5 text-[12px] text-shell-muted">OpenAI / Anthropic 等</p>
+              {(stats.by_provider ?? []).length === 0 ? (
+                <p className="mt-6 text-[13px] text-shell-muted">暂无数据</p>
+              ) : (
+                <ul className="mt-4 space-y-2.5">
+                  {(stats.by_provider ?? []).map((row) => (
+                    <li
+                      key={row.provider}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-shell-border bg-shell-bg/50 px-3 py-2.5 text-[13px]"
+                    >
+                      <span className="font-medium text-shell-text">{row.provider}</span>
+                      <span className="tabular-nums text-shell-muted">{formatTokens(row.total_tokens)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
 
           <section className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -229,9 +524,16 @@ export function TokenUsageStats() {
                         <p className="truncate font-mono text-[12px] font-medium text-shell-text">{row.model}</p>
                         <p className="text-[11px] text-shell-muted">{row.provider}</p>
                       </div>
-                      <span className="shrink-0 tabular-nums text-[13px] text-shell-muted">
-                        {formatTokens(row.total_tokens)}
-                      </span>
+                      <div className="shrink-0 text-right">
+                        <span className="tabular-nums text-[13px] text-shell-muted">
+                          {formatTokens(row.total_tokens)}
+                        </span>
+                        {row.estimated_cost_usd != null && row.estimated_cost_usd > 0 ? (
+                          <p className="text-[11px] tabular-nums text-shell-subtext">
+                            {formatCost(row.estimated_cost_usd)}
+                          </p>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>

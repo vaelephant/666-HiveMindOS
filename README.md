@@ -28,11 +28,9 @@ Model Layer          ← LLM 基础能力
 
 ---
 
-## 当前开发：企业执行知识库
+## 当前开发：HiveMindOS 执行引擎
 
-> `memory_layer/knowledge_base/`
-
-Phase 1 MVP：销售型企业场景（客户 / 合同 / 报价 / 销售流程）
+> `memory_layer/knowledge_base/` — 后端服务模块（Chat、自主任务、知识沉淀）
 
 详细文档见 → [knowledge_base/README.md](memory_layer/knowledge_base/README.md)
 
@@ -44,7 +42,7 @@ Phase 1 MVP：销售型企业场景（客户 / 合同 / 报价 / 销售流程）
 HiveMindOS/
 ├── model_layer/              # LLM 统一调用层
 ├── memory_layer/
-│   └── knowledge_base/       # 企业执行知识库（Phase 1）
+│   └── knowledge_base/       # HiveMindOS 执行引擎（Phase 1）
 ├── tool_layer/               # 原子工具集合
 ├── workflow_layer/           # 流程编排
 ├── agent_layer/              # AI Agent
@@ -52,7 +50,7 @@ HiveMindOS/
 ├── audit_layer/              # 审计日志
 ├── human_layer/              # 人类控制
 └── docs/                     # 架构文档
-    ├── architecture.md       # 知识库技术架构
+    ├── architecture.md       # 执行引擎技术架构
     └── hivemind_architecture.md  # 整体系统规范
 ```
 

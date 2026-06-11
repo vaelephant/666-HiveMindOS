@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
+import { kbBackendBase, getSessionUserId, mergeUserIntoJsonBody } from '@/lib/kb-backend';
 
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8000';
+const BACKEND = kbBackendBase();
 
 export async function GET(
   _req: Request,
@@ -17,11 +18,21 @@ export async function POST(
   { params }: { params: Promise<{ orgId: string }> },
 ) {
   const { orgId } = await params;
-  const body = await req.json();
+  const bodyText = await req.text();
+  const merged = await mergeUserIntoJsonBody(bodyText);
+  const parsed = JSON.parse(merged) as Record<string, unknown>;
+  if (!parsed.constraints || typeof parsed.constraints !== 'object') {
+    parsed.constraints = {};
+  }
+  const constraints = parsed.constraints as Record<string, unknown>;
+  if (!constraints.user_id) {
+    constraints.user_id = await getSessionUserId();
+  }
+  parsed.constraints = constraints;
   const res = await fetch(`${BACKEND}/api/v1/orgs/${orgId}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(parsed),
   });
   const data = await res.json().catch(() => ({}));
   return NextResponse.json(data, { status: res.status });

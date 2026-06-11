@@ -32,18 +32,40 @@ def _openai_tools_to_anthropic(tools_schema: list[dict]) -> list[dict]:
     return converted
 
 
+_CACHE_MIN_CHARS = 1024
+
+
+def _system_with_cache(system: str | None, *, cache: bool = True) -> str | list[dict] | None:
+    """Anthropic prompt caching — 对足够长的 system 块加 ephemeral cache。"""
+    if not system:
+        return None
+    if not cache or len(system) < _CACHE_MIN_CHARS:
+        return system
+    return [
+        {
+            "type": "text",
+            "text": system,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
 def _usage_from_anthropic(usage) -> dict | None:
     if usage is None:
         return None
     prompt = int(getattr(usage, "input_tokens", 0) or 0)
     completion = int(getattr(usage, "output_tokens", 0) or 0)
     total = prompt + completion
-    if total <= 0:
+    cached = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+    cache_creation = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+    if total <= 0 and cached <= 0:
         return None
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": total,
+        "cached_prompt_tokens": cached,
+        "cache_creation_tokens": cache_creation,
     }
 
 
@@ -75,8 +97,9 @@ def complete_with_usage(
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
-    if system:
-        kwargs["system"] = system
+    cached_system = _system_with_cache(system)
+    if cached_system is not None:
+        kwargs["system"] = cached_system
     response = _get_client().messages.create(**kwargs)
     parts = [block.text for block in response.content if block.type == "text"]
     return "".join(parts), _usage_from_anthropic(response.usage)
@@ -109,8 +132,9 @@ def complete_stream_with_usage(
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }
-    if system:
-        kwargs["system"] = system
+    cached_system = _system_with_cache(system)
+    if cached_system is not None:
+        kwargs["system"] = cached_system
     with _get_client().messages.stream(**kwargs) as stream:
         yield from stream.text_stream
 
@@ -153,7 +177,13 @@ def agentic_loop_with_usage(
     tools = _openai_tools_to_anthropic(tools_schema)
     messages: list[dict] = [{"role": "user", "content": user_message}]
     steps: list[dict] = []
-    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    total_usage = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "cached_prompt_tokens": 0,
+        "cache_creation_tokens": 0,
+    }
 
     for _ in range(max_iterations):
         kwargs: dict = {
@@ -162,14 +192,14 @@ def agentic_loop_with_usage(
             "messages": messages,
             "tools": tools,
         }
-        if system:
-            kwargs["system"] = system
+        cached_system = _system_with_cache(system)
+        if cached_system is not None:
+            kwargs["system"] = cached_system
         response = _get_client().messages.create(**kwargs)
         usage = _usage_from_anthropic(response.usage)
         if usage:
-            total_usage["prompt_tokens"] += usage["prompt_tokens"]
-            total_usage["completion_tokens"] += usage["completion_tokens"]
-            total_usage["total_tokens"] += usage["total_tokens"]
+            for key in total_usage:
+                total_usage[key] += usage.get(key, 0)
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})

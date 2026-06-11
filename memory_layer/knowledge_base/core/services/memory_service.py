@@ -25,6 +25,7 @@ from memory_layer.knowledge_base.core.services.candidate_service import (
 )
 from memory_layer.knowledge_base.core.vector.memory_vector_store import get_vector_store
 from memory_layer.knowledge_base.models.memory import SessionRecapResult
+from memory_layer.knowledge_base.core.services.model_settings_service import get_settings as get_model_settings
 from model_layer.usage import track_usage
 
 log = get_logger("hivemind.memory.service")
@@ -73,11 +74,13 @@ def _extract_from_turn_inner(
     # 最近对话（不含本轮 user+assistant，本轮由 question/answer 单独传入）
     recent_turns = _recent_session_context(session_id)
 
+    fast_profile = get_model_settings(org_id, user_id).fast_profile
     candidates = _extractor.run(
         question,
         answer,
         existing_dicts,
         recent_turns=recent_turns,
+        profile=fast_profile,
     )
     if not candidates:
         log.debug("[memory] nothing to extract  session=%s", session_id[:8])
@@ -174,13 +177,14 @@ def recap_session(
     session_memories = _registry.list_by_session(org_id, session_id, user_id)
     session_dicts = [asdict(m) for m in session_memories]
 
-    plan = _recap.run(
-        session_id=session_id,
-        session_title=session.title,
-        turns=history,
-        existing=existing_dicts,
-        session_memories=session_dicts,
-    )
+    with track_usage(org_id, user_id, "memory", session_id):
+        plan = _recap.run(
+            session_id=session_id,
+            session_title=session.title,
+            turns=history,
+            existing=existing_dicts,
+            session_memories=session_dicts,
+        )
 
     memory_ids: list[int] = []
     archived_ids: list[int] = []
@@ -257,7 +261,8 @@ def sync_vectors(org_id: str, user_id: str, limit: int = 200) -> dict:
 
     memories = _registry.list_active(org_id, user_id, limit=limit)
     synced = 0
-    for m in memories:
-        if store.upsert_memory(m):
-            synced += 1
+    with track_usage(org_id, user_id, "embed", None):
+        for m in memories:
+            if store.upsert_memory(m):
+                synced += 1
     return {"synced": synced, "total": len(memories), "available": True}

@@ -80,7 +80,7 @@ class WikiManager:
         for p in pages:
             by_cat.setdefault(p["category"], []).append(p)
 
-        lines = ["# 知识库索引\n"]
+        lines = ["# Wiki 索引\n"]
         for cat, cat_pages in sorted(by_cat.items()):
             if cat == "root":
                 continue

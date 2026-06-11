@@ -181,7 +181,7 @@ export function HumanReviewView() {
                 人工审核
               </h1>
               <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-shell-muted">
-                审核从对话与智慧进化产生的 Wiki 候选，批准后经编译写入企业知识库。
+                审核从对话与智慧进化产生的 Wiki 候选，批准后经编译写入企业 Wiki。
               </p>
             </div>
           </div>
@@ -479,7 +479,7 @@ export function HumanReviewView() {
               {selected.status === 'approved' && (
                 <div className="border-t border-shell-border px-5 py-4">
                   <p className="text-[12px] text-shell-muted">
-                    已批准，点击页头「编译进 Wiki」批量写入企业知识库。
+                    已批准，点击页头「编译进 Wiki」批量写入企业 Wiki。
                   </p>
                 </div>
               )}

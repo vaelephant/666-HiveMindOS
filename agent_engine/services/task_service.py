@@ -23,6 +23,7 @@ from agent_engine.services.experience_service import (
 )
 from agent_engine.models.plan import Plan, QueueTask
 from agent_engine.settings import load
+from model_layer.usage import track_usage
 
 log = get_logger("hivemind.task.service")
 
@@ -38,6 +39,8 @@ def run_goal(task_id: str, org_id: str, *, resume_from: str | None = None) -> No
     if not task or task.org_id != org_id:
         raise ValueError("任务不存在")
 
+    user_id = str((task.constraints or {}).get("user_id") or "demo")
+
     def on_step(step: dict):
         current = _registry.get(task_id)
         if not current:
@@ -47,131 +50,8 @@ def run_goal(task_id: str, org_id: str, *, resume_from: str | None = None) -> No
         _registry.update(task_id, steps=steps)
 
     try:
-        needs_planning = task.phase in ("pending", "planning") and not task.queue
-        if needs_planning:
-            _registry.update(task_id, status="running", phase="planning")
-            task_type = match_task_type(task.input)
-            exp = recall_for_planner(org_id, task_type, task.input, limit=2)
-
-            def on_committee_progress(minutes: list[dict], active_role: str | None) -> None:
-                _registry.update(
-                    task_id,
-                    plan={
-                        "goal": task.input,
-                        "task_type": task_type,
-                        "rubric_id": task_type,
-                        "success_criteria": [],
-                        "estimated_risk": "medium",
-                        "tasks": [],
-                        "planning_mode": "committee",
-                        "planning_minutes": minutes,
-                        "planning_active_role": active_role,
-                        "committee_roles": committee_roles_for_ui(),
-                    },
-                )
-
-            if should_trigger_committee(task.constraints):
-                log.info("[task] planning committee  id=%s", task_id[:8])
-                plan = PlanningCommittee().run(
-                    task.input,
-                    org_id,
-                    constraints=task.constraints,
-                    experience=exp,
-                    on_progress=on_committee_progress,
-                )
-            else:
-                plan = PlannerAgent().run(
-                    task.input,
-                    org_id,
-                    constraints=task.constraints,
-                    experience=exp,
-                )
-            queue = [t.to_dict() for t in plan.tasks]
-            _registry.update(
-                task_id,
-                phase="planned",
-                plan=plan.to_dict(),
-                queue=queue,
-                task_type=plan.task_type,
-                rubric_id=plan.rubric_id,
-            )
-            task = _registry.get(task_id)
-
-        plan = Plan.from_dict(task.plan or {})
-        if task.queue:
-            queue = [QueueTask.from_dict(q) for q in task.queue]
-        else:
-            queue = list(plan.tasks)
-
-        _registry.update(task_id, phase="executing", status="running")
-
-        orchestrator = TaskOrchestrator(org_id, on_step=on_step)
-        outcome = orchestrator.run(
-            plan,
-            queue,
-            goal_text=task.input,
-            resume_from=resume_from or task.pending_step_id,
-        )
-
-        _registry.update(
-            task_id,
-            phase="reflecting",
-            queue=outcome["queue"],
-            checkpoints=outcome["checkpoints"],
-            reflections=outcome["reflections"],
-            pending_step_id=None,
-        )
-
-        score = outcome.get("score")
-        reflection_report = outcome.get("report") or ""
-        deliverable = extract_deliverable(
-            task.input,
-            outcome.get("steps") or [],
-            plan.task_type,
-            checkpoints=outcome.get("checkpoints"),
-        )
-        user_result = deliverable if deliverable else reflection_report
-        exp_id = None
-        min_score = int(load("task_gates").get("experience_min_score") or 80)
-        if score is not None and score >= min_score:
-            exp_id = save_experience_with_vector(
-                org_id,
-                plan.task_type,
-                task.input,
-                success=True,
-                score=score,
-                workflow=outcome.get("workflow") or [],
-                reflection={"reflections": outcome.get("reflections")},
-                final_output=(deliverable or reflection_report)[:500],
-            )
-            try:
-                from agent_engine.skills.experience_to_skill import write_skill_from_experience
-
-                write_skill_from_experience(
-                    org_id,
-                    task_type=plan.task_type,
-                    goal=task.input,
-                    score=score,
-                    workflow=outcome.get("workflow") or [],
-                    reflection={"reflections": outcome.get("reflections")},
-                    final_output=(deliverable or reflection_report)[:500],
-                    experience_id=exp_id,
-                )
-            except Exception as skill_exc:
-                log.warning("[task] skill write skipped  id=%s  err=%s", task_id[:8], skill_exc)
-
-        _registry.update(
-            task_id,
-            phase="done",
-            status="done",
-            result=user_result,
-            reflection_report=reflection_report if deliverable else None,
-            score=score,
-            experience_id=exp_id,
-            completed_at=_now(),
-        )
-        log.info("[task] done  id=%s  score=%s", task_id[:8], score)
-
+        with track_usage(org_id, user_id, "agent", task_id):
+            _run_goal_inner(task_id, org_id, task, resume_from=resume_from, on_step=on_step)
     except ApprovalRequired as exc:
         patch = {
             "phase": "awaiting_approval",
@@ -195,6 +75,140 @@ def run_goal(task_id: str, org_id: str, *, resume_from: str | None = None) -> No
             error=str(exc),
             completed_at=_now(),
         )
+
+
+def _run_goal_inner(
+    task_id: str,
+    org_id: str,
+    task,
+    *,
+    resume_from: str | None,
+    on_step,
+) -> None:
+    needs_planning = task.phase in ("pending", "planning") and not task.queue
+    if needs_planning:
+        _registry.update(task_id, status="running", phase="planning")
+        task_type = match_task_type(task.input)
+        exp = recall_for_planner(org_id, task_type, task.input, limit=2)
+
+        def on_committee_progress(minutes: list[dict], active_role: str | None) -> None:
+            _registry.update(
+                task_id,
+                plan={
+                    "goal": task.input,
+                    "task_type": task_type,
+                    "rubric_id": task_type,
+                    "success_criteria": [],
+                    "estimated_risk": "medium",
+                    "tasks": [],
+                    "planning_mode": "committee",
+                    "planning_minutes": minutes,
+                    "planning_active_role": active_role,
+                    "committee_roles": committee_roles_for_ui(),
+                },
+            )
+
+        if should_trigger_committee(task.constraints):
+            log.info("[task] planning committee  id=%s", task_id[:8])
+            plan = PlanningCommittee().run(
+                task.input,
+                org_id,
+                constraints=task.constraints,
+                experience=exp,
+                on_progress=on_committee_progress,
+            )
+        else:
+            plan = PlannerAgent().run(
+                task.input,
+                org_id,
+                constraints=task.constraints,
+                experience=exp,
+            )
+        queue = [t.to_dict() for t in plan.tasks]
+        _registry.update(
+            task_id,
+            phase="planned",
+            plan=plan.to_dict(),
+            queue=queue,
+            task_type=plan.task_type,
+            rubric_id=plan.rubric_id,
+        )
+        task = _registry.get(task_id)
+
+    plan = Plan.from_dict(task.plan or {})
+    if task.queue:
+        queue = [QueueTask.from_dict(q) for q in task.queue]
+    else:
+        queue = list(plan.tasks)
+
+    _registry.update(task_id, phase="executing", status="running")
+
+    orchestrator = TaskOrchestrator(org_id, on_step=on_step, user_id=str((task.constraints or {}).get("user_id") or "demo"))
+    outcome = orchestrator.run(
+        plan,
+        queue,
+        goal_text=task.input,
+        resume_from=resume_from or task.pending_step_id,
+    )
+
+    _registry.update(
+        task_id,
+        phase="reflecting",
+        queue=outcome["queue"],
+        checkpoints=outcome["checkpoints"],
+        reflections=outcome["reflections"],
+        pending_step_id=None,
+    )
+
+    score = outcome.get("score")
+    reflection_report = outcome.get("report") or ""
+    deliverable = extract_deliverable(
+        task.input,
+        outcome.get("steps") or [],
+        plan.task_type,
+        checkpoints=outcome.get("checkpoints"),
+    )
+    user_result = deliverable if deliverable else reflection_report
+    exp_id = None
+    min_score = int(load("task_gates").get("experience_min_score") or 80)
+    if score is not None and score >= min_score:
+        exp_id = save_experience_with_vector(
+            org_id,
+            plan.task_type,
+            task.input,
+            success=True,
+            score=score,
+            workflow=outcome.get("workflow") or [],
+            reflection={"reflections": outcome.get("reflections")},
+            final_output=(deliverable or reflection_report)[:500],
+        )
+        try:
+            from agent_engine.skills.experience_to_skill import write_skill_from_experience
+
+            write_skill_from_experience(
+                org_id,
+                task_type=plan.task_type,
+                goal=task.input,
+                score=score,
+                workflow=outcome.get("workflow") or [],
+                reflection={"reflections": outcome.get("reflections")},
+                final_output=(deliverable or reflection_report)[:500],
+                experience_id=exp_id,
+            )
+        except Exception as skill_exc:
+            log.warning("[task] skill write skipped  id=%s  err=%s", task_id[:8], skill_exc)
+
+    _registry.update(
+        task_id,
+        phase="done",
+        status="done",
+        result=user_result,
+        reflection_report=reflection_report if deliverable else None,
+        score=score,
+        experience_id=exp_id,
+        completed_at=_now(),
+    )
+    log.info("[task] done  id=%s  score=%s", task_id[:8], score)
 
 
 def list_experiences(org_id: str, task_type: str | None = None, limit: int = 20) -> list[dict]:

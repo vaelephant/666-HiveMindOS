@@ -1,4 +1,4 @@
-# 知识库 Agent 共用 OpenAI function tools
+# HiveMindOS Agent 共用 OpenAI function tools
 
 schemas:
   - type: function

@@ -234,7 +234,12 @@ def _run_daily_digest(org_id: str, user_id: str, params: dict[str, Any]) -> dict
 
 只输出摘要正文，不要标题。"""
 
-    digest = llm.complete(prompt=prompt, profile="fast").strip()
+    from memory_layer.knowledge_base.core.services.model_settings_service import get_settings as get_model_settings
+    from model_layer.usage import track_usage
+
+    fast_profile = get_model_settings(org_id, user_id).fast_profile
+    with track_usage(org_id, user_id, "automation", job_id):
+        digest = llm.complete(prompt=prompt, profile=fast_profile).strip()
     result: dict[str, Any] = {
         "digest": digest,
         "memories_count": len(memories),

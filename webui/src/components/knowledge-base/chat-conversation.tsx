@@ -311,7 +311,7 @@ function AssistantPending({
         ) : (
           <div className="flex items-center gap-2.5 text-[13px] text-shell-muted">
             <Loader2 className="size-3.5 animate-spin text-brand-primary" />
-            {streamPhase === 'writing' ? '正在生成回答…' : '正在查阅知识库与智慧…'}
+            {streamPhase === 'writing' ? '正在生成回答…' : '正在检索 Wiki 与智慧记忆…'}
           </div>
         )}
       </div>
@@ -438,7 +438,7 @@ export function ChatEmptyState({
         有什么可以帮你的？
       </h1>
       <p className="mt-2 text-[13px] text-shell-muted">
-        检索企业知识库，召回你的长期智慧
+        提问或描述目标，系统将检索 Wiki 与智慧记忆并回答
       </p>
 
       <div className="mt-10 w-full max-w-5xl">
@@ -539,7 +539,7 @@ export function ChatThread({
             placeholder="发送消息…"
           />
           <p className="mt-2 text-center text-[11px] text-shell-muted">
-            回答基于知识库与智慧记忆，重要决策请核实原文
+            回答基于 Wiki 与智慧记忆，重要决策请核实原文
             {onUpgrade && turns.length > 0 && !upgradeSuggestion?.recommended && (
               <>
                 {' · '}

@@ -23,6 +23,7 @@ _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="task-worker")
 class TaskRequest(BaseModel):
     input: str
     constraints: dict | None = None
+    user_id: str | None = None
     auto_run: bool = True
 
 
@@ -36,13 +37,16 @@ def _run_task(task_id: str, org_id: str, resume_from: str | None = None):
 
 @router.post("/orgs/{org_id}/tasks")
 def create_task(org_id: str, req: TaskRequest, background_tasks: BackgroundTasks):
+    constraints = dict(req.constraints or {})
+    if req.user_id:
+        constraints["user_id"] = req.user_id
     task = Task(
         id=str(uuid.uuid4()),
         org_id=org_id,
         input=req.input,
         status="pending",
         phase="pending",
-        constraints=req.constraints or {},
+        constraints=constraints,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     _registry.add(task)

@@ -3,7 +3,7 @@ import uuid
 from dataclasses import asdict
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,7 @@ from memory_layer.knowledge_base.core.registry.source_registry import SourceReco
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.wiki import wiki_meta
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
+from model_layer.usage import track_usage
 
 router = APIRouter()
 log = get_logger("hivemind.ingest")
@@ -154,7 +155,12 @@ def delete_source(org_id: str, source_id: str):
 # ── Step 2: Compile ──────────────────────────────────────────────────────────
 
 @router.post("/orgs/{org_id}/sources/{source_id}/compile")
-def compile_source(org_id: str, source_id: str, background_tasks: BackgroundTasks):
+def compile_source(
+    org_id: str,
+    source_id: str,
+    background_tasks: BackgroundTasks,
+    user_id: str = Query("demo"),
+):
     """Trigger AI compilation for an uploaded source."""
     record = _registry.get(source_id)
     if not record:
@@ -182,9 +188,10 @@ def compile_source(org_id: str, source_id: str, background_tasks: BackgroundTask
     _registry.update(source_id, status="compiling")
     log.info("[compile] start  org=%s  source=%s  file=%s", org_id, source_id[:8], record.filename)
     try:
-        result = _make_agent(org_id).run(
-            Path(record.file_path), org_id, record.source_type, source_id=source_id
-        )
+        with track_usage(org_id, user_id, "ingest", source_id):
+            result = _make_agent(org_id).run(
+                Path(record.file_path), org_id, record.source_type, source_id=source_id
+            )
         _registry.update(
             source_id,
             status="done",
@@ -209,7 +216,7 @@ def compile_source(org_id: str, source_id: str, background_tasks: BackgroundTask
         log.error("[compile] error  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-    background_tasks.add_task(extract_memories_from_ingest, org_id, source_id, result)
+    background_tasks.add_task(extract_memories_from_ingest, org_id, source_id, result, user_id)
     return asdict(_registry.get(source_id))
 
 

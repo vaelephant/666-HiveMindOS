@@ -6,7 +6,27 @@ from collections.abc import Iterator
 from typing import Callable
 
 from model_layer import registry
-from model_layer.usage import TokenUsage, emit_usage
+from model_layer.registry import ResolvedProfile
+from model_layer.usage import TokenUsage, emit_usage, get_usage_context
+from model_layer.user_resolver import try_resolve_user_profile
+
+
+def _resolve_chat(profile: str | None) -> ResolvedProfile:
+    ctx = get_usage_context()
+    if ctx and profile:
+        custom = try_resolve_user_profile(ctx.org_id, ctx.user_id, profile)
+        if custom and custom.kind == "chat":
+            return custom
+    return registry.resolve_chat(profile)
+
+
+def _resolve_embed(profile: str | None) -> ResolvedProfile:
+    ctx = get_usage_context()
+    if ctx and profile:
+        custom = try_resolve_user_profile(ctx.org_id, ctx.user_id, profile)
+        if custom and custom.kind == "embed":
+            return custom
+    return registry.resolve_embed(profile)
 
 
 def _usage_from_raw(raw: dict | None) -> TokenUsage | None:
@@ -16,47 +36,104 @@ def _usage_from_raw(raw: dict | None) -> TokenUsage | None:
         prompt_tokens=raw.get("prompt_tokens"),
         completion_tokens=raw.get("completion_tokens"),
         total_tokens=raw.get("total_tokens"),
+        cached_prompt_tokens=raw.get("cached_prompt_tokens"),
+        cache_creation_tokens=raw.get("cache_creation_tokens"),
     )
 
 
-def _record_chat(resolved, operation: str, raw_usage: dict | None) -> None:
+def _record_chat(
+    resolved,
+    operation: str,
+    raw_usage: dict | None,
+    *,
+    org_id: str | None = None,
+    user_id: str | None = None,
+    source: str | None = None,
+    source_id: str | None = None,
+) -> None:
     emit_usage(
         provider=resolved.provider,
         model=resolved.model,
         profile_id=resolved.id,
         operation=operation,
         usage=_usage_from_raw(raw_usage),
+        org_id=org_id,
+        user_id=user_id,
+        source=source,
+        source_id=source_id,
     )
 
 
-def _record_embed(resolved, raw_usage: dict | None) -> None:
+def _record_embed(
+    resolved,
+    raw_usage: dict | None,
+    *,
+    org_id: str | None = None,
+    user_id: str | None = None,
+    source: str | None = None,
+    source_id: str | None = None,
+) -> None:
     emit_usage(
         provider=resolved.provider,
         model=resolved.model,
         profile_id=resolved.id,
         operation="embed",
         usage=_usage_from_raw(raw_usage),
+        org_id=org_id,
+        user_id=user_id,
+        source=source,
+        source_id=source_id,
     )
 
 
-def embed(text: str, profile: str | None = None) -> list[float]:
-    resolved = registry.resolve_embed(profile)
+def embed(
+    text: str,
+    profile: str | None = None,
+    *,
+    org_id: str | None = None,
+    user_id: str | None = None,
+    source: str | None = None,
+    source_id: str | None = None,
+) -> list[float]:
+    resolved = _resolve_embed(profile)
     mod = registry.get_embed_module(resolved.provider)
     fn = getattr(mod, "embed_with_usage", None)
     if fn:
         vector, raw = fn(text=text, model=resolved.model)
-        _record_embed(resolved, raw)
+        _record_embed(
+            resolved,
+            raw,
+            org_id=org_id,
+            user_id=user_id,
+            source=source,
+            source_id=source_id,
+        )
         return vector
     return mod.embed(text=text, model=resolved.model)
 
 
-def embed_batch(texts: list[str], profile: str | None = None) -> list[list[float]]:
-    resolved = registry.resolve_embed(profile)
+def embed_batch(
+    texts: list[str],
+    profile: str | None = None,
+    *,
+    org_id: str | None = None,
+    user_id: str | None = None,
+    source: str | None = None,
+    source_id: str | None = None,
+) -> list[list[float]]:
+    resolved = _resolve_embed(profile)
     mod = registry.get_embed_module(resolved.provider)
     fn = getattr(mod, "embed_batch_with_usage", None)
     if fn:
         vectors, raw = fn(texts=texts, model=resolved.model)
-        _record_embed(resolved, raw)
+        _record_embed(
+            resolved,
+            raw,
+            org_id=org_id,
+            user_id=user_id,
+            source=source,
+            source_id=source_id,
+        )
         return vectors
     return mod.embed_batch(texts=texts, model=resolved.model)
 
@@ -67,7 +144,7 @@ def complete(
     profile: str | None = None,
     max_tokens: int | None = None,
 ) -> str:
-    resolved = registry.resolve_chat(profile)
+    resolved = _resolve_chat(profile)
     mod = registry.get_chat_module(resolved.provider)
     fn = getattr(mod, "complete_with_usage", None)
     max_tok = max_tokens or resolved.max_tokens
@@ -84,7 +161,7 @@ def complete_stream(
     profile: str | None = None,
     max_tokens: int | None = None,
 ) -> Iterator[str]:
-    resolved = registry.resolve_chat(profile)
+    resolved = _resolve_chat(profile)
     mod = registry.get_chat_module(resolved.provider)
     max_tok = max_tokens or resolved.max_tokens
 
@@ -116,8 +193,9 @@ def complete_stream(
             "max_tokens": max_tok,
             "messages": [{"role": "user", "content": prompt}],
         }
-        if system:
-            kwargs["system"] = system
+        cached_system = ant._system_with_cache(system)
+        if cached_system is not None:
+            kwargs["system"] = cached_system
         with ant._get_client().messages.stream(**kwargs) as astream:
             yield from astream.text_stream
             final = astream.get_final_message()
@@ -143,7 +221,7 @@ def agentic_loop(
     max_iterations: int = 10,
     on_step: Callable[[dict], None] | None = None,
 ) -> tuple[str, list[dict]]:
-    resolved = registry.resolve_chat(profile)
+    resolved = _resolve_chat(profile)
     mod = registry.get_chat_module(resolved.provider)
     fn = getattr(mod, "agentic_loop_with_usage", None)
     max_tok = max_tokens or resolved.max_tokens

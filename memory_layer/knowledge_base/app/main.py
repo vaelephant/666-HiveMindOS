@@ -13,11 +13,13 @@ from memory_layer.knowledge_base.app.routers import (
     overview,
     playbook,
     query,
+    settings,
     skills,
     tasks,
     usage,
     wiki,
 )
+from memory_layer.knowledge_base.core.services.model_settings_service import init_user_profile_resolver
 from memory_layer.knowledge_base.core.services.usage_service import init_usage_tracking
 from memory_layer.knowledge_base.app.routers.integrations import wechat_work as integrations_wechat_work
 from memory_layer.knowledge_base.app.routers.webhooks import wechat_work as webhooks_wechat_work
@@ -32,7 +34,7 @@ async def lifespan(_app: FastAPI):
     log = get_logger("hivemind.startup")
 
     log.info("━" * 50)
-    log.info("  HiveMindOS · Knowledge Base  v0.1.0")
+    log.info("  HiveMindOS · AI 执行引擎  v0.1.0")
     log.info("━" * 50)
     log.info("model        = %s (%s)", config.DEFAULT_MODEL, "default")
     log.info("fast_model   = %s (%s)", config.FAST_MODEL, "fast")
@@ -52,6 +54,7 @@ async def lifespan(_app: FastAPI):
     log.info("━" * 50)
 
     init_usage_tracking()
+    init_user_profile_resolver()
 
     try:
         with pg_conn() as conn:
@@ -65,10 +68,10 @@ async def lifespan(_app: FastAPI):
     yield
 
     close_pool()
-    log.info("Knowledge Base server shutting down.")
+    log.info("HiveMindOS server shutting down.")
 
 
-app = FastAPI(title="HiveMindOS — Knowledge Base", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="HiveMindOS — AI Execution Engine", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,6 +92,7 @@ app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
 app.include_router(skills.router,       prefix="/api/v1", tags=["skills"])
 app.include_router(playbook.router,     prefix="/api/v1", tags=["playbook"])
 app.include_router(usage.router,        prefix="/api/v1", tags=["usage"])
+app.include_router(settings.router,     prefix="/api/v1", tags=["settings"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])
 

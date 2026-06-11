@@ -21,6 +21,7 @@ class MemoryExtractor:
         answer: str,
         existing: list[dict],
         recent_turns: list[dict] | None = None,
+        profile: str | None = None,
     ) -> list[MemoryCandidate]:
         existing_block = "（无已有智慧）"
         if existing:
@@ -41,7 +42,7 @@ class MemoryExtractor:
         raw = llm.complete(
             prompt=prompt,
             system=_L1.system,
-            profile=_L1.resolve_profile(),
+            profile=profile or _L1.resolve_profile(),
         )
         items = parse_memory_items(raw)
         if not items and raw.strip():

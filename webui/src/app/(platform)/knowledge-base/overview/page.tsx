@@ -10,7 +10,7 @@ const QUICK_ACTIONS = [
   {
     href: HIVEMIND_HOME_PATH,
     label: 'Chat',
-    desc: '向企业知识库提问',
+    desc: '与 HiveMind 对话，检索 Wiki 与智慧',
     icon: MessageSquare,
     tone: 'brand' as const,
   },
@@ -24,7 +24,7 @@ const QUICK_ACTIONS = [
   {
     href: '/knowledge-base/ingest',
     label: '上传资料',
-    desc: '编译新文档进知识库',
+    desc: '上传资料编译进 Wiki',
     icon: Upload,
     tone: 'default' as const,
   },
@@ -64,7 +64,7 @@ export default function KnowledgeBaseOverviewPage() {
             <div className="min-w-0">
               <p className="text-[11px] font-medium tracking-wide text-shell-muted">知识管理</p>
               <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-shell-text md:text-[24px]">
-                企业知识全景
+                知识沉淀全景
               </h1>
               <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-shell-muted">
                 文档资料与对话记录共同构成可信知识来源，为 Chat 与 Agent 提供 grounding 层。

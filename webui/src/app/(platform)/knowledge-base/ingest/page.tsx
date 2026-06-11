@@ -323,7 +323,7 @@ export default function IngestPage() {
       setSources(sourcesResult.value);
     } else {
       setSources([]);
-      setLoadError('加载资料列表失败，请确认知识库后端已启动');
+      setLoadError('加载资料列表失败，请确认 HiveMindOS 后端已启动');
     }
     if (collectionsResult.status === 'fulfilled') {
       setCollectionsMeta(collectionsResult.value);

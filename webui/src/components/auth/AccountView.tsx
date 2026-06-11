@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { BarChart3, LogOut, Shield, User } from 'lucide-react';
+import { BarChart3, Box, LogOut, Shield, User } from 'lucide-react';
+import { ModelSettings } from '@/components/auth/model-settings';
 import { TokenUsageStats } from '@/components/auth/token-usage-stats';
 import { cn } from '@/lib/utils';
 
@@ -15,10 +16,11 @@ type AccountUser = {
   createdAt: string | Date;
 };
 
-type SectionId = 'profile' | 'usage';
+type SectionId = 'profile' | 'models' | 'usage';
 
 const sections: { id: SectionId; label: string }[] = [
   { id: 'profile', label: '账户信息' },
+  { id: 'models', label: '模型设置' },
   { id: 'usage', label: '使用统计' },
 ];
 
@@ -43,7 +45,7 @@ export function AccountView({ user }: { user: AccountUser }) {
                 个人中心
               </h1>
               <p className="mt-1 max-w-xl text-[13px] text-shell-muted">
-                管理登录身份、数据工作空间（org）与大模型 Token 使用统计。
+                管理登录身份、模型偏好与大模型 Token 使用统计。
               </p>
             </div>
           </div>
@@ -74,7 +76,13 @@ export function AccountView({ user }: { user: AccountUser }) {
                     : 'text-shell-muted hover:bg-shell-panel-hover hover:text-shell-text',
                 )}
               >
-                {s.id === 'usage' ? <BarChart3 className="size-3.5" /> : <User className="size-3.5" />}
+                {s.id === 'usage' ? (
+                  <BarChart3 className="size-3.5" />
+                ) : s.id === 'models' ? (
+                  <Box className="size-3.5" />
+                ) : (
+                  <User className="size-3.5" />
+                )}
                 {s.label}
               </button>
             );
@@ -123,6 +131,8 @@ export function AccountView({ user }: { user: AccountUser }) {
             <span className="font-mono text-shell-subtext">user_id</span> 隔离；切换账号后只会看到自己的内容。
           </p>
         </section>
+      ) : active === 'models' ? (
+        <ModelSettings />
       ) : (
         <TokenUsageStats />
       )}

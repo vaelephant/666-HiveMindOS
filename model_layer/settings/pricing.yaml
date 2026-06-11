@@ -1,0 +1,41 @@
+# 估算费用（USD / 百万 tokens）。实际账单以 Provider 为准。
+label: 模型单价参考
+currency: USD
+per: 1_000_000
+
+models:
+  gpt-4o:
+    input: 2.5
+    output: 10.0
+    cached_input: 1.25
+
+  gpt-4o-mini:
+    input: 0.15
+    output: 0.6
+    cached_input: 0.075
+
+  text-embedding-3-small:
+    input: 0.02
+    output: 0.0
+
+  text-embedding-3-large:
+    input: 0.13
+    output: 0.0
+
+  claude-sonnet-4-6:
+    input: 3.0
+    output: 15.0
+    cached_input: 0.3
+    cache_creation: 3.75
+
+  claude-opus-4-7:
+    input: 15.0
+    output: 75.0
+    cached_input: 1.5
+    cache_creation: 18.75
+
+defaults:
+  input: 1.0
+  output: 3.0
+  cached_input: 0.1
+  cache_creation: 1.25

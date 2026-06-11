@@ -18,6 +18,7 @@ from memory_layer.knowledge_base.core.registry.memory_registry import MemoryRegi
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from memory_layer.knowledge_base.core.registry.source_registry import SourceRegistry
 from memory_layer.knowledge_base.core.services.memory_service import _index_memories
+from model_layer.usage import track_usage
 
 log = get_logger("hivemind.doc_memory.service")
 
@@ -30,10 +31,24 @@ def extract_memories_from_ingest(
     org_id: str,
     source_id: str,
     ingest_result: dict,
+    user_id: str = "demo",
 ) -> list[int]:
     """
     编译成功后调用。失败仅打日志，不影响编译状态。
     """
+    try:
+        with track_usage(org_id, user_id, "ingest", source_id):
+            return _extract_memories_from_ingest_inner(org_id, source_id, ingest_result)
+    except Exception as exc:
+        log.error("[l3] failed  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
+        return []
+
+
+def _extract_memories_from_ingest_inner(
+    org_id: str,
+    source_id: str,
+    ingest_result: dict,
+) -> list[int]:
     try:
         record = _source_registry.get(source_id)
         if not record or record.org_id != org_id:
@@ -69,7 +84,7 @@ def extract_memories_from_ingest(
         )
         return ids
     except Exception as exc:
-        log.error("[l3] failed  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
+        log.error("[l3] inner failed  org=%s  source=%s  err=%s", org_id, source_id[:8], exc)
         return []
 
 

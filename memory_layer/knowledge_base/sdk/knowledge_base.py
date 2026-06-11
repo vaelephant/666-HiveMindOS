@@ -1,5 +1,5 @@
 """
-HiveMindOS 其他模块调用企业知识库的统一接口。
+HiveMindOS 其他模块调用执行引擎（Chat / 任务 / Wiki）的统一接口。
 
 用法：
     from memory_layer.knowledge_base.sdk.knowledge_base import KnowledgeBase

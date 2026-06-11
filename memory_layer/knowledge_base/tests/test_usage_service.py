@@ -24,13 +24,17 @@ def test_get_user_usage_stats_shapes_response():
     since = datetime.now(timezone.utc) - timedelta(days=30)
     _ = since  # reference for mock rows
 
-    summary = (1500, 900, 600, 12)
+    summary = (1500, 900, 600, 12, 450, 80)
     by_day = [
         (datetime(2026, 6, 1).date(), 800, 500, 300, 5),
         (datetime(2026, 6, 2).date(), 700, 400, 300, 7),
     ]
     by_source = [("chat", 1200, 700, 500, 10), ("memory", 300, 200, 100, 2)]
-    by_model = [("gpt-4o", "openai", 1500, 900, 600, 12)]
+    by_model = [("gpt-4o", "openai", 1500, 900, 600, 12, 450, 80)]
+    by_operation = [("chat", 1200, 700, 500, 10)]
+    by_profile = [("default", 1500, 900, 600, 12)]
+    by_provider = [("openai", 1500, 900, 600, 12)]
+    by_hour = [(9, 400, 250, 150, 3), (14, 600, 350, 250, 5), (20, 500, 300, 200, 4)]
 
     mock_conn = MagicMock()
     mock_conn.execute.side_effect = [
@@ -38,6 +42,10 @@ def test_get_user_usage_stats_shapes_response():
         MagicMock(fetchall=MagicMock(return_value=by_day)),
         MagicMock(fetchall=MagicMock(return_value=by_source)),
         MagicMock(fetchall=MagicMock(return_value=by_model)),
+        MagicMock(fetchall=MagicMock(return_value=by_operation)),
+        MagicMock(fetchall=MagicMock(return_value=by_profile)),
+        MagicMock(fetchall=MagicMock(return_value=by_provider)),
+        MagicMock(fetchall=MagicMock(return_value=by_hour)),
     ]
 
     with patch("memory_layer.knowledge_base.core.services.usage_service.pg_conn") as pg:
@@ -47,9 +55,21 @@ def test_get_user_usage_stats_shapes_response():
     assert result["period_days"] == 30
     assert result["summary"]["total_tokens"] == 1500
     assert result["summary"]["request_count"] == 12
-    assert len(result["by_day"]) == 2
+    assert result["summary"]["cached_prompt_tokens"] == 450
+    assert result["summary"]["cache_hit_rate"] == round(450 / 900, 4)
+    assert len(result["by_day"]) == 30
+    assert sum(d["total_tokens"] for d in result["by_day"]) == 1500
     assert result["by_source"][0]["source"] == "chat"
     assert result["by_model"][0]["model"] == "gpt-4o"
+    assert result["by_operation"][0]["operation"] == "chat"
+    assert result["by_profile"][0]["profile_id"] == "default"
+    assert len(result["by_hour"]) == 24
+    assert result["by_hour"][9]["total_tokens"] == 400
+    assert result["by_hour"][0]["total_tokens"] == 0
+    assert result["timezone"] == "Asia/Shanghai"
+    assert result["currency"] == "USD"
+    assert result["summary"]["estimated_cost_usd"] > 0
+    assert result["by_model"][0]["estimated_cost_usd"] > 0
 
 
 def test_persist_usage_skips_unknown_org():

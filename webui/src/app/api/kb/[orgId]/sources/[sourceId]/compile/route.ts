@@ -1,16 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8000';
+import { NextResponse } from 'next/server';
+import { kbBackendUrl } from '@/lib/kb-backend';
 
 export async function POST(
-  _req: NextRequest,
+  _req: Request,
   { params }: { params: Promise<{ orgId: string; sourceId: string }> },
 ) {
   const { orgId, sourceId } = await params;
-  const res = await fetch(
-    `${BACKEND}/api/v1/orgs/${orgId}/sources/${sourceId}/compile`,
-    { method: 'POST' },
-  );
+  const backend = await kbBackendUrl(orgId, `/sources/${sourceId}/compile`);
+  const res = await fetch(backend, { method: 'POST' });
   const data = await res.json().catch(() => ({ error: 'compile failed' }));
   return NextResponse.json(data, { status: res.status });
 }

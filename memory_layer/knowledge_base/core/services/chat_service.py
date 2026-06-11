@@ -16,6 +16,7 @@ from memory_layer.knowledge_base.core.agents.chat_agent import ChatAgent
 from memory_layer.knowledge_base.core.services.context_builder import build_context
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
+from memory_layer.knowledge_base.core.services.model_settings_service import get_settings as get_model_settings
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
 from model_layer.usage import track_usage
 
@@ -96,8 +97,11 @@ def send_message(
     )
 
     wiki, graph = _wiki_and_graph(org_id)
+    chat_profile = get_model_settings(org_id, user_id).chat_profile
     with track_usage(org_id, user_id, "chat", session_id):
-        result = ChatAgent(wiki, graph).run(message, prior, org_id, memory_context=memory_block)
+        result = ChatAgent(wiki, graph).run(
+            message, prior, org_id, memory_context=memory_block, chat_profile=chat_profile,
+        )
 
     _registry.add_message(
         session_id,
@@ -181,9 +185,13 @@ def send_message_stream(
     sources: list = []
     follow_ups: list = []
 
+    chat_profile = get_model_settings(org_id, user_id).chat_profile
+
     def _tracked_stream():
         with track_usage(org_id, user_id, "chat", session_id):
-            yield from agent.run_stream(message, prior, org_id, memory_context=memory_block)
+            yield from agent.run_stream(
+                message, prior, org_id, memory_context=memory_block, chat_profile=chat_profile,
+            )
 
     for event in _tracked_stream():
         if cancel_check and cancel_check():

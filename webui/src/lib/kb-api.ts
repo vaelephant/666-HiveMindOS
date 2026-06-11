@@ -21,7 +21,9 @@ import type {
   MemoryRecord,
   MemoryStats,
   OverviewData,
+  CustomModelCreate,
   LlmUsageStats,
+  ModelSettingsCatalog,
   OrgPlaybook,
   OrgPlaybookPreview,
   QueryResult,
@@ -64,7 +66,7 @@ const base = (orgId: string) => `/api/kb/${orgId}`;
 
 function parseApiError(text: string, status: number): string {
   if (text.trimStart().startsWith('<!DOCTYPE') || text.includes('__next_error__')) {
-    return `请求失败 (HTTP ${status})：接口返回了页面而非 JSON，请确认知识库后端已启动并刷新页面`;
+    return `请求失败 (HTTP ${status})：接口返回了页面而非 JSON，请确认 HiveMindOS 后端已启动并刷新页面`;
   }
   try {
     const body = JSON.parse(text) as { detail?: string; error?: string };
@@ -676,4 +678,38 @@ export async function getLlmUsageStats(
 ): Promise<LlmUsageStats> {
   const params = new URLSearchParams({ days: String(days) });
   return req(`${base(orgId)}/usage/stats?${params}`);
+}
+
+// ── Model settings ─────────────────────────────────────────────────────────────
+
+export async function getModelSettings(orgId = resolveOrgId()): Promise<ModelSettingsCatalog> {
+  return req(`${base(orgId)}/settings/models`);
+}
+
+export async function saveModelPreferences(
+  payload: Partial<ModelSettingsCatalog['preferences']>,
+  orgId = resolveOrgId(),
+): Promise<ModelSettingsCatalog> {
+  return req(`${base(orgId)}/settings/models`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addCustomModel(
+  payload: CustomModelCreate,
+  orgId = resolveOrgId(),
+): Promise<ModelSettingsCatalog> {
+  return req(`${base(orgId)}/settings/models/custom`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCustomModel(profileId: string, orgId = resolveOrgId()): Promise<ModelSettingsCatalog> {
+  return req(`${base(orgId)}/settings/models/custom/${encodeURIComponent(profileId)}`, {
+    method: 'DELETE',
+  });
 }

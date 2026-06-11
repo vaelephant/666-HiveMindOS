@@ -87,7 +87,12 @@ class ExperienceVectorStore:
             from qdrant_client.models import PointStruct
 
             text = self._experience_text(goal, task_type, workflow)
-            vector = llm.embed(text)
+            vector = llm.embed(
+                text,
+                org_id=org_id,
+                source="embed",
+                source_id=exp_id,
+            )
             point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, exp_id))
             point = PointStruct(
                 id=point_id,
@@ -121,7 +126,11 @@ class ExperienceVectorStore:
             from model_layer import client as llm
             from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-            vector = llm.embed(query)
+            vector = llm.embed(
+                query,
+                org_id=org_id,
+                source="embed",
+            )
             must = [
                 FieldCondition(key="org_id", match=MatchValue(value=org_id)),
                 FieldCondition(key="task_type", match=MatchValue(value=task_type)),

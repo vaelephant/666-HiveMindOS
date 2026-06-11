@@ -169,3 +169,8 @@ def get_embed_module(provider_name: str):
 def list_profiles() -> dict[str, ResolvedProfile]:
     cfg = _raw_config()
     return {pid: resolve(pid) for pid in (cfg.get("profiles") or {})}
+
+
+def raw_config() -> dict[str, Any]:
+    """只读访问 models.yaml 解析结果（供设置页 catalog 使用）。"""
+    return _raw_config()

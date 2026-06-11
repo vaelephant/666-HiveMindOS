@@ -47,7 +47,7 @@ export default function AIDecisionView() {
     },
     {
       title: 'AI 客服查询',
-      body: '自然语言查询订单与库存状态，对接库内知识库与权限。',
+      body: '自然语言查询订单与库存状态，对接 Wiki 沉淀与权限体系。',
       icon: MessageCircleQuestion,
       tag: 'WareBrain',
     },

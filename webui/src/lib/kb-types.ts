@@ -675,10 +675,21 @@ export type LlmUsageSummary = {
   prompt_tokens: number;
   completion_tokens: number;
   request_count: number;
+  cached_prompt_tokens?: number;
+  cache_creation_tokens?: number;
+  /** 0~1，cached_prompt / prompt；无输入时为 null */
+  cache_hit_rate?: number | null;
+  /** 按 pricing.yaml 估算的 USD 费用 */
+  estimated_cost_usd?: number;
 };
 
 export type LlmUsageDayBucket = LlmUsageSummary & {
   date: string;
+};
+
+export type LlmUsageHourBucket = LlmUsageSummary & {
+  /** 0~23，本地时区小时 */
+  hour: number;
 };
 
 export type LlmUsageSourceBucket = LlmUsageSummary & {
@@ -690,10 +701,71 @@ export type LlmUsageModelBucket = LlmUsageSummary & {
   provider: string;
 };
 
+export type LlmUsageOperationBucket = LlmUsageSummary & {
+  operation: string;
+};
+
+export type LlmUsageProfileBucket = LlmUsageSummary & {
+  profile_id: string;
+};
+
+export type LlmUsageProviderBucket = LlmUsageSummary & {
+  provider: string;
+};
+
 export type LlmUsageStats = {
   period_days: number;
+  /** 时段聚合使用的 IANA 时区，如 Asia/Shanghai */
+  timezone?: string;
+  /** 费用估算货币，如 USD */
+  currency?: string;
   summary: LlmUsageSummary;
   by_day: LlmUsageDayBucket[];
+  by_hour: LlmUsageHourBucket[];
   by_source: LlmUsageSourceBucket[];
   by_model: LlmUsageModelBucket[];
+  by_operation: LlmUsageOperationBucket[];
+  by_profile: LlmUsageProfileBucket[];
+  by_provider: LlmUsageProviderBucket[];
+};
+
+export type ModelProfileSpec = {
+  id: string;
+  label: string;
+  kind: 'chat' | 'embed';
+  provider: string;
+  model: string;
+  max_tokens: number;
+  dim?: number | null;
+  optional?: boolean;
+  source: 'system' | 'custom';
+  available: boolean;
+};
+
+export type ModelProviderInfo = {
+  id: string;
+  api_key_env?: string | null;
+  available: boolean;
+};
+
+export type ModelSettingsCatalog = {
+  preferences: {
+    chat_profile: string;
+    fast_profile: string;
+    embed_profile: string;
+    updated_at?: string | null;
+  };
+  system_profiles: ModelProfileSpec[];
+  custom_profiles: ModelProfileSpec[];
+  providers: ModelProviderInfo[];
+};
+
+export type CustomModelCreate = {
+  label: string;
+  id?: string;
+  provider: 'openai' | 'anthropic';
+  model: string;
+  kind?: 'chat' | 'embed';
+  max_tokens?: number;
+  dim?: number;
 };

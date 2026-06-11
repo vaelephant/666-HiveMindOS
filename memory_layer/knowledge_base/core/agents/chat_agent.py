@@ -33,6 +33,7 @@ class ChatAgent:
         history: list[dict],
         org_id: str,
         memory_context: str = "",
+        chat_profile: str | None = None,
     ) -> dict:
         """
         Returns:
@@ -45,7 +46,7 @@ class ChatAgent:
         log.info("[chat] turn  org=%s  msg=%s…", org_id, message[:50])
 
         read_pages, steps = self._gather_pages(message, history, org_id)
-        answer, follow_ups = self._synthesize(message, read_pages, memory_context)
+        answer, follow_ups = self._synthesize(message, read_pages, memory_context, chat_profile=chat_profile)
         sources = self._pages_to_sources(read_pages)
 
         log.info("[chat] done  steps=%d  sources=%d  ans_len=%d", len(steps), len(sources), len(answer))
@@ -57,6 +58,7 @@ class ChatAgent:
         history: list[dict],
         org_id: str,
         memory_context: str = "",
+        chat_profile: str | None = None,
     ):
         """
         流式版本：Phase 1 检索 → Phase 2 逐 token 输出回答。
@@ -73,10 +75,11 @@ class ChatAgent:
 
         prompt = self._build_synthesis_prompt(message, read_pages, memory_context, stream=True)
         chunks: list[str] = []
+        synthesis_profile = chat_profile or _CHAT_SYNTHESIS_STREAM.resolve_profile()
         for delta in llm.complete_stream(
             prompt=prompt,
             system=_CHAT_SYNTHESIS_STREAM.system,
-            profile=_CHAT_SYNTHESIS_STREAM.resolve_profile(),
+            profile=synthesis_profile,
         ):
             chunks.append(delta)
             yield {"type": "token", "text": delta}
@@ -147,17 +150,17 @@ class ChatAgent:
                 f"[{i+1}] 来源文件：{path}\n{content[:_RT.get('synthesis_source_chars', 800)]}"
                 for i, (path, content) in enumerate(read_pages)
             )
-            parts.append(f"以下是检索到的知识库内容：\n\n{sources_block}")
+            parts.append(f"以下是检索到的 Wiki 内容：\n\n{sources_block}")
         if stream:
             if memory_context or read_pages:
                 parts.append("请根据以上内容回答。")
             else:
-                parts.append("知识库与用户长期智慧中均无相关内容，请直接说明。")
+                parts.append("Wiki 与用户长期智慧中均无相关内容，请直接说明。")
         elif memory_context or read_pages:
             parts.append("请根据以上内容回答，并返回 JSON。")
         else:
             parts.append(
-                "知识库与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
+                "Wiki 与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
                 '返回 JSON：{"answer": "...", "follow_ups": ["...", "...", "..."]}'
             )
         return "\n\n".join(parts)
@@ -189,12 +192,15 @@ class ChatAgent:
         question: str,
         read_pages: list[tuple[str, str]],
         memory_context: str = "",
+        *,
+        chat_profile: str | None = None,
     ) -> tuple[str, list[str]]:
         prompt = self._build_synthesis_prompt(question, read_pages, memory_context, stream=False)
+        synthesis_profile = chat_profile or _CHAT_SYNTHESIS.resolve_profile()
         raw = llm.complete(
             prompt=prompt,
             system=_CHAT_SYNTHESIS.system,
-            profile=_CHAT_SYNTHESIS.resolve_profile(),
+            profile=synthesis_profile,
         )
         return self._parse_synthesis(raw)
 

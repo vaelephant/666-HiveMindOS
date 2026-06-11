@@ -18,6 +18,15 @@ class TokenUsage:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    cached_prompt_tokens: int = 0
+    cache_creation_tokens: int = 0
+
+    @property
+    def cache_hit_rate(self) -> float | None:
+        """KV / prompt cache 命中率：cached / prompt（无输入时返回 None）。"""
+        if self.prompt_tokens <= 0:
+            return None
+        return self.cached_prompt_tokens / self.prompt_tokens
 
     @classmethod
     def from_counts(
@@ -26,13 +35,23 @@ class TokenUsage:
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
         total_tokens: int | None = None,
+        cached_prompt_tokens: int | None = None,
+        cache_creation_tokens: int | None = None,
     ) -> "TokenUsage | None":
         prompt = int(prompt_tokens or 0)
         completion = int(completion_tokens or 0)
         total = int(total_tokens if total_tokens is not None else prompt + completion)
-        if total <= 0 and prompt <= 0 and completion <= 0:
+        cached = int(cached_prompt_tokens or 0)
+        cache_creation = int(cache_creation_tokens or 0)
+        if total <= 0 and prompt <= 0 and completion <= 0 and cached <= 0:
             return None
-        return cls(prompt_tokens=prompt, completion_tokens=completion, total_tokens=total)
+        return cls(
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            total_tokens=total,
+            cached_prompt_tokens=cached,
+            cache_creation_tokens=cache_creation,
+        )
 
 
 @dataclass(frozen=True)

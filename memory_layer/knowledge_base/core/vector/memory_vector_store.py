@@ -86,7 +86,13 @@ class MemoryVectorStore:
             from model_layer import client as llm
             from qdrant_client.models import PointStruct
 
-            vector = llm.embed(self._memory_text(memory))
+            vector = llm.embed(
+                self._memory_text(memory),
+                org_id=memory.org_id,
+                user_id=memory.user_id or "demo",
+                source="embed",
+                source_id=str(memory.id),
+            )
             point = PointStruct(
                 id=memory.id,
                 vector=vector,
@@ -125,7 +131,12 @@ class MemoryVectorStore:
             from model_layer import client as llm
             from qdrant_client.models import FieldCondition, Filter, MatchValue
 
-            vector = llm.embed(query)
+            vector = llm.embed(
+                query,
+                org_id=org_id,
+                user_id=user_id,
+                source="embed",
+            )
             must = [
                 FieldCondition(key="org_id", match=MatchValue(value=org_id)),
                 FieldCondition(key="user_id", match=MatchValue(value=user_id)),

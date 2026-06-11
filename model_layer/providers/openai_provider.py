@@ -34,12 +34,16 @@ def _usage_from_openai(usage) -> dict | None:
     prompt = int(getattr(usage, "prompt_tokens", 0) or 0)
     completion = int(getattr(usage, "completion_tokens", 0) or 0)
     total = int(getattr(usage, "total_tokens", 0) or prompt + completion)
-    if total <= 0 and prompt <= 0 and completion <= 0:
+    details = getattr(usage, "prompt_tokens_details", None)
+    cached = int(getattr(details, "cached_tokens", 0) or 0) if details else 0
+    if total <= 0 and prompt <= 0 and completion <= 0 and cached <= 0:
         return None
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
         "total_tokens": total,
+        "cached_prompt_tokens": cached,
+        "cache_creation_tokens": 0,
     }
 
 
@@ -150,7 +154,13 @@ def agentic_loop_with_usage(
     ]
     steps: list[dict] = []
 
-    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    total_usage = {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0,
+        "cached_prompt_tokens": 0,
+        "cache_creation_tokens": 0,
+    }
 
     for _ in range(max_iterations):
         response = _get_client().chat.completions.create(
@@ -162,9 +172,8 @@ def agentic_loop_with_usage(
         )
         usage = _usage_from_openai(response.usage)
         if usage:
-            total_usage["prompt_tokens"] += usage["prompt_tokens"]
-            total_usage["completion_tokens"] += usage["completion_tokens"]
-            total_usage["total_tokens"] += usage["total_tokens"]
+            for key in total_usage:
+                total_usage[key] += usage.get(key, 0)
         choice = response.choices[0]
         msg = choice.message
 
