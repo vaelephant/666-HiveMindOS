@@ -15,8 +15,10 @@ from memory_layer.knowledge_base.app.routers import (
     query,
     skills,
     tasks,
+    usage,
     wiki,
 )
+from memory_layer.knowledge_base.core.services.usage_service import init_usage_tracking
 from memory_layer.knowledge_base.app.routers.integrations import wechat_work as integrations_wechat_work
 from memory_layer.knowledge_base.app.routers.webhooks import wechat_work as webhooks_wechat_work
 from memory_layer.knowledge_base import config
@@ -48,6 +50,8 @@ async def lifespan(_app: FastAPI):
         log.warning("[models] %s", warning)
     log.info("log_dir      = %s", config.LOG_DIR)
     log.info("━" * 50)
+
+    init_usage_tracking()
 
     try:
         with pg_conn() as conn:
@@ -84,6 +88,7 @@ app.include_router(automations.router,  prefix="/api/v1", tags=["automations"])
 app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
 app.include_router(skills.router,       prefix="/api/v1", tags=["skills"])
 app.include_router(playbook.router,     prefix="/api/v1", tags=["playbook"])
+app.include_router(usage.router,        prefix="/api/v1", tags=["usage"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])
 

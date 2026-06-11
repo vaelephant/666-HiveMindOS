@@ -17,6 +17,7 @@ from memory_layer.knowledge_base.core.services.context_builder import build_cont
 from memory_layer.knowledge_base.core.graph.memory_graph import MemoryGraph
 from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
 from memory_layer.knowledge_base.core.wiki.wiki_manager import WikiManager
+from model_layer.usage import track_usage
 
 log = get_logger("hivemind.chat.service")
 
@@ -95,7 +96,8 @@ def send_message(
     )
 
     wiki, graph = _wiki_and_graph(org_id)
-    result = ChatAgent(wiki, graph).run(message, prior, org_id, memory_context=memory_block)
+    with track_usage(org_id, user_id, "chat", session_id):
+        result = ChatAgent(wiki, graph).run(message, prior, org_id, memory_context=memory_block)
 
     _registry.add_message(
         session_id,
@@ -179,7 +181,11 @@ def send_message_stream(
     sources: list = []
     follow_ups: list = []
 
-    for event in agent.run_stream(message, prior, org_id, memory_context=memory_block):
+    def _tracked_stream():
+        with track_usage(org_id, user_id, "chat", session_id):
+            yield from agent.run_stream(message, prior, org_id, memory_context=memory_block)
+
+    for event in _tracked_stream():
         if cancel_check and cancel_check():
             log.info(
                 "[chat] stream aborted  org=%s  session=%s  partial_chars=%d",

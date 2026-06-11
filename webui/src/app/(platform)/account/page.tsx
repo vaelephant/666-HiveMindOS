@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { AccountView } from '@/components/auth/AccountView';
 
 export const metadata: Metadata = {
-  title: '账户 · HiveMind OS',
-  description: '查看与管理你的 HiveMind OS 账户信息。',
+  title: '个人中心 · HiveMind OS',
+  description: '查看账户信息与大模型 Token 使用统计。',
 };
 
 export default async function AccountPage() {

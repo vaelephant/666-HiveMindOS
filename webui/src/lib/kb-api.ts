@@ -21,6 +21,7 @@ import type {
   MemoryRecord,
   MemoryStats,
   OverviewData,
+  LlmUsageStats,
   OrgPlaybook,
   OrgPlaybookPreview,
   QueryResult,
@@ -665,4 +666,14 @@ export async function previewOrgPlaybook(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   });
+}
+
+// ── Usage stats ────────────────────────────────────────────────────────────────
+
+export async function getLlmUsageStats(
+  days = 30,
+  orgId = resolveOrgId(),
+): Promise<LlmUsageStats> {
+  const params = new URLSearchParams({ days: String(days) });
+  return req(`${base(orgId)}/usage/stats?${params}`);
 }

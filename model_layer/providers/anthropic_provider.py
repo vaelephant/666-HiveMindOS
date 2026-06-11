@@ -32,6 +32,21 @@ def _openai_tools_to_anthropic(tools_schema: list[dict]) -> list[dict]:
     return converted
 
 
+def _usage_from_anthropic(usage) -> dict | None:
+    if usage is None:
+        return None
+    prompt = int(getattr(usage, "input_tokens", 0) or 0)
+    completion = int(getattr(usage, "output_tokens", 0) or 0)
+    total = prompt + completion
+    if total <= 0:
+        return None
+    return {
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "total_tokens": total,
+    }
+
+
 def complete(
     *,
     prompt: str,
@@ -39,6 +54,22 @@ def complete(
     model: str,
     max_tokens: int,
 ) -> str:
+    text, _usage = complete_with_usage(
+        prompt=prompt,
+        system=system,
+        model=model,
+        max_tokens=max_tokens,
+    )
+    return text
+
+
+def complete_with_usage(
+    *,
+    prompt: str,
+    system: str | None,
+    model: str,
+    max_tokens: int,
+) -> tuple[str, dict | None]:
     kwargs: dict = {
         "model": model,
         "max_tokens": max_tokens,
@@ -48,10 +79,25 @@ def complete(
         kwargs["system"] = system
     response = _get_client().messages.create(**kwargs)
     parts = [block.text for block in response.content if block.type == "text"]
-    return "".join(parts)
+    return "".join(parts), _usage_from_anthropic(response.usage)
 
 
 def complete_stream(
+    *,
+    prompt: str,
+    system: str | None,
+    model: str,
+    max_tokens: int,
+) -> Iterator[str]:
+    yield from complete_stream_with_usage(
+        prompt=prompt,
+        system=system,
+        model=model,
+        max_tokens=max_tokens,
+    )
+
+
+def complete_stream_with_usage(
     *,
     prompt: str,
     system: str | None,
@@ -80,9 +126,34 @@ def agentic_loop(
     max_iterations: int = 10,
     on_step: Callable[[dict], None] | None = None,
 ) -> tuple[str, list[dict]]:
+    text, steps, _usage = agentic_loop_with_usage(
+        system=system,
+        user_message=user_message,
+        tools_schema=tools_schema,
+        tool_executor=tool_executor,
+        model=model,
+        max_tokens=max_tokens,
+        max_iterations=max_iterations,
+        on_step=on_step,
+    )
+    return text, steps
+
+
+def agentic_loop_with_usage(
+    *,
+    system: str,
+    user_message: str,
+    tools_schema: list[dict],
+    tool_executor: Callable[[str, dict], str],
+    model: str,
+    max_tokens: int,
+    max_iterations: int = 10,
+    on_step: Callable[[dict], None] | None = None,
+) -> tuple[str, list[dict], dict | None]:
     tools = _openai_tools_to_anthropic(tools_schema)
     messages: list[dict] = [{"role": "user", "content": user_message}]
     steps: list[dict] = []
+    total_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
 
     for _ in range(max_iterations):
         kwargs: dict = {
@@ -94,6 +165,11 @@ def agentic_loop(
         if system:
             kwargs["system"] = system
         response = _get_client().messages.create(**kwargs)
+        usage = _usage_from_anthropic(response.usage)
+        if usage:
+            total_usage["prompt_tokens"] += usage["prompt_tokens"]
+            total_usage["completion_tokens"] += usage["completion_tokens"]
+            total_usage["total_tokens"] += usage["total_tokens"]
 
         if response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
@@ -116,9 +192,12 @@ def agentic_loop(
             if tool_results:
                 messages.append({"role": "user", "content": tool_results})
                 continue
-            return final_text, steps
+            usage_out = total_usage if total_usage["total_tokens"] else None
+            return final_text, steps, usage_out
 
         text = "".join(block.text for block in response.content if block.type == "text")
-        return text, steps
+        usage_out = total_usage if total_usage["total_tokens"] else None
+        return text, steps, usage_out
 
-    return "（已达最大步骤数，结果可能不完整）", steps
+    usage_out = total_usage if total_usage["total_tokens"] else None
+    return "（已达最大步骤数，结果可能不完整）", steps, usage_out

@@ -669,3 +669,31 @@ export type GraphSnapshot = {
     edge_count: number;
   };
 };
+
+export type LlmUsageSummary = {
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  request_count: number;
+};
+
+export type LlmUsageDayBucket = LlmUsageSummary & {
+  date: string;
+};
+
+export type LlmUsageSourceBucket = LlmUsageSummary & {
+  source: string;
+};
+
+export type LlmUsageModelBucket = LlmUsageSummary & {
+  model: string;
+  provider: string;
+};
+
+export type LlmUsageStats = {
+  period_days: number;
+  summary: LlmUsageSummary;
+  by_day: LlmUsageDayBucket[];
+  by_source: LlmUsageSourceBucket[];
+  by_model: LlmUsageModelBucket[];
+};

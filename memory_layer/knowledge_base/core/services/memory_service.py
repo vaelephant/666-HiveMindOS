@@ -25,6 +25,7 @@ from memory_layer.knowledge_base.core.services.candidate_service import (
 )
 from memory_layer.knowledge_base.core.vector.memory_vector_store import get_vector_store
 from memory_layer.knowledge_base.models.memory import SessionRecapResult
+from model_layer.usage import track_usage
 
 log = get_logger("hivemind.memory.service")
 
@@ -50,37 +51,50 @@ def extract_from_turn(
     由 chat router 的 BackgroundTasks 在回答返回后异步调用。
     """
     try:
-        existing = _registry.list_active(org_id, user_id)
-        existing_dicts = [asdict(m) for m in existing]
-
-        # 最近对话（不含本轮 user+assistant，本轮由 question/answer 单独传入）
-        recent_turns = _recent_session_context(session_id)
-
-        candidates = _extractor.run(
-            question,
-            answer,
-            existing_dicts,
-            recent_turns=recent_turns,
-        )
-        if not candidates:
-            log.debug("[memory] nothing to extract  session=%s", session_id[:8])
-            return []
-
-        ids = _registry.apply_candidates(org_id, user_id, candidates, session_id)
-        _index_memories(org_id, ids)
-        enqueue_from_memory_candidates(org_id, user_id, session_id, candidates)
-        log.info(
-            "[memory] extracted  org=%s  session=%s  count=%d  ids=%s  types=%s",
-            org_id,
-            session_id[:8],
-            len(ids),
-            ids,
-            [c.memory_type for c in candidates],
-        )
-        return ids
+        with track_usage(org_id, user_id, "memory", session_id):
+            return _extract_from_turn_inner(
+                org_id, user_id, session_id, question, answer,
+            )
     except Exception as exc:
-        log.error("[memory] extraction failed  session=%s  err=%s", session_id[:8], exc)
+        log.error("[memory] extract_from_turn failed: %s", exc)
         return []
+
+
+def _extract_from_turn_inner(
+    org_id: str,
+    user_id: str,
+    session_id: str,
+    question: str,
+    answer: str,
+) -> list[int]:
+    existing = _registry.list_active(org_id, user_id)
+    existing_dicts = [asdict(m) for m in existing]
+
+    # 最近对话（不含本轮 user+assistant，本轮由 question/answer 单独传入）
+    recent_turns = _recent_session_context(session_id)
+
+    candidates = _extractor.run(
+        question,
+        answer,
+        existing_dicts,
+        recent_turns=recent_turns,
+    )
+    if not candidates:
+        log.debug("[memory] nothing to extract  session=%s", session_id[:8])
+        return []
+
+    ids = _registry.apply_candidates(org_id, user_id, candidates, session_id)
+    _index_memories(org_id, ids)
+    enqueue_from_memory_candidates(org_id, user_id, session_id, candidates)
+    log.info(
+        "[memory] extracted  org=%s  session=%s  count=%d  ids=%s  types=%s",
+        org_id,
+        session_id[:8],
+        len(ids),
+        ids,
+        [c.memory_type for c in candidates],
+    )
+    return ids
 
 
 def _recent_session_context(session_id: str) -> list[dict]:
