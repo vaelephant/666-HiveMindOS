@@ -4,6 +4,7 @@ Thumbs.db
 
 # ── Environment & secrets ───────────────────────────
 .env*
+.1env*
 !.env.example
 !**/.env.example
 
