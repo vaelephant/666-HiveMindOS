@@ -74,6 +74,7 @@ def list_events(
     user_id: str | None = None,
     category: str | None = None,
     action: str | None = None,
+    q: str | None = None,
     days: int = 30,
     limit: int = 100,
     offset: int = 0,
@@ -94,6 +95,13 @@ def list_events(
     if action:
         clauses.append("action = %s")
         params.append(action)
+    if q and q.strip():
+        pattern = f"%{q.strip()}%"
+        clauses.append(
+            "(summary ILIKE %s OR action ILIKE %s OR resource_id ILIKE %s "
+            "OR detail::text ILIKE %s)"
+        )
+        params.extend([pattern, pattern, pattern, pattern])
 
     where = " AND ".join(clauses)
     params.extend([limit, offset])
@@ -112,6 +120,28 @@ def list_events(
         ).fetchall()
 
     return [_row_to_dict(r) for r in rows]
+
+
+def export_events(
+    org_id: str,
+    *,
+    user_id: str | None = None,
+    category: str | None = None,
+    action: str | None = None,
+    q: str | None = None,
+    days: int = 30,
+    limit: int = 5000,
+) -> list[dict]:
+    return list_events(
+        org_id,
+        user_id=user_id,
+        category=category,
+        action=action,
+        q=q,
+        days=days,
+        limit=min(limit, 5000),
+        offset=0,
+    )
 
 
 def get_stats(org_id: str, *, user_id: str | None = None, days: int = 30) -> dict:

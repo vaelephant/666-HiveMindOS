@@ -184,7 +184,7 @@ export function SkillsView() {
   }
 
   return (
-    <div className="w-full py-6 md:py-8">
+    <div className="w-full pb-6 md:pb-8">
       {showCreate && orgReady && (
         <CreateSkillDialog
           saving={creating}

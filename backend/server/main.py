@@ -18,6 +18,7 @@ from server.routers import (
     settings,
     skills,
     tasks,
+    tool_registry,
     usage,
     wiki,
     workflows,
@@ -112,6 +113,7 @@ app.include_router(skills.router,       prefix="/api/v1", tags=["skills"])
 app.include_router(playbook.router,     prefix="/api/v1", tags=["playbook"])
 app.include_router(usage.router,        prefix="/api/v1", tags=["usage"])
 app.include_router(audit.router,        prefix="/api/v1", tags=["audit"])
+app.include_router(tool_registry.router, prefix="/api/v1", tags=["tools"])
 app.include_router(workflows.router,    prefix="/api/v1", tags=["workflows"])
 app.include_router(settings.router,     prefix="/api/v1", tags=["settings"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])

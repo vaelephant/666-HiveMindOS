@@ -52,6 +52,16 @@ def get_workflow_runs(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
+@router.get("/orgs/{org_id}/workflows/scheduler/status")
+def get_scheduler_status(org_id: str):
+    from server.health_checks import _flag
+
+    return {
+        "org_id": org_id,
+        "enabled": _flag("WORKFLOW_SCHEDULER_ENABLED", default=False),
+    }
+
+
 @router.get("/orgs/{org_id}/workflows/{workflow_id}")
 def get_one_workflow(org_id: str, workflow_id: str):
     wf = get_workflow(org_id, workflow_id)

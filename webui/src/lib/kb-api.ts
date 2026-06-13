@@ -818,6 +818,7 @@ export async function getAuditEvents(
   options: {
     days?: number;
     category?: string;
+    q?: string;
     limit?: number;
     offset?: number;
     orgId?: string;
@@ -827,10 +828,80 @@ export async function getAuditEvents(
   const params = new URLSearchParams();
   if (options.days != null) params.set('days', String(options.days));
   if (options.category) params.set('category', options.category);
+  if (options.q) params.set('q', options.q);
   if (options.limit != null) params.set('limit', String(options.limit));
   if (options.offset != null) params.set('offset', String(options.offset));
   const qs = params.toString();
   return req(`${base(orgId)}/audit/events${qs ? `?${qs}` : ''}`);
+}
+
+export function auditExportUrl(
+  options: {
+    days?: number;
+    category?: string;
+    q?: string;
+    format?: 'csv' | 'json';
+    orgId?: string;
+  } = {},
+): string {
+  const orgId = resolveOrgId(options.orgId);
+  const params = new URLSearchParams();
+  if (options.days != null) params.set('days', String(options.days));
+  if (options.category) params.set('category', options.category);
+  if (options.q) params.set('q', options.q);
+  params.set('format', options.format ?? 'csv');
+  return `${base(orgId)}/audit/export?${params.toString()}`;
+}
+
+export async function getWorkflowSchedulerStatus(orgId = resolveOrgId()): Promise<{ enabled: boolean }> {
+  return req(`${base(orgId)}/workflows/scheduler/status`);
+}
+
+export type ExternalTool = {
+  id: number;
+  org_id: string;
+  tool_id: string;
+  label: string;
+  kind: string;
+  description: string | null;
+  endpoint: string | null;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ToolCatalog = {
+  builtin: {
+    tool_id: string;
+    label: string;
+    kind: string;
+    domain?: string;
+    description?: string;
+    enabled: boolean;
+    source: string;
+  }[];
+  external: ExternalTool[];
+  builtin_count: number;
+  external_count: number;
+  enabled_external: number;
+};
+
+export async function getToolCatalog(orgId = resolveOrgId()): Promise<ToolCatalog> {
+  return req(`${base(orgId)}/tools/catalog`);
+}
+
+export async function patchExternalTool(
+  toolId: string,
+  patch: { enabled?: boolean; endpoint?: string; description?: string },
+  orgId = resolveOrgId(),
+): Promise<ExternalTool> {
+  const data = await req<{ tool: ExternalTool }>(`${base(orgId)}/tools/external/${toolId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return data.tool;
 }
 
 // ── Model settings ─────────────────────────────────────────────────────────────

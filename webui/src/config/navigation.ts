@@ -369,6 +369,7 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path === '/automations' || path.startsWith('/automations/')) return '定时运维';
   if (path === '/agent-tasks' || path.startsWith('/agent-tasks/')) return '自主任务';
   if (path.startsWith('/workflows/')) return '工作流';
+  if (path.startsWith('/tools/registry')) return '工具注册表';
   if (path.startsWith('/tools/')) return '工具箱';
   if (path === '/tools') return 'Agent Skills';
   if (path.startsWith('/integrations/playbook')) return 'Playbook';

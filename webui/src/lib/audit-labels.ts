@@ -1,4 +1,5 @@
 import type { AuditEvent } from '@/lib/kb-types';
+import { HIVEMIND_HOME_PATH } from '@/config/navigation';
 import { wikiHref } from '@/lib/wiki-links';
 
 /** 工作流 id → 中文名（与内置模板一致） */
@@ -133,6 +134,19 @@ function taskStepLabel(action: string): string {
   return TASK_ACTION_LABELS[action] ?? STEP_ACTION_LABELS[`automation.${action}`] ?? action;
 }
 
+function chatLinksFromDetail(d: Record<string, unknown>): AuditLink[] {
+  const sid = String(d.session_id ?? '');
+  if (!sid) return [];
+  return [{
+    label: '打开来源对话',
+    href: `${HIVEMIND_HOME_PATH}?id=${encodeURIComponent(sid)}`,
+  }];
+}
+
+function withChatLinks(links: AuditLink[], d: Record<string, unknown>): AuditLink[] {
+  return [...links, ...chatLinksFromDetail(d)];
+}
+
 function stepLabel(action: string | undefined): string {
   if (!action) return '未知步骤';
   return STEP_ACTION_LABELS[action] ?? action.replace('automation.', '').replace('tool.', '');
@@ -260,7 +274,7 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: title ? `知识写入 Wiki：${title}` : '知识写入 Wiki',
       description: resolvedPath ? `页面路径：${resolvedPath}` : (ev.summary ?? '候选知识已编译为企业 Wiki 页面'),
       bullets: [],
-      links,
+      links: withChatLinks(links, d),
       actorLabel,
     };
   }
@@ -291,9 +305,12 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: '人工批准 Wiki 候选',
       description: ev.summary || '管理员批准了一条待晋升 Wiki 的候选知识',
       bullets: [],
-      links: cid
-        ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
-        : [{ label: '人工审核', href: '/human-review' }],
+      links: withChatLinks(
+        cid
+          ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
+          : [{ label: '人工审核', href: '/human-review' }],
+        d,
+      ),
       actorLabel,
     };
   }
@@ -304,9 +321,12 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: '人工驳回 Wiki 候选',
       description: ev.summary || '管理员驳回了一条 Wiki 候选',
       bullets: [],
-      links: cid
-        ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
-        : [{ label: '人工审核', href: '/human-review' }],
+      links: withChatLinks(
+        cid
+          ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
+          : [{ label: '人工审核', href: '/human-review' }],
+        d,
+      ),
       actorLabel,
     };
   }

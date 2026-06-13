@@ -24,6 +24,7 @@ import {
   deleteWorkflow,
   deleteWorkflowRun,
   getWorkflow,
+  getWorkflowSchedulerStatus,
   listWorkflowRuns,
   listWorkflowTemplates,
   listWorkflows,
@@ -170,19 +171,22 @@ export function WorkflowsView() {
   const [editTarget, setEditTarget] = useState<{ id: string; yaml: string; isNew: boolean } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [runModalId, setRunModalId] = useState<string | null>(null);
+  const [schedulerEnabled, setSchedulerEnabled] = useState<boolean | null>(null);
 
   const load = useCallback(async () => {
     if (!ready || !orgId) return;
     setLoading(true);
     try {
-      const [wf, tpl, r] = await Promise.all([
+      const [wf, tpl, r, sched] = await Promise.all([
         listWorkflows(orgId),
         listWorkflowTemplates(orgId),
         listWorkflowRuns(undefined, orgId, 30),
+        getWorkflowSchedulerStatus(orgId).catch(() => ({ enabled: false })),
       ]);
       setWorkflows(wf);
       setTemplates(tpl);
       setRuns(r);
+      setSchedulerEnabled(sched.enabled);
     } catch (e) {
       setMessage({ tone: 'err', text: e instanceof Error ? e.message : '加载失败' });
     } finally {
@@ -262,36 +266,53 @@ export function WorkflowsView() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <GitBranch className="h-5 w-5 text-brand-primary" aria-hidden={true} />
-            <h1 className="text-xl font-semibold text-shell-text">工作流</h1>
+    <div className="w-full space-y-4 py-6 md:space-y-5 md:py-8">
+      <header className="rounded-2xl border border-shell-border bg-shell-panel p-5 shadow-sm md:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-brand-primary/8">
+              <GitBranch className="size-6 text-brand-primary" strokeWidth={1.5} aria-hidden />
+            </div>
+            <div>
+              <p className="text-[11px] font-medium tracking-wide text-shell-muted">HiveMind 编排</p>
+              <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-shell-text md:text-[24px]">
+                工作流
+              </h1>
+              <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-shell-muted">
+                YAML 定义多步编排；开启<strong className="font-medium text-shell-text">定时</strong>后按{' '}
+                <code className="text-brand-primary">cron_hint</code> 自动运行（需服务端{' '}
+                <code className="text-brand-primary">WORKFLOW_SCHEDULER_ENABLED=true</code>）。
+              </p>
+            </div>
           </div>
-          <p className="mt-1 max-w-2xl text-[13px] text-shell-muted">
-            YAML 定义多步编排；开启<strong className="font-medium text-shell-text">定时</strong>后按{' '}
-            <code>cron_hint</code> 自动运行（需{' '}
-            <code>WORKFLOW_SCHEDULER_ENABLED=true</code> 或系统 cron 调用脚本）。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setEditTarget({ id: '', yaml: DEFAULT_NEW_YAML, isNew: true })}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-panel px-3 py-1.5 text-xs font-medium text-shell-text hover:bg-shell-bg"
-          >
-            <Plus className="size-3.5" />
-            新建 YAML
-          </button>
-          <Link
-            href="/tasks/ops"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-panel px-3 py-1.5 text-xs text-shell-muted hover:text-shell-text"
-          >
-            单步自动化 →
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEditTarget({ id: '', yaml: DEFAULT_NEW_YAML, isNew: true })}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-bg px-3 py-1.5 text-xs font-medium text-shell-text hover:bg-shell-panel"
+            >
+              <Plus className="size-3.5" />
+              新建 YAML
+            </button>
+            <Link
+              href="/tasks/ops"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-bg px-3 py-1.5 text-xs text-shell-muted hover:text-shell-text"
+            >
+              单步自动化 →
+            </Link>
+          </div>
         </div>
       </header>
+
+      {schedulerEnabled === false && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/8 px-4 py-3 text-[13px] text-amber-900 dark:text-amber-200">
+          <p className="font-medium">定时调度未启用</p>
+          <p className="mt-1 text-[12px] opacity-90">
+            工作流 YAML 中的 <code>schedule_enabled</code> 不会自动触发。请在服务端设置{' '}
+            <code>WORKFLOW_SCHEDULER_ENABLED=true</code> 并重启，或使用系统 cron 调用运行脚本。
+          </p>
+        </div>
+      )}
 
       {message && (
         <div

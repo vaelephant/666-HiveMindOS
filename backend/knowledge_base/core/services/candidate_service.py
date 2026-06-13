@@ -236,13 +236,25 @@ def get_candidate_stats(org_id: str, user_id: str | None = None) -> dict:
     return asdict(_registry.get_stats(org_id, user_id))
 
 
+def _candidate_audit_detail(cand) -> dict:
+    detail: dict = {"title": cand.title, "candidate_id": cand.id}
+    source_type = getattr(cand, "source_type", None)
+    source_id = getattr(cand, "source_id", None)
+    if source_id and source_type in ("chat", "recap"):
+        detail["session_id"] = source_id
+        detail["source_type"] = source_type
+    return detail
+
+
 def reject_candidate(candidate_id: int, org_id: str, reason: str = "", user_id: str | None = None) -> None:
+    cand = _registry.get_by_id(candidate_id, org_id)
     _registry.update_resolver(
         candidate_id, org_id,
         status="rejected",
         resolver_action="noop",
         resolver_note=reason or "人工驳回",
     )
+    summary = f"驳回「{cand.title}」" if cand else (reason or "人工驳回")
     audit_service.log_event(
         org_id,
         user_id=user_id,
@@ -250,17 +262,20 @@ def reject_candidate(candidate_id: int, org_id: str, reason: str = "", user_id: 
         action="candidate.reject",
         resource_type="candidate",
         resource_id=str(candidate_id),
-        summary=reason or "人工驳回",
+        summary=summary,
+        detail=_candidate_audit_detail(cand) if cand else {},
     )
 
 
 def approve_candidate(candidate_id: int, org_id: str, note: str = "", user_id: str | None = None) -> None:
+    cand = _registry.get_by_id(candidate_id, org_id)
     _registry.update_resolver(
         candidate_id, org_id,
         status="approved",
         resolver_action="create",
         resolver_note=note or "人工批准",
     )
+    summary = f"批准「{cand.title}」" if cand else (note or "人工批准")
     audit_service.log_event(
         org_id,
         user_id=user_id,
@@ -268,7 +283,8 @@ def approve_candidate(candidate_id: int, org_id: str, note: str = "", user_id: s
         action="candidate.approve",
         resource_type="candidate",
         resource_id=str(candidate_id),
-        summary=note or "人工批准",
+        summary=summary,
+        detail=_candidate_audit_detail(cand) if cand else {},
     )
 
 
@@ -303,7 +319,12 @@ def compile_candidate_by_id(
         resource_type="candidate",
         resource_id=str(cand.id),
         summary=f"将「{cand.title}」写入 Wiki",
-        detail={"title": cand.title, "wiki_path": wiki_path, "category": cand.category},
+        detail={
+            "title": cand.title,
+            "wiki_path": wiki_path,
+            "category": cand.category,
+            **_candidate_audit_detail(cand),
+        },
     )
     return {
         "candidate_id": cand.id,
@@ -361,7 +382,12 @@ def compile_approved_candidates(
                 resource_type="candidate",
                 resource_id=str(cand.id),
                 summary=f"将「{cand.title}」写入 Wiki",
-                detail={"title": cand.title, "wiki_path": wiki_path, "category": cand.category},
+                detail={
+                    "title": cand.title,
+                    "wiki_path": wiki_path,
+                    "category": cand.category,
+                    **_candidate_audit_detail(cand),
+                },
             )
         except Exception as exc:
             log.error("[candidate] compile failed  id=%d  err=%s", cand.id, exc)

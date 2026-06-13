@@ -1,0 +1,33 @@
+# 内置外部工具 / MCP 模板 — 首次访问工具注册表时按 org 种子化
+
+templates:
+  - tool_id: filesystem_read
+    label: 本地文件读取 (MCP)
+    kind: mcp
+    description: 通过 MCP 服务器读取工作区文件（演示模板，需配置 endpoint）
+    endpoint: ""
+    enabled: false
+    config:
+      transport: stdio
+      command: npx
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+
+  - tool_id: web_fetch
+    label: 网页抓取 (MCP)
+    kind: mcp
+    description: 通过 MCP 抓取公开网页内容
+    endpoint: ""
+    enabled: false
+    config:
+      transport: sse
+      url: ""
+
+  - tool_id: custom_http
+    label: 自定义 HTTP 工具
+    kind: http
+    description: 调用外部 REST API 并将结果返回给 Agent
+    endpoint: ""
+    enabled: false
+    config:
+      method: POST
+      headers: {}
