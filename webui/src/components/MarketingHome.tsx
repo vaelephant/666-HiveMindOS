@@ -29,7 +29,9 @@ function deckInitial(reduced: boolean, state: { opacity?: number; x?: number; y?
   return reduced ? false : state;
 }
 
-const HERO_VIDEO_SRC = `/${encodeURIComponent('卡车 1.mp4')}`;
+// public/ 下目前只有 ware.mp4；原 `卡车 1.mp4` 不存在会 404。
+// 若放入真实卡车视频，改回对应文件名即可。
+const HERO_VIDEO_SRC = encodeURI('/ware.mp4');
 
 /** Full-bleed video with scrim; falls back to QuietField when reduced motion is requested. */
 function HeroVideoBackdrop() {

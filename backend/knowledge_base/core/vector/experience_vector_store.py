@@ -43,7 +43,7 @@ class ExperienceVectorStore:
             return
         from qdrant_client import QdrantClient
 
-        kwargs: dict = {"url": config.QDRANT_URL}
+        kwargs: dict = {"url": config.QDRANT_URL, "check_compatibility": False}
         if config.QDRANT_API_KEY:
             kwargs["api_key"] = config.QDRANT_API_KEY
         self._client = QdrantClient(**kwargs)

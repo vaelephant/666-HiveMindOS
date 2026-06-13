@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server.logging_config import setup_logging, get_logger
-from server.health_checks import run_startup_checks, log_results
+from server.health_checks import run_startup_checks, cached_checks, log_results, _flag
 from server.routers import (
     automations,
     candidates,
@@ -53,10 +53,13 @@ async def lifespan(_app: FastAPI):
     init_usage_tracking()
     init_user_profile_resolver()
 
-    try:
-        log_results(log, run_startup_checks())
-    except Exception as exc:  # noqa: BLE001 — 自检失败不应阻断启动
-        log.error("连通自检执行异常: %s", exc)
+    if _flag("STARTUP_HEALTHCHECK", default=True):
+        try:
+            log_results(log, run_startup_checks())
+        except Exception as exc:  # noqa: BLE001 — 自检失败不应阻断启动
+            log.error("连通自检执行异常: %s", exc)
+    else:
+        log.info("连通自检已关闭 (STARTUP_HEALTHCHECK=false)")
 
     try:
         with pg_conn() as conn:
@@ -105,11 +108,17 @@ def health():
 
 
 @app.get("/health/deps")
-def health_deps():
-    """实测各外部依赖（Postgres / Qdrant / 大模型）连通性。"""
-    results = run_startup_checks()
+def health_deps(live: bool = True):
+    """实测各外部依赖连通性。
+
+    - live=true（默认）：连 Postgres/Qdrant，并真发一次 embedding。
+    - live=false：跳过大模型网络调用，只查本地依赖（Postgres/Qdrant）。
+
+    结果带 10s TTL 缓存，避免高频轮询反复真连/烧钱。
+    """
+    results = cached_checks(include_llm=live)
     checks = [r.as_dict() for r in results]
-    all_ok = all(r.ok for r in results)
+    all_ok = all(r.ok or r.skipped for r in results)
     return {
         "status": "ok" if all_ok else "degraded",
         "checks": checks,
