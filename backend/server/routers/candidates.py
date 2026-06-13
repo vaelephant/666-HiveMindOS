@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 from server.logging_config import get_logger
 from knowledge_base.core.services.candidate_service import (
+    approve_and_compile_candidate,
     approve_candidate,
     compile_approved_candidates,
     get_candidate_stats,
@@ -72,6 +73,21 @@ def approve(org_id: str, candidate_id: int, req: ReviewRequest):
         return {"ok": True, "candidate_id": candidate_id, "status": "approved"}
     except Exception as exc:
         log.error("[candidate] approve failed: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/orgs/{org_id}/candidates/{candidate_id}/approve-and-compile")
+def approve_and_compile(org_id: str, candidate_id: int, req: ReviewRequest):
+    """人工批准并立即编译进 Wiki。"""
+    try:
+        result = approve_and_compile_candidate(
+            candidate_id, org_id, note=req.reason, user_id=req.user_id,
+        )
+        return {"ok": True, **result}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        log.error("[candidate] approve-and-compile failed: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

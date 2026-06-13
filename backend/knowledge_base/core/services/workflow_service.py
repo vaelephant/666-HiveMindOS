@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import os
 from typing import Any
 
 from knowledge_base import config
@@ -122,6 +123,13 @@ def restore_workflow(org_id: str, workflow_id: str) -> dict:
     return get_workflow(org_id, workflow_id) or tpl
 
 
+def get_run(org_id: str, run_id: str) -> dict:
+    run = _registry.get_run(run_id)
+    if not run or run.get("org_id") != org_id:
+        raise ValueError(f"运行记录不存在: {run_id}")
+    return run
+
+
 def list_runs(org_id: str, workflow_id: str | None = None, limit: int = 50) -> list[dict]:
     return _registry.list_runs(org_id, workflow_id=workflow_id, limit=limit)
 
@@ -232,10 +240,33 @@ def _human_skip_reason(when: str | None, checkpoints: dict[str, dict]) -> str:
     return f"前置条件未满足（{when}）"
 
 
+def _alert_workflow_failure(
+    org_id: str,
+    workflow_id: str,
+    label: str,
+    error: str,
+) -> None:
+    alert_user = (os.environ.get("WORKFLOW_ALERT_WECHAT_USERID") or "").strip()
+    if not alert_user:
+        return
+    try:
+        from agent_engine.tools.wechat_work import send_wechat_work_message
+
+        send_wechat_work_message(
+            org_id,
+            alert_user,
+            f"⚠️ 工作流「{label}」执行失败\n\n{error[:400]}",
+        )
+    except Exception as exc:
+        log.warning("[workflow] alert failed: %s", exc)
+
+
 def dispatch_action(org_id: str, user_id: str, action: str, params: dict) -> dict:
     if action.startswith("automation."):
         job_id = action.split(".", 1)[1]
-        return execute_automation_job(job_id, org_id, user_id, params)
+        internal = dict(params or {})
+        internal["_from_workflow"] = True
+        return execute_automation_job(job_id, org_id, user_id, internal)
     if action.startswith("tool."):
         tool_name = action.split(".", 1)[1]
         return TaskToolExecutor(org_id, user_id).execute(tool_name, params)
@@ -335,8 +366,9 @@ def run_workflow(
             resource_id=workflow_id,
             status="error",
             summary=str(exc)[:200],
-            detail={"run_id": run_id},
+            detail={"run_id": run_id, "steps": steps_log},
         )
+        _alert_workflow_failure(org_id, workflow_id, wf.get("label") or workflow_id, str(exc))
         log.error("[workflow] failed  id=%s  org=%s  err=%s", workflow_id, org_id, exc)
         run = _registry.get_run(run_id)
         return {"ok": False, "run": run, "error": str(exc)}

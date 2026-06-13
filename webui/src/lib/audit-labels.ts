@@ -44,7 +44,25 @@ const LINT_SEVERITY_LABELS: Record<string, string> = {
   error: '严重',
 };
 
-type WorkflowStep = {
+const TASK_ACTION_LABELS: Record<string, string> = {
+  search_wiki: '搜索 Wiki',
+  read_page: '读取 Wiki 页面',
+  search_memories: '搜索智慧记忆',
+  list_sessions: '列出会话',
+  read_session: '读取会话',
+  extract_facts: '提炼结构化事实',
+  enqueue_candidates: '写入候选池',
+  resolve_candidates: '解析 Wiki 候选',
+  compile_candidates: '编译进 Wiki',
+  llm_generate: '生成文本',
+  web_search: '联网搜索',
+  save_deliverable: '保存交付物',
+  wechat_work_send: '发送企微消息',
+  get_org_stats: '获取组织概况',
+  list_entities: '列出知识实体',
+};
+
+export type WorkflowStep = {
   step_id?: string;
   action?: string;
   status?: string;
@@ -96,7 +114,24 @@ export type AuditDisplay = {
   bullets: AuditDetailLine[];
   links: AuditLink[];
   actorLabel: string | null;
+  workflowRunId?: string | null;
 };
+
+export function formatWorkflowStepBullets(steps: WorkflowStep[]): AuditDetailLine[] {
+  return steps.map((s) => {
+    const name = stepLabel(s.action);
+    if (s.status === 'skipped') {
+      const why = formatSkipReason(s, steps);
+      return { text: `○ ${name}：${why}` };
+    }
+    const extra = formatStepResult(s.result as Record<string, unknown> | undefined);
+    return { text: `✓ ${name}${extra ? `（${extra}）` : ''}` };
+  });
+}
+
+function taskStepLabel(action: string): string {
+  return TASK_ACTION_LABELS[action] ?? STEP_ACTION_LABELS[`automation.${action}`] ?? action;
+}
 
 function stepLabel(action: string | undefined): string {
   if (!action) return '未知步骤';
@@ -191,15 +226,8 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       ? steps.filter((s) => s.status === 'skipped').length
       : Number(d.steps_skipped ?? 0);
 
-    const bullets: AuditDetailLine[] = steps.map((s) => {
-      const name = stepLabel(s.action);
-      if (s.status === 'skipped') {
-        const why = formatSkipReason(s, steps);
-        return { text: `○ ${name}：${why}` };
-      }
-      const extra = formatStepResult(s.result as Record<string, unknown> | undefined);
-      return { text: `✓ ${name}${extra ? `（${extra}）` : ''}` };
-    });
+    const bullets = formatWorkflowStepBullets(steps);
+    const runId = String(d.run_id ?? '');
 
     const description =
       ev.summary ??
@@ -207,12 +235,15 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
         ? `${trigger}执行：${done} 步完成${skipped ? `，${skipped} 步跳过` : ''}`
         : `${trigger}运行工作流`);
 
+    const links: AuditLink[] = [{ label: '打开工作流', href: '/workflows' }];
+
     return {
       title: `工作流「${wfName}」`,
       description,
       bullets,
-      links: [{ label: '打开工作流', href: '/workflows' }],
+      links,
       actorLabel: trigger === 'cron' ? '定时任务' : actorLabel,
+      workflowRunId: runId || null,
     };
   }
 
@@ -255,21 +286,27 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
   }
 
   if (action === 'candidate.approve') {
+    const cid = ev.resource_id;
     return {
       title: '人工批准 Wiki 候选',
       description: ev.summary || '管理员批准了一条待晋升 Wiki 的候选知识',
-      bullets: ev.resource_id ? [{ text: `候选 #${ev.resource_id}` }] : [],
-      links: [{ label: '查看候选池', href: '/knowledge-base/overview' }],
+      bullets: [],
+      links: cid
+        ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
+        : [{ label: '人工审核', href: '/human-review' }],
       actorLabel,
     };
   }
 
   if (action === 'candidate.reject') {
+    const cid = ev.resource_id;
     return {
       title: '人工驳回 Wiki 候选',
       description: ev.summary || '管理员驳回了一条 Wiki 候选',
-      bullets: ev.resource_id ? [{ text: `候选 #${ev.resource_id}` }] : [],
-      links: [{ label: '查看候选池', href: '/knowledge-base/overview' }],
+      bullets: [],
+      links: cid
+        ? [{ label: '查看候选详情', href: `/human-review?candidate=${cid}` }]
+        : [{ label: '人工审核', href: '/human-review' }],
       actorLabel,
     };
   }
@@ -285,13 +322,38 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
     };
   }
 
+  if (action === 'task.save_deliverable') {
+    const path = String(d.wiki_path ?? '');
+    const taskName = String(d.task_name ?? '');
+    const links: AuditLink[] = [];
+    if (path && path.includes('/')) {
+      links.push({ label: '打开交付物', href: wikiHref(path) });
+    }
+    return {
+      title: taskName ? `任务交付物：${taskName}` : '保存任务交付物',
+      description: path ? `已写入 Wiki：${path}` : (ev.summary ?? '任务产出已保存'),
+      bullets: [],
+      links,
+      actorLabel,
+    };
+  }
+
   if (action.startsWith('task.')) {
     const taskAction = action.replace('task.', '');
+    const label = taskStepLabel(taskAction);
+    const path = String(d.wiki_path ?? '');
+    const links: AuditLink[] = [];
+    if (path && path.includes('/')) {
+      links.push({ label: '打开 Wiki 页面', href: wikiHref(path) });
+    }
+    if (taskAction === 'wechat_work_send') {
+      links.push({ label: '企微集成设置', href: '/integrations/wechat-work' });
+    }
     return {
-      title: `自主任务步骤：${stepLabel(`automation.${taskAction}`) || taskAction}`,
-      description: ev.summary ?? '',
+      title: `自主任务 · ${label}`,
+      description: ev.summary?.replace(/^[^·]+ · /, '') ?? ev.summary ?? '',
       bullets: [],
-      links: [],
+      links,
       actorLabel,
     };
   }

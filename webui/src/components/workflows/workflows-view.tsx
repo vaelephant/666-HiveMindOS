@@ -17,6 +17,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useOrgReady } from '@/components/auth/OrgProvider';
+import { WorkflowRunDetailModal } from '@/components/workflows/workflow-run-detail-modal';
 import {
   createWorkflowFromTemplate,
   createWorkflowFromYaml,
@@ -168,6 +169,7 @@ export function WorkflowsView() {
   const [message, setMessage] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; yaml: string; isNew: boolean } | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [runModalId, setRunModalId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ready || !orgId) return;
@@ -519,7 +521,11 @@ export function WorkflowsView() {
             {runs.slice(0, 15).map((run) => {
               const Icon = STATUS_ICON[run.status as keyof typeof STATUS_ICON] ?? CheckCircle2;
               return (
-                <li key={run.id} className="flex items-center gap-3 px-4 py-2.5 text-[12px]">
+                <li
+                  key={run.id}
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-[12px] hover:bg-shell-bg/60"
+                  onClick={() => setRunModalId(run.id)}
+                >
                   <Icon
                     className={cn(
                       'size-4 shrink-0',
@@ -532,7 +538,8 @@ export function WorkflowsView() {
                   <span className="text-shell-muted">{formatTime(run.finished_at ?? run.started_at)}</span>
                   <button
                     type="button"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       if (!orgId) return;
                       await deleteWorkflowRun(run.id, orgId);
                       await load();
@@ -557,6 +564,8 @@ export function WorkflowsView() {
           onSave={(yaml) => void handleEditSave(yaml)}
         />
       )}
+
+      <WorkflowRunDetailModal runId={runModalId} onClose={() => setRunModalId(null)} />
     </div>
   );
 }

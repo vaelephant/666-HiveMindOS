@@ -9,6 +9,7 @@ from knowledge_base.core.services.workflow_service import (
     create_from_yaml,
     delete_run,
     delete_workflow,
+    get_run,
     get_workflow,
     list_runs,
     list_workflow_templates,
@@ -169,6 +170,17 @@ def trigger_workflow(org_id: str, workflow_id: str, req: RunWorkflowRequest):
         raise
     except Exception as exc:
         log.error("[workflow] run failed: %s", exc)
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/orgs/{org_id}/workflows/runs/{run_id}")
+def get_workflow_run(org_id: str, run_id: str):
+    try:
+        return {"run": get_run(org_id, run_id)}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        log.error("[workflow] get run failed: %s", exc)
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 

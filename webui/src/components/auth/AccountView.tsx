@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { BarChart3, Box, LogOut, Shield, User } from 'lucide-react';
+import { BarChart3, Box, Check, Loader2, LogOut, Pencil, Shield, User, X } from 'lucide-react';
 import { ModelSettings } from '@/components/auth/model-settings';
 import { TokenUsageStats } from '@/components/auth/token-usage-stats';
 import { cn } from '@/lib/utils';
@@ -24,12 +24,38 @@ const sections: { id: SectionId; label: string }[] = [
   { id: 'usage', label: '使用统计' },
 ];
 
-export function AccountView({ user }: { user: AccountUser }) {
+export function AccountView({ user: initialUser }: { user: AccountUser }) {
   const [active, setActive] = useState<SectionId>('profile');
+  const [user, setUser] = useState(initialUser);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(initialUser.name ?? '');
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
   const created =
     user.createdAt instanceof Date
       ? user.createdAt.toLocaleDateString('zh-CN')
       : new Date(user.createdAt).toLocaleDateString('zh-CN');
+
+  async function saveName() {
+    setSavingName(true);
+    setNameError(null);
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? '保存失败');
+      setUser((u) => ({ ...u, name: data.user?.name ?? (nameDraft.trim() || null) }));
+      setEditingName(false);
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : '保存失败');
+    } finally {
+      setSavingName(false);
+    }
+  }
 
   return (
     <div className="w-full py-6 md:py-8">
@@ -44,7 +70,6 @@ export function AccountView({ user }: { user: AccountUser }) {
               <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-shell-text md:text-[24px]">
                 个人中心
               </h1>
-              
             </div>
           </div>
           {active === 'profile' ? (
@@ -97,8 +122,58 @@ export function AccountView({ user }: { user: AccountUser }) {
               </span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[16px] font-semibold text-shell-text">{user.name || '未设置姓名'}</p>
+              {editingName ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="显示名称"
+                    maxLength={64}
+                    className="min-w-[200px] rounded-lg border border-shell-border bg-shell-bg px-3 py-1.5 text-[14px] text-shell-text focus:border-brand-primary/40 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={savingName}
+                    onClick={() => void saveName()}
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-primary px-2.5 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+                  >
+                    {savingName ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingName}
+                    onClick={() => {
+                      setEditingName(false);
+                      setNameDraft(user.name ?? '');
+                      setNameError(null);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-shell-border px-2.5 py-1.5 text-[12px] text-shell-muted"
+                  >
+                    <X className="size-3.5" />
+                    取消
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="text-[16px] font-semibold text-shell-text">{user.name || '未设置姓名'}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNameDraft(user.name ?? '');
+                      setEditingName(true);
+                    }}
+                    className="rounded-md p-1 text-shell-muted hover:bg-shell-bg hover:text-brand-primary"
+                    aria-label="编辑姓名"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                </div>
+              )}
+              {nameError && <p className="mt-1 text-[12px] text-red-600">{nameError}</p>}
               <p className="mt-0.5 text-[13px] text-shell-muted">{user.email}</p>
+              <p className="mt-1 text-[11px] text-shell-muted">姓名会显示在审计日志等处的「操作人」字段</p>
             </div>
           </div>
 

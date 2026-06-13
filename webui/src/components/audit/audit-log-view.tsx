@@ -14,6 +14,7 @@ import {
   User,
 } from 'lucide-react';
 import { useOrgReady } from '@/components/auth/OrgProvider';
+import { WorkflowRunDetailModal } from '@/components/workflows/workflow-run-detail-modal';
 import { formatAuditEvent } from '@/lib/audit-labels';
 import { getAuditEvents } from '@/lib/kb-api';
 import type { AuditEvent, AuditStats } from '@/lib/kb-types';
@@ -72,7 +73,13 @@ function StatCard({ label, value }: { label: string; value: number }) {
   );
 }
 
-function AuditEventRow({ ev }: { ev: AuditEvent }) {
+function AuditEventRow({
+  ev,
+  onOpenRun,
+}: {
+  ev: AuditEvent;
+  onOpenRun: (runId: string) => void;
+}) {
   const display = formatAuditEvent(ev);
   const autoExpand =
     (ev.action === 'wiki.lint' || ev.action === 'workflow.run') && display.bullets.length > 0;
@@ -105,11 +112,11 @@ function AuditEventRow({ ev }: { ev: AuditEvent }) {
           {display.description && (
             <p className="mt-0.5 text-[13px] text-shell-muted">{display.description}</p>
           )}
-          {display.links.length > 0 && (
+          {(display.links.length > 0 || display.workflowRunId) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {display.links.map((link) => (
                 <Link
-                  key={link.href}
+                  key={`${link.label}-${link.href}`}
                   href={link.href}
                   className="inline-flex items-center gap-1 rounded-md border border-brand-primary/25 bg-brand-primary/5 px-2.5 py-1 text-[12px] font-medium text-brand-primary hover:bg-brand-primary/10"
                 >
@@ -117,6 +124,15 @@ function AuditEventRow({ ev }: { ev: AuditEvent }) {
                   <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
                 </Link>
               ))}
+              {display.workflowRunId && (
+                <button
+                  type="button"
+                  onClick={() => onOpenRun(display.workflowRunId!)}
+                  className="inline-flex items-center gap-1 rounded-md border border-brand-primary/25 bg-brand-primary/5 px-2.5 py-1 text-[12px] font-medium text-brand-primary hover:bg-brand-primary/10"
+                >
+                  查看运行详情
+                </button>
+              )}
             </div>
           )}
           {hasDetails && (
@@ -163,6 +179,7 @@ export function AuditLogView() {
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runModalId, setRunModalId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!ready || !orgId) return;
@@ -290,11 +307,12 @@ export function AuditLogView() {
         ) : (
           <ul className="divide-y divide-shell-border">
             {events.map((ev) => (
-              <AuditEventRow key={ev.id} ev={ev} />
+              <AuditEventRow key={ev.id} ev={ev} onOpenRun={setRunModalId} />
             ))}
           </ul>
         )}
       </div>
+      <WorkflowRunDetailModal runId={runModalId} onClose={() => setRunModalId(null)} />
     </div>
   );
 }

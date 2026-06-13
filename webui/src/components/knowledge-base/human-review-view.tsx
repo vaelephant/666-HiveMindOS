@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import {
   AlertTriangle,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import {
+  approveAndCompileCandidate,
   approveCandidate,
   compileCandidates,
   getCandidateStats,
@@ -89,6 +91,8 @@ const WORKFLOW_STEPS = [
 ] as const;
 
 export function HumanReviewView() {
+  const searchParams = useSearchParams();
+  const deepLinkId = searchParams.get('candidate');
   const [stats, setStats] = useState<CandidateStats | null>(null);
   const [filter, setFilter] = useState<StatusFilter>('pending');
   const [items, setItems] = useState<KnowledgeCandidate[]>([]);
@@ -125,6 +129,14 @@ export function HumanReviewView() {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (!deepLinkId) return;
+    const id = Number(deepLinkId);
+    if (!Number.isFinite(id)) return;
+    setFilter('all');
+    setSelectedId(id);
+  }, [deepLinkId]);
+
   async function runBatch(action: 'resolve' | 'compile') {
     setBusy(action);
     setMessage(null);
@@ -144,18 +156,29 @@ export function HumanReviewView() {
     }
   }
 
-  async function review(kind: 'approve' | 'reject') {
+  async function review(kind: 'approve' | 'reject' | 'approve-compile') {
     if (!selected) return;
     setBusy(`${kind}-${selected.id}`);
     setMessage(null);
     try {
-      if (kind === 'approve') await approveCandidate(selected.id, reason);
-      else await rejectCandidate(selected.id, reason);
-      setReason('');
-      setMessage({
-        tone: 'ok',
-        text: kind === 'approve' ? '已批准，可批量编译进 Wiki' : '已驳回',
-      });
+      if (kind === 'approve-compile') {
+        const res = await approveAndCompileCandidate(selected.id, reason);
+        setReason('');
+        setMessage({
+          tone: 'ok',
+          text: res.wiki_path
+            ? `已批准并写入 Wiki：${res.wiki_path}`
+            : '已批准并编译进 Wiki',
+        });
+      } else if (kind === 'approve') {
+        await approveCandidate(selected.id, reason);
+        setReason('');
+        setMessage({ tone: 'ok', text: '已批准，可批量编译进 Wiki' });
+      } else {
+        await rejectCandidate(selected.id, reason);
+        setReason('');
+        setMessage({ tone: 'ok', text: '已驳回' });
+      }
       await refresh();
     } catch (e) {
       setMessage({ tone: 'err', text: e instanceof Error ? e.message : '操作失败' });
@@ -449,15 +472,28 @@ export function HumanReviewView() {
                     <button
                       type="button"
                       disabled={!!busy}
-                      onClick={() => review('approve')}
+                      onClick={() => review('approve-compile')}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                    >
+                      {busy === `approve-compile-${selected.id}` ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <BookOpen className="size-3.5" />
+                      )}
+                      批准并写入 Wiki
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => review('approve')}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-brand-primary/30 bg-brand-primary/5 px-4 py-2 text-[13px] font-medium text-brand-primary transition-colors hover:bg-brand-primary/10 disabled:opacity-50"
                     >
                       {busy === `approve-${selected.id}` ? (
                         <Loader2 className="size-3.5 animate-spin" />
                       ) : (
                         <Check className="size-3.5" />
                       )}
-                      批准
+                      仅批准
                     </button>
                     <button
                       type="button"

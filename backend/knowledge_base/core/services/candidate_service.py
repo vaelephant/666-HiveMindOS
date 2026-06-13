@@ -272,6 +272,58 @@ def approve_candidate(candidate_id: int, org_id: str, note: str = "", user_id: s
     )
 
 
+def compile_candidate_by_id(
+    candidate_id: int,
+    org_id: str,
+    user_id: str | None = None,
+) -> dict:
+    """将单条 approved 候选编译进 Wiki。"""
+    cand = _registry.get_by_id(candidate_id, org_id)
+    if not cand:
+        raise ValueError(f"候选不存在: {candidate_id}")
+    if cand.status != "approved":
+        raise ValueError(f"候选 #{candidate_id} 状态为 {cand.status}，仅 approved 可编译")
+
+    wiki = WikiManager(config.WIKI_ROOT)
+    wiki_path = compile_candidate(wiki.root, org_id, cand)
+    _registry.update_resolver(
+        cand.id,
+        org_id,
+        status="merged",
+        resolver_action=cand.resolver_action or "create",
+        resolver_note=f"已编译进 Wiki: {wiki_path}",
+        target_wiki_path=wiki_path,
+    )
+    wiki.update_index(org_id)
+    audit_service.log_event(
+        org_id,
+        user_id=user_id,
+        category="wiki",
+        action="wiki.compile",
+        resource_type="candidate",
+        resource_id=str(cand.id),
+        summary=f"将「{cand.title}」写入 Wiki",
+        detail={"title": cand.title, "wiki_path": wiki_path, "category": cand.category},
+    )
+    return {
+        "candidate_id": cand.id,
+        "title": cand.title,
+        "wiki_path": wiki_path,
+        "status": "merged",
+    }
+
+
+def approve_and_compile_candidate(
+    candidate_id: int,
+    org_id: str,
+    note: str = "",
+    user_id: str | None = None,
+) -> dict:
+    """人工批准并立即编译进 Wiki。"""
+    approve_candidate(candidate_id, org_id, note=note, user_id=user_id)
+    return compile_candidate_by_id(candidate_id, org_id, user_id=user_id)
+
+
 def compile_approved_candidates(
     org_id: str,
     user_id: str | None = None,

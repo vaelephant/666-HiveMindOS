@@ -380,6 +380,11 @@ export async function listWorkflowRuns(
   return data.runs;
 }
 
+export async function getWorkflowRun(runId: string, orgId = resolveOrgId()): Promise<WorkflowRun> {
+  const data = await req<{ run: WorkflowRun }>(`${base(orgId)}/workflows/runs/${runId}`);
+  return data.run;
+}
+
 export async function deleteWorkflowRun(runId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/workflows/runs/${runId}`, { method: 'DELETE' });
 }
@@ -433,6 +438,18 @@ export async function approveCandidate(
   orgId = resolveOrgId(),
 ): Promise<void> {
   await req(`${base(orgId)}/candidates/${candidateId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function approveAndCompileCandidate(
+  candidateId: number,
+  reason = '',
+  orgId = resolveOrgId(),
+): Promise<{ ok: boolean; wiki_path?: string; title?: string }> {
+  return req(`${base(orgId)}/candidates/${candidateId}/approve-and-compile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reason }),

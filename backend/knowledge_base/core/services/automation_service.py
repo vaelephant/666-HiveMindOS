@@ -215,12 +215,13 @@ def _execute(job_id: str, org_id: str, user_id: str, params: dict[str, Any]) -> 
         return _run_daily_digest(org_id, user_id, params)
 
     if job_id == "lint_wiki":
-        return _run_lint_wiki(org_id, user_id)
+        skip_audit = bool(params.pop("_from_workflow", False))
+        return _run_lint_wiki(org_id, user_id, write_audit=not skip_audit)
 
     raise ValueError(f"未实现的任务: {job_id}")
 
 
-def _run_lint_wiki(org_id: str, user_id: str) -> dict:
+def _run_lint_wiki(org_id: str, user_id: str, *, write_audit: bool = True) -> dict:
     from knowledge_base.core.pipelines.lint_agent import LintAgent
     from knowledge_base.core.services import audit_service
     from knowledge_base.core.wiki.wiki_manager import WikiManager
@@ -228,23 +229,23 @@ def _run_lint_wiki(org_id: str, user_id: str) -> dict:
     wiki = WikiManager(config.WIKI_ROOT)
     report = LintAgent(wiki).run(org_id)
     issues = report.get("issues") or []
-    warnings = sum(1 for i in issues if i.get("severity") == "warning")
-    audit_service.log_event(
-        org_id,
-        user_id=user_id,
-        category="lint",
-        action="wiki.lint",
-        resource_type="wiki",
-        summary=(
-            f"检查了 {report.get('total_pages', 0)} 篇 Wiki"
-            + (f"，发现 {len(issues)} 处提示" if issues else "，未发现明显问题")
-        ),
-        detail={
-            "total_pages": report.get("total_pages"),
-            "issues_found": report.get("issues_found"),
-            "issues": issues[:30],
-        },
-    )
+    if write_audit:
+        audit_service.log_event(
+            org_id,
+            user_id=user_id,
+            category="lint",
+            action="wiki.lint",
+            resource_type="wiki",
+            summary=(
+                f"检查了 {report.get('total_pages', 0)} 篇 Wiki"
+                + (f"，发现 {len(issues)} 处提示" if issues else "，未发现明显问题")
+            ),
+            detail={
+                "total_pages": report.get("total_pages"),
+                "issues_found": report.get("issues_found"),
+                "issues": issues[:30],
+            },
+        )
     return report
 
 
