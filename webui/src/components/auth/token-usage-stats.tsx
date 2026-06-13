@@ -19,7 +19,18 @@ import type { LlmUsageStats } from '@/lib/kb-types';
 import { themeVars } from '@/lib/theme-vars';
 import { cn } from '@/lib/utils';
 
-const PERIOD_OPTIONS = [7, 30, 90] as const;
+const PERIOD_OPTIONS = [
+  { days: 1, label: '今日' },
+  { days: 7, label: '7 天' },
+  { days: 30, label: '30 天' },
+  { days: 90, label: '90 天' },
+] as const;
+
+type PeriodDays = (typeof PERIOD_OPTIONS)[number]['days'];
+
+function periodHint(days: number): string {
+  return days === 1 ? '今日' : `近 ${days} 天`;
+}
 
 const SOURCE_LABELS: Record<string, string> = {
   chat: '对话',
@@ -231,7 +242,7 @@ function StatCard({
 
 export function TokenUsageStats() {
   const { ready, orgId } = useOrgReady();
-  const [days, setDays] = useState<(typeof PERIOD_OPTIONS)[number]>(30);
+  const [days, setDays] = useState<PeriodDays>(7);
   const [stats, setStats] = useState<LlmUsageStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -275,6 +286,13 @@ export function TokenUsageStats() {
     [stats?.by_day],
   );
 
+  const isTodayView = days === 1;
+
+  const todayUsage = useMemo(() => {
+    const buckets = stats?.by_day ?? [];
+    return buckets.length ? buckets[buckets.length - 1] : null;
+  }, [stats?.by_day]);
+
   const peakHour = useMemo(() => {
     const buckets = stats?.by_hour ?? [];
     if (!buckets.length) return null;
@@ -301,17 +319,17 @@ export function TokenUsageStats() {
           <div className="flex rounded-lg border border-shell-border bg-shell-bg p-0.5">
             {PERIOD_OPTIONS.map((option) => (
               <button
-                key={option}
+                key={option.days}
                 type="button"
-                onClick={() => setDays(option)}
+                onClick={() => setDays(option.days)}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors',
-                  days === option
+                  days === option.days
                     ? 'bg-brand-primary text-brand-on-primary shadow-sm shadow-brand-primary/20'
                     : 'text-shell-muted hover:text-shell-text',
                 )}
               >
-                {option} 天
+                {option.label}
               </button>
             ))}
           </div>
@@ -351,8 +369,19 @@ export function TokenUsageStats() {
             <StatCard
               label="总 Token"
               value={formatTokens(stats.summary.total_tokens)}
-              hint={`近 ${stats.period_days} 天`}
+              hint={periodHint(stats.period_days)}
             />
+            {!isTodayView ? (
+              <StatCard
+                label="今日 Token"
+                value={formatTokens(todayUsage?.total_tokens ?? 0)}
+                hint={
+                  todayUsage && todayUsage.request_count > 0
+                    ? `输入 ${formatTokens(todayUsage.prompt_tokens)} · 输出 ${formatTokens(todayUsage.completion_tokens)} · ${todayUsage.request_count} 次`
+                    : '今日暂无调用'
+                }
+              />
+            ) : null}
             <StatCard label="输入 Token" value={formatTokens(stats.summary.prompt_tokens)} />
             <StatCard label="输出 Token" value={formatTokens(stats.summary.completion_tokens)} />
             <StatCard label="调用次数" value={formatTokens(stats.summary.request_count)} />
@@ -379,7 +408,9 @@ export function TokenUsageStats() {
                 <div>
                   <p className="text-[14px] font-semibold text-shell-text">按时段分布</p>
                   <p className="text-[12px] text-shell-muted">
-                    统计周期内 24 小时累计 · {tzLabel(stats.timezone)}
+                    {isTodayView
+                      ? `今日各时段用量 · ${tzLabel(stats.timezone)}`
+                      : `统计周期内 24 小时累计 · ${tzLabel(stats.timezone)}`}
                   </p>
                 </div>
               </div>
@@ -393,24 +424,30 @@ export function TokenUsageStats() {
               data={hourChartData}
               gradientId="usage-hour-gradient"
               emptyTitle="暂无时段数据"
-              emptyHint="累计多次调用后将展示 24 小时用量曲线"
+              emptyHint={
+                isTodayView
+                  ? '今日发起对话后，将按小时展示用量曲线'
+                  : '累计多次调用后将展示 24 小时用量曲线'
+              }
             />
           </section>
 
-          <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
-            <div className="mb-1 flex items-center gap-2">
-              <Coins className="size-4 text-brand-primary" />
-              <div>
-                <p className="text-[14px] font-semibold text-shell-text">每日趋势</p>
-                <p className="text-[12px] text-shell-muted">按自然日汇总 Token 消耗</p>
+          {!isTodayView ? (
+            <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
+              <div className="mb-1 flex items-center gap-2">
+                <Coins className="size-4 text-brand-primary" />
+                <div>
+                  <p className="text-[14px] font-semibold text-shell-text">每日趋势</p>
+                  <p className="text-[12px] text-shell-muted">按自然日汇总 Token 消耗</p>
+                </div>
               </div>
-            </div>
-            <UsageBarChart
-              data={dayChartData}
-              emptyTitle="暂无用量记录"
-              emptyHint="发起 Chat 对话后，数据会自动累计到此页"
-            />
-          </section>
+              <UsageBarChart
+                data={dayChartData}
+                emptyTitle="暂无用量记录"
+                emptyHint="发起 Chat 对话后，数据会自动累计到此页"
+              />
+            </section>
+          ) : null}
 
           <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
             <div className="rounded-2xl border border-shell-border bg-shell-panel p-5">
