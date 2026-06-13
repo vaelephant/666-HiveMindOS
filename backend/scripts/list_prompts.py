@@ -10,7 +10,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from knowledge_base.prompts import get, list_keys
+from prompts import get, list_keys
 
 def main() -> None:
     for key in list_keys():

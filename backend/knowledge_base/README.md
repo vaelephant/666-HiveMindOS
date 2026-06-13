@@ -2,7 +2,8 @@
 
 HiveMindOS 顶层包 — **Wiki / 智慧 / 候选池 / Chat** 知识沉淀，不是指挥中心。
 
-自主任务引擎（Plan → Execute → Reflect）已迁至顶层包 **`agent_engine/`**，见 `agent_engine/README.md`。  
+自主任务引擎见 **`agent_engine/`**；HiveMind Chat 见 **`chat_layer/`**；智慧记忆见 **`memory_layer/`**；定时运维与工作流见 **`ops/`**；审计见 **`platform_layer/`**。
+
 全仓库目录说明：[项目文档/0-程序目录结构.md](../../项目文档/0-程序目录结构.md)
 
 不是普通 RAG 问答，而是把企业原始资料**编译**成持续成长的知识网络。

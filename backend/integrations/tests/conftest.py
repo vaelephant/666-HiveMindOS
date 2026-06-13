@@ -16,7 +16,7 @@ def postgres_available() -> bool:
     try:
         import psycopg
 
-        from knowledge_base import config
+        from shared import config
 
         with psycopg.connect(config.DATABASE_URL, connect_timeout=2) as conn:
             conn.execute("SELECT 1")

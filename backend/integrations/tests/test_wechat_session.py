@@ -7,10 +7,10 @@ import uuid
 import pytest
 
 from integrations.tests.conftest import requires_postgres
-from knowledge_base.core.db.postgres import pg_conn
+from shared.db.postgres import pg_conn
 
 pytestmark = requires_postgres
-from knowledge_base.core.registry.chat_registry import ChatRegistry
+from chat_layer.core.registry.chat_registry import ChatRegistry
 
 
 def _cleanup(org_id: str) -> None:

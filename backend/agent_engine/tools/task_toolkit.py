@@ -6,12 +6,12 @@ import json
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 
-from knowledge_base import config
+from shared import config
 from knowledge_base.core.domain.taxonomy import category_to_memory_type
 from knowledge_base.core.graph.memory_graph import MemoryGraph
 from knowledge_base.core.parsers.llm_json import parse_json_object
-from knowledge_base.core.registry.chat_registry import ChatRegistry
-from knowledge_base.core.registry.memory_registry import MemoryRegistry
+from chat_layer.core.registry.chat_registry import ChatRegistry
+from memory_layer.core.registry.memory_registry import MemoryRegistry
 from knowledge_base.core.services.candidate_service import (
     compile_approved_candidates,
     get_candidate_stats,
@@ -24,7 +24,7 @@ from agent_engine.tools.wechat_work import send_wechat_work_message
 from knowledge_base.core.wiki.wiki_manager import WikiManager
 from knowledge_base.models.knowledge_candidate import CandidateInput
 from knowledge_base.core.registry.candidate_registry import CandidateRegistry
-from knowledge_base.prompts import get, render
+from prompts import get, render
 from agent_engine.settings import load
 from model_layer import client as llm
 

@@ -4,8 +4,8 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from server.logging_config import get_logger
-from knowledge_base.core.registry.memory_registry import MemoryRegistry
-from knowledge_base.core.services.memory_service import (
+from memory_layer.core.registry.memory_registry import MemoryRegistry
+from memory_layer.core.services.memory_service import (
     recap_idle_sessions,
     recap_session,
     sync_vectors,

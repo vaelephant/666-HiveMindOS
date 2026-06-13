@@ -2,12 +2,12 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter
 
-from knowledge_base import config
+from shared import config
 from knowledge_base.core.registry.source_registry import SourceRegistry
-from knowledge_base.core.registry.chat_registry import ChatRegistry
-from knowledge_base.core.registry.memory_registry import MemoryRegistry
+from chat_layer.core.registry.chat_registry import ChatRegistry
+from memory_layer.core.registry.memory_registry import MemoryRegistry
 from knowledge_base.core.services.candidate_service import get_candidate_stats
-from knowledge_base.core.services.pipeline_service import list_recent_pipeline_activity
+from chat_layer.core.services.pipeline_service import list_recent_pipeline_activity
 from knowledge_base.core.graph.memory_graph import MemoryGraph
 from knowledge_base.core.wiki.wiki_manager import WikiManager
 

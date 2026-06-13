@@ -6,8 +6,8 @@ from integrations.gateway.base import truncate_reply
 from integrations.gateway.commands import HELP_TEXT, RESET_OK, parse_slash_command
 from integrations.wechat_work.config import ERROR_REPLY, MSG_MAX_BYTES, UNBOUND_REPLY
 from integrations.wechat_work.registry import WeChatWorkRegistry
-from knowledge_base.core.registry.chat_registry import ChatRegistry
-from knowledge_base.core.services import chat_service
+from chat_layer.core.registry.chat_registry import ChatRegistry
+from chat_layer.core.services import chat_service
 
 
 class WeChatWorkAdapter:

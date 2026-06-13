@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from knowledge_base import config
+from shared import config
 from knowledge_base.core.graph.memory_graph import MemoryGraph
 from knowledge_base.core.registry.source_registry import SourceRegistry
 from knowledge_base.core.wiki.page_detail import build_page_detail

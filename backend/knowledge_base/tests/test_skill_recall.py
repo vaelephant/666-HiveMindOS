@@ -67,14 +67,14 @@ def test_format_skills_block_includes_steps(tmp_path):
 
 
 def test_build_context_includes_skills_block(tmp_path):
-    from knowledge_base.core.services.context_builder import build_context
+    from chat_layer.core.services.context_builder import build_context
 
     org = "org-skills"
     skills_root = tmp_path / "skills" / org
     _write_skill(skills_root, "research-竞品报价", "竞品报价分析")
 
     with patch("agent_engine.skills.skill_recall.skills_root", return_value=skills_root):
-        with patch("knowledge_base.core.services.context_builder._registry") as reg:
+        with patch("chat_layer.core.services.context_builder._registry") as reg:
             reg.list_active.return_value = []
             block, memories, skills = build_context(org, "demo", "竞品报价对标")
 

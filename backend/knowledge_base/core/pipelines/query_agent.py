@@ -3,11 +3,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[3]))
 from model_layer import client as llm
-from knowledge_base import config
+from shared import config
 from knowledge_base.core.wiki.wiki_manager import WikiManager
 from knowledge_base.core.graph.memory_graph import MemoryGraph
 from knowledge_base.core.tools.kb_toolkit import tool_runtime
-from knowledge_base.prompts import get, render
+from prompts import get, render
 
 _QUERY = get("agents.query")
 

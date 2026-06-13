@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from agent_engine.agents.planner_agent import PlannerAgent
 from agent_engine.agents.planning_committee import PlanningCommittee

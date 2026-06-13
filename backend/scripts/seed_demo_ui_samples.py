@@ -19,9 +19,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from knowledge_base import config
-from knowledge_base.models.memory import MemoryCandidate
-from knowledge_base.core.registry.memory_registry import MemoryRegistry
+from shared import config
+from memory_layer.models.memory import MemoryCandidate
+from memory_layer.core.registry.memory_registry import MemoryRegistry
 
 ORG_DEFAULT = "demo"
 USER_DEFAULT = "demo"

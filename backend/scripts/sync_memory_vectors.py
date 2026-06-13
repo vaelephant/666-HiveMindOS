@@ -10,8 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from knowledge_base.core.db.postgres import close_pool  # noqa: E402
-from knowledge_base.core.services.memory_service import sync_vectors  # noqa: E402
+from shared.db.postgres import close_pool  # noqa: E402
+from memory_layer.core.services.memory_service import sync_vectors  # noqa: E402
 
 
 def main() -> int:

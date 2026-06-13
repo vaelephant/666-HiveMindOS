@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from knowledge_base.core.db.postgres import pg_conn
+from shared.db.postgres import pg_conn
 from knowledge_base.models.knowledge_candidate import (
     CandidateInput,
     CandidateStats,

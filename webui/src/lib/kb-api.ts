@@ -14,6 +14,7 @@ import type {
   ChatSendResponse,
   ChatSession,
   ChatSessionSummary,
+  ChatStartersConfig,
   DeleteSessionResponse,
   EntityDetail,
   GraphSnapshot,
@@ -524,6 +525,28 @@ export async function getGraphSnapshot(orgId = resolveOrgId()): Promise<GraphSna
 export async function listChatSessions(orgId = resolveOrgId()): Promise<ChatSessionSummary[]> {
   const data = await req<{ sessions: ChatSessionSummary[] }>(`${base(orgId)}/chat/sessions`);
   return data.sessions;
+}
+
+export async function getChatStarters(orgId = resolveOrgId()): Promise<ChatStartersConfig> {
+  const url = new URL(`${base(orgId)}/chat/starters`, window.location.origin);
+  url.searchParams.set('user_id', resolveUserId());
+  return req(url.toString());
+}
+
+export async function saveChatStarters(
+  starters: string[],
+  orgId = resolveOrgId(),
+): Promise<ChatStartersConfig> {
+  return req(`${base(orgId)}/chat/starters`, {
+    method: 'PUT',
+    body: JSON.stringify({ starters, user_id: resolveUserId() }),
+  });
+}
+
+export async function resetChatStarters(orgId = resolveOrgId()): Promise<ChatStartersConfig> {
+  const url = new URL(`${base(orgId)}/chat/starters`, window.location.origin);
+  url.searchParams.set('user_id', resolveUserId());
+  return req(url.toString(), { method: 'DELETE' });
 }
 
 export async function getChatSession(sessionId: string, orgId = resolveOrgId()): Promise<ChatSession> {

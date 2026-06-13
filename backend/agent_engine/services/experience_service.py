@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from knowledge_base import config
+from shared import config
 from agent_engine.registry.experience_registry import ExperienceRegistry
-from knowledge_base.core.vector.experience_vector_store import get_experience_vector_store
+from agent_engine.vector.experience_vector_store import get_experience_vector_store
 
 _registry = ExperienceRegistry(config.TASK_DB)
 

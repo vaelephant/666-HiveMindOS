@@ -7,10 +7,10 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from knowledge_base.core.pipelines.ingest_agent import IngestAgent
-from knowledge_base.core.services.doc_memory_service import extract_memories_from_ingest
+from memory_layer.core.services.doc_memory_service import extract_memories_from_ingest
 from knowledge_base.core.domain.source_formats import (
     MEDIA_SOURCE_TYPES,
     source_type_from_filename,

@@ -632,6 +632,12 @@ export type ChatSessionSummary = {
   updated_at: string;
 };
 
+export type ChatStartersConfig = {
+  starters: string[];
+  source: 'user' | 'org' | 'system';
+  limits: { max_count: number; max_length: number };
+};
+
 export type ChatSession = ChatSessionSummary & {
   turns: ChatTurn[];
 };

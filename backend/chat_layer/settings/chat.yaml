@@ -1,0 +1,11 @@
+# Chat 空状态快捷问题 — 组织默认（可被 storage/orgs/{org_id}/chat.yaml 覆盖）
+
+default_starters:
+  - 报价超过多少金额需要审批？
+  - 中康尚德的应收款情况是什么
+  - 有哪些涉及税务合规的规则
+  - 销售跟进的完整流程是什么？
+
+limits:
+  max_count: 6
+  max_length: 120

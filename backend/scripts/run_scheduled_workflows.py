@@ -12,8 +12,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from knowledge_base.core.db.postgres import close_pool
-from knowledge_base.core.services.workflow_scheduler import run_scheduled_tick
+from shared.db.postgres import close_pool
+from ops.core.services.workflow_scheduler import run_scheduled_tick
 
 
 def main() -> None:

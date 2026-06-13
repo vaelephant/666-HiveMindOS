@@ -1,9 +1,9 @@
 import logging
 import logging.handlers
 import os
-from pathlib import Path
 
-LOG_DIR = Path(os.environ.get("STORAGE_ROOT", "storage")) / "logs"
+from shared.config import LOG_DIR
+
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 
 _FMT = "%(asctime)s  %(levelname)-8s  %(name)-30s  %(message)s"

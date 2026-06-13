@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from server.logging_config import get_logger
-from knowledge_base.core.services.automation_service import (
+from ops.core.services.automation_service import (
     delete_job,
     delete_run,
     list_jobs,

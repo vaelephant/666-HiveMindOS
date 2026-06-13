@@ -7,9 +7,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from server.logging_config import get_logger
-from knowledge_base.core.services import chat_service
-from knowledge_base.core.services.memory_service import extract_from_turn, recap_session
-from knowledge_base.core.services.pipeline_service import get_session_pipeline
+from chat_layer.core.services import chat_service
+from chat_layer.core.services.chat_preferences_service import (
+    clear_user_starters,
+    get_chat_starters,
+    save_user_starters,
+)
+from memory_layer.core.services.memory_service import extract_from_turn, recap_session
+from chat_layer.core.services.pipeline_service import get_session_pipeline
 
 router = APIRouter()
 log = get_logger("hivemind.chat")
@@ -24,6 +29,55 @@ class SendMessageRequest(BaseModel):
 class ExtractTurnRequest(BaseModel):
     user_id: str = "demo"
     turn_index: int | None = None
+
+
+class ChatStartersUpdate(BaseModel):
+    user_id: str = "demo"
+    starters: list[str]
+
+
+@router.get("/orgs/{org_id}/chat/starters")
+def get_starters(org_id: str, user_id: str = "demo"):
+    try:
+        result = get_chat_starters(org_id, user_id)
+        return {
+            "starters": result.starters,
+            "source": result.source,
+            "limits": result.limits,
+        }
+    except Exception as exc:
+        log.error("[chat] get starters failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"读取快捷问题失败: {exc}") from exc
+
+
+@router.put("/orgs/{org_id}/chat/starters")
+def update_starters(org_id: str, body: ChatStartersUpdate):
+    try:
+        result = save_user_starters(org_id, body.user_id, body.starters)
+        return {
+            "starters": result.starters,
+            "source": result.source,
+            "limits": result.limits,
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        log.error("[chat] save starters failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"保存快捷问题失败: {exc}") from exc
+
+
+@router.delete("/orgs/{org_id}/chat/starters")
+def reset_starters(org_id: str, user_id: str = "demo"):
+    try:
+        result = clear_user_starters(org_id, user_id)
+        return {
+            "starters": result.starters,
+            "source": result.source,
+            "limits": result.limits,
+        }
+    except Exception as exc:
+        log.error("[chat] reset starters failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"重置快捷问题失败: {exc}") from exc
 
 
 @router.post("/orgs/{org_id}/chat/sessions/{session_id}/extract")

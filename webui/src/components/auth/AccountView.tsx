@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { BarChart3, Box, Check, Loader2, LogOut, Pencil, Shield, User, X } from 'lucide-react';
+import { BarChart3, Box, Check, Loader2, LogOut, MessageSquareText, Pencil, Shield, User, X } from 'lucide-react';
+import { ChatStartersSettings } from '@/components/chat/chat-starters-settings';
 import { ModelSettings } from '@/components/auth/model-settings';
 import { TokenUsageStats } from '@/components/auth/token-usage-stats';
 import { cn } from '@/lib/utils';
@@ -16,10 +17,11 @@ type AccountUser = {
   createdAt: string | Date;
 };
 
-type SectionId = 'profile' | 'models' | 'usage';
+type SectionId = 'profile' | 'models' | 'usage' | 'chat';
 
 const sections: { id: SectionId; label: string }[] = [
   { id: 'profile', label: '账户信息' },
+  { id: 'chat', label: '对话偏好' },
   { id: 'models', label: '模型设置' },
   { id: 'usage', label: '使用统计' },
 ];
@@ -103,6 +105,8 @@ export function AccountView({ user: initialUser }: { user: AccountUser }) {
                   <BarChart3 className="size-3.5" />
                 ) : s.id === 'models' ? (
                   <Box className="size-3.5" />
+                ) : s.id === 'chat' ? (
+                  <MessageSquareText className="size-3.5" />
                 ) : (
                   <User className="size-3.5" />
                 )}
@@ -206,6 +210,10 @@ export function AccountView({ user: initialUser }: { user: AccountUser }) {
         </section>
       ) : active === 'models' ? (
         <ModelSettings />
+      ) : active === 'chat' ? (
+        <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5 md:p-6">
+          <ChatStartersSettings />
+        </section>
       ) : (
         <TokenUsageStats />
       )}

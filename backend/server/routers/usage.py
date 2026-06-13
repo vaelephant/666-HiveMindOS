@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 
 from server.logging_config import get_logger
-from knowledge_base.core.services import usage_service
+import model_layer.services.usage_service as usage_service
 
 router = APIRouter()
 log = get_logger("hivemind.usage")

@@ -4,10 +4,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[3]))
 from model_layer import client as llm
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from knowledge_base.core.parsers.llm_json import parse_json_object
-from knowledge_base.prompts import get, render
+from prompts import get, render
 
 log = get_logger("hivemind.compiler.entity")
 

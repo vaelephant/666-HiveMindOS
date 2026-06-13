@@ -12,11 +12,11 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from knowledge_base.core.registry.candidate_registry import CandidateRegistry
-from knowledge_base.core.registry.memory_registry import MemoryRegistry
-from knowledge_base.core.compiler.chat_digest_compiler import compile_candidate
+from memory_layer.core.registry.memory_registry import MemoryRegistry
+from chat_layer.core.compiler.chat_digest_compiler import compile_candidate
 from knowledge_base.core.wiki.wiki_manager import WikiManager
 from knowledge_base.models.knowledge_candidate import CandidateInput
 from knowledge_base.core.domain.taxonomy import (
@@ -25,9 +25,9 @@ from knowledge_base.core.domain.taxonomy import (
     memory_type_to_category,
     normalize_category,
 )
-from knowledge_base.models.memory import MemoryCandidate, WikiSuggestion
+from memory_layer.models.memory import MemoryCandidate, WikiSuggestion
 from knowledge_base.settings import load
-from knowledge_base.core.services import audit_service
+import platform_layer.audit_service as audit_service
 
 log = get_logger("hivemind.candidate.service")
 

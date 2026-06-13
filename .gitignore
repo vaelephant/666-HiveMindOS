@@ -51,14 +51,18 @@ yarn-error.log*
 *.swp
 *.swo
 
-# ── Knowledge base runtime data (keep .gitkeep) ─────
-backend/knowledge_base/storage/raw/**
-!backend/knowledge_base/storage/raw/.gitkeep
-backend/knowledge_base/storage/wiki/**
-!backend/knowledge_base/storage/wiki/.gitkeep
-backend/knowledge_base/storage/graph/**
-!backend/knowledge_base/storage/graph/.gitkeep
-backend/knowledge_base/storage/registry.db
+# ── Backend runtime data (keep .gitkeep) ─────
+backend/storage/raw/**
+!backend/storage/raw/.gitkeep
+backend/storage/wiki/**
+!backend/storage/wiki/.gitkeep
+backend/storage/graph/**
+!backend/storage/graph/.gitkeep
+backend/storage/registry.db
+backend/agent_engine/storage/skills/**
+!backend/agent_engine/storage/skills/.gitkeep
+# legacy path (pre-refactor)
+backend/knowledge_base/storage/**
 
 # Root-level storage (runtime data, not tracked)
 /storage/

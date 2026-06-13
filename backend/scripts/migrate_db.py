@@ -67,7 +67,7 @@ def fetch_applied(conn) -> set[str]:
 
 def repair_sequences(url: str) -> None:
     sys.path.insert(0, str(ROOT))
-    from knowledge_base.core.db.sequences import repair_serial_sequences
+    from shared.db.sequences import repair_serial_sequences
 
     import psycopg
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from knowledge_base import config
+from shared import config
 from knowledge_base.core.pipelines.query_agent import QueryAgent
 from knowledge_base.core.pipelines.lint_agent import LintAgent
 from knowledge_base.core.wiki.wiki_manager import WikiManager

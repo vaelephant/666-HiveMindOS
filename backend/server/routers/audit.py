@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 
 from server.logging_config import get_logger
-from knowledge_base.core.services import audit_service
+import platform_layer.audit_service as audit_service
 
 router = APIRouter()
 log = get_logger("hivemind.audit.api")

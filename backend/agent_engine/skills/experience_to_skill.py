@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 
 log = get_logger("hivemind.skills")
@@ -20,7 +20,7 @@ def _slug(text: str, max_len: int = 48) -> str:
 
 
 def skills_root(org_id: str) -> Path:
-    root = config.STORAGE_ROOT / "skills" / org_id
+    root = config.SKILLS_ROOT / org_id
     root.mkdir(parents=True, exist_ok=True)
     return root
 

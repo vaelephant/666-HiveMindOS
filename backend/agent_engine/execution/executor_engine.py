@@ -11,7 +11,7 @@ from knowledge_base.core.services.candidate_service import get_candidate_stats
 from agent_engine.tools.task_toolkit import TaskToolExecutor
 from agent_engine.models.plan import QueueTask
 from agent_engine.settings import load
-from knowledge_base.core.services import audit_service
+import platform_layer.audit_service as audit_service
 
 
 def _audit_task_action(

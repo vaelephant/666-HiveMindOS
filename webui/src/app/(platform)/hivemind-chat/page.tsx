@@ -12,6 +12,7 @@ import {
   createTask,
   extractChatTurn,
   getChatSession,
+  getChatStarters,
   getSessionPipeline,
   listChatSessions,
   sendChatMessageStream,
@@ -55,6 +56,7 @@ function ChatPageContent() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeTurnIndex, setUpgradeTurnIndex] = useState<number | null>(null);
   const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
+  const [chatStarters, setChatStarters] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const eventBaselineRef = useRef(0);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -90,6 +92,21 @@ function ChatPageContent() {
     setMounted(true);
     return () => abortActiveStream();
   }, []);
+
+  useEffect(() => {
+    if (!orgReady) return;
+    let cancelled = false;
+    getChatStarters(orgId)
+      .then((data) => {
+        if (!cancelled) setChatStarters(data.starters);
+      })
+      .catch(() => {
+        if (!cancelled) setChatStarters([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, orgReady]);
 
   useEffect(() => {
     if (sessionIdFromUrl && ownedUrlSessionRef.current === sessionIdFromUrl) {
@@ -374,6 +391,7 @@ function ChatPageContent() {
             onInputChange={setInput}
             onSend={handleSend}
             disabled={pending !== null}
+            suggestions={chatStarters}
           />
         ) : (
           <ChatThread

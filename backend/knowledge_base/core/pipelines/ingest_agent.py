@@ -2,7 +2,7 @@ import hashlib
 import uuid
 from pathlib import Path
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from knowledge_base.core.compiler.entity_extractor import extract_entities
 from knowledge_base.core.compiler.workflow_extractor import extract_workflows

@@ -23,13 +23,13 @@ from server.routers import (
     wiki,
     workflows,
 )
-from knowledge_base.core.services.model_settings_service import init_user_profile_resolver
-from knowledge_base.core.services.usage_service import init_usage_tracking
+from model_layer.services.model_settings_service import init_user_profile_resolver
+from model_layer.services.usage_service import init_usage_tracking
 from server.routers.integrations import wechat_work as integrations_wechat_work
 from server.routers.webhooks import wechat_work as webhooks_wechat_work
-from knowledge_base import config
-from knowledge_base.core.db.postgres import close_pool, pg_conn
-from knowledge_base.core.db.sequences import repair_serial_sequences
+from shared import config
+from shared.db.postgres import close_pool, pg_conn
+from shared.db.sequences import repair_serial_sequences
 
 
 @asynccontextmanager
@@ -75,7 +75,7 @@ async def lifespan(_app: FastAPI):
 
     scheduler_task = None
     if _flag("WORKFLOW_SCHEDULER_ENABLED", default=False):
-        from knowledge_base.core.services.workflow_scheduler import start_scheduler
+        from ops.core.services.workflow_scheduler import start_scheduler
 
         scheduler_task = start_scheduler()
         log.info("工作流 cron 调度已启用 (WORKFLOW_SCHEDULER_ENABLED=true)")
@@ -83,7 +83,7 @@ async def lifespan(_app: FastAPI):
     yield
 
     if scheduler_task is not None:
-        from knowledge_base.core.services.workflow_scheduler import stop_scheduler
+        from ops.core.services.workflow_scheduler import stop_scheduler
 
         await stop_scheduler()
 

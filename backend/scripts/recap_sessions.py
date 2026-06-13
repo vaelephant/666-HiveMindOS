@@ -11,8 +11,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from knowledge_base.core.db.postgres import close_pool
-from knowledge_base.core.services.memory_service import recap_idle_sessions
+from shared.db.postgres import close_pool
+from memory_layer.core.services.memory_service import recap_idle_sessions
 
 
 def main() -> None:

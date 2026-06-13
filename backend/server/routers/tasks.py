@@ -10,7 +10,7 @@ from agent_engine.domain.task_present import task_to_api_dict
 from agent_engine.models.task import Task
 from agent_engine.registry.task_registry import TaskRegistry
 from agent_engine.services.task_service import list_experiences, run_goal
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 
 router = APIRouter()

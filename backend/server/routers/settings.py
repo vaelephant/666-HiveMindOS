@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from server.logging_config import get_logger
-from knowledge_base.core.services import model_settings_service
+import model_layer.services.model_settings_service as model_settings_service
 
 router = APIRouter()
 log = get_logger("hivemind.settings")

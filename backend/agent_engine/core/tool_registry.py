@@ -11,7 +11,7 @@ from pathlib import Path
 
 from agent_engine.settings import load
 from agent_engine.tools.task_toolkit import format_tools_for_prompt, list_actions
-from knowledge_base.core.db.postgres import pg_conn
+from shared.db.postgres import pg_conn
 from server.logging_config import get_logger
 
 log = get_logger("hivemind.tool_registry")

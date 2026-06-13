@@ -8,7 +8,7 @@ from pathlib import Path
 
 from agent_engine.skills.experience_to_skill import skills_root
 from server.logging_config import get_logger
-from knowledge_base.settings import load
+from chat_layer.settings import load
 
 log = get_logger("hivemind.skills.recall")
 

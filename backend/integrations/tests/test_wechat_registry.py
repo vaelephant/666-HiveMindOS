@@ -10,7 +10,7 @@ from integrations.tests.conftest import requires_postgres
 from integrations.wechat_work.registry import WeChatWorkRegistry
 
 pytestmark = requires_postgres
-from knowledge_base.core.db.postgres import pg_conn
+from shared.db.postgres import pg_conn
 
 
 def _cleanup(org_id: str) -> None:

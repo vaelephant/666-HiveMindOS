@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from server.logging_config import get_logger
-from knowledge_base.core.services.playbook_service import (
+from chat_layer.core.services.playbook_service import (
     get_playbook,
     preview_playbook,
     reset_playbook,

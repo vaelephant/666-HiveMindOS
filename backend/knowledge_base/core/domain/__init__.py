@@ -3,7 +3,7 @@ from knowledge_base.core.domain.pipeline_meta import (
     memory_event_label,
     stage_meta,
 )
-from knowledge_base.core.domain.taxonomy import (
+from shared.domain.taxonomy import (
     category_to_memory_type,
     is_wiki_category,
     memory_type_label,

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 
-from knowledge_base import config
+from shared import config
 from server.logging_config import get_logger
 from agent_engine.domain.rubric import format_rubric_for_prompt, load_rubric
 from knowledge_base.core.parsers.llm_json import parse_json_object
 from agent_engine.models.plan import QueueTask
 from agent_engine.models.reflection import StepReflectResult
-from knowledge_base.prompts import get, render
+from prompts import get, render
 from model_layer import client as llm
 
 log = get_logger("hivemind.agent.step_reflect")

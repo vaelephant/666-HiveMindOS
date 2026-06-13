@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from server.logging_config import get_logger
-from knowledge_base.core.services.workflow_service import (
+from ops.core.services.workflow_service import (
     create_from_template,
     create_from_yaml,
     delete_run,
@@ -19,7 +19,7 @@ from knowledge_base.core.services.workflow_service import (
     set_workflow_schedule,
     update_workflow_yaml,
 )
-from knowledge_base.core.parsers.workflow_yaml import workflow_to_yaml
+from ops.core.parsers.workflow_yaml import workflow_to_yaml
 
 router = APIRouter()
 log = get_logger("hivemind.workflows")

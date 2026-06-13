@@ -25,7 +25,7 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from knowledge_base import config
+from shared import config
 
 
 def _timeout() -> float:

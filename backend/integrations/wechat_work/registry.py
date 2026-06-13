@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from integrations.wechat_work.config import WeChatWorkOrgConfig
-from knowledge_base.core.db.postgres import pg_conn
+from shared.db.postgres import pg_conn
 
 
 def _mask_secret(secret: str) -> str:

@@ -471,23 +471,18 @@ export function ChatInputBar({
   );
 }
 
-const SUGGESTIONS = [
-  '报价超过多少金额需要审批？',
-  '中康尚德的应收款情况是什么',
-  '有哪些涉及税务合规的规则',
-  '销售跟进的完整流程是什么？',
-];
-
 export function ChatEmptyState({
   input,
   onInputChange,
   onSend,
   disabled,
+  suggestions = [],
 }: {
   input: string;
   onInputChange: (v: string) => void;
   onSend: (text?: string) => void;
   disabled: boolean;
+  suggestions?: string[];
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-5 pb-8">
@@ -513,7 +508,7 @@ export function ChatEmptyState({
       </div>
 
       <div className="mt-5 flex w-full max-w-5xl flex-wrap justify-center gap-2">
-        {SUGGESTIONS.map((s) => (
+        {suggestions.map((s) => (
           <button
             key={s}
             type="button"

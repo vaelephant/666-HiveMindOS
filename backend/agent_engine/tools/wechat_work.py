@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from integrations.wechat_work.client import WeChatWorkClient
 from integrations.wechat_work.registry import WeChatWorkRegistry
-from knowledge_base.core.services import audit_service
+import platform_layer.audit_service as audit_service
 
 
 def send_wechat_work_message(

@@ -12,10 +12,13 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from agent_engine.settings import load as load_agent
-from knowledge_base import config
+from chat_layer.settings import load as load_chat
+from shared import config
 from knowledge_base.settings import load as load_kb
 from model_layer.registry import list_profiles, startup_report
 from model_layer.settings.loader import load as load_models
+from ops.settings import load as load_ops
+from shared.settings import load as load_shared
 
 
 def _print_cfg(label: str, name: str, cfg: dict) -> None:
@@ -48,6 +51,21 @@ def main() -> None:
     print("=== knowledge_base (知识沉淀) ===\n")
     for path in sorted(config.SETTINGS_DIR.glob("*.yaml")):
         _print_cfg("KB", path.stem, load_kb(path.stem))
+
+    ops_dir = Path(ROOT) / "ops" / "settings"
+    print("=== ops (运维编排) ===\n")
+    for path in sorted(ops_dir.glob("*.yaml")):
+        _print_cfg("Ops", path.stem, load_ops(path.stem))
+
+    shared_dir = Path(ROOT) / "shared" / "settings"
+    print("=== shared (跨模块) ===\n")
+    for path in sorted(shared_dir.glob("*.yaml")):
+        _print_cfg("Shared", path.stem, load_shared(path.stem))
+
+    chat_dir = Path(ROOT) / "chat_layer" / "settings"
+    print("=== chat_layer (HiveMind Chat) ===\n")
+    for path in sorted(chat_dir.glob("*.yaml")):
+        _print_cfg("Chat", path.stem, load_chat(path.stem))
 
     agent_dir = Path(ROOT) / "agent_engine" / "settings"
     print("=== agent_engine (自主任务) ===\n")
