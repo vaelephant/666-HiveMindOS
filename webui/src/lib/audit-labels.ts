@@ -1,4 +1,5 @@
 import type { AuditEvent } from '@/lib/kb-types';
+import { wikiHref } from '@/lib/wiki-links';
 
 /** 工作流 id → 中文名（与内置模板一致） */
 const WORKFLOW_LABELS: Record<string, string> = {
@@ -31,6 +32,18 @@ const TRIGGER_LABELS: Record<string, string> = {
   cron: '定时',
 };
 
+const LINT_ISSUE_LABELS: Record<string, string> = {
+  empty_page: '内容过短',
+  orphan_page: '孤立页面（无引用）',
+  ai_review: 'AI 审阅建议',
+};
+
+const LINT_SEVERITY_LABELS: Record<string, string> = {
+  warning: '需关注',
+  info: '提示',
+  error: '严重',
+};
+
 type WorkflowStep = {
   step_id?: string;
   action?: string;
@@ -39,16 +52,60 @@ type WorkflowStep = {
   result?: Record<string, unknown>;
 };
 
+function formatSkipReason(step: WorkflowStep, steps: WorkflowStep[]): string {
+  const reason = step.reason ?? '';
+  if (reason.includes('$resolve.approved') || step.step_id === 'compile') {
+    const resolveStep = steps.find(
+      (s) => s.step_id === 'resolve' || s.action?.includes('resolve_candidates'),
+    );
+    const approved = Number(resolveStep?.result?.approved ?? 0);
+    const resolved = Number(resolveStep?.result?.resolved ?? 0);
+    if (approved === 0 && resolved > 0) {
+      return `解析了 ${resolved} 条候选，但尚无自动批准项（需人工审核后才可写入 Wiki）`;
+    }
+    if (approved === 0) {
+      return '没有待写入 Wiki 的已批准候选';
+    }
+  }
+  if (reason.includes('when not met')) {
+    return '前置条件未满足，已跳过';
+  }
+  return reason || '已跳过';
+}
+
+type LintIssue = {
+  type?: string;
+  page?: string;
+  severity?: string;
+  feedback?: string;
+};
+
+export type AuditDetailLine = {
+  text: string;
+  href?: string;
+};
+
+export type AuditLink = {
+  label: string;
+  href: string;
+};
+
 export type AuditDisplay = {
   title: string;
   description: string;
-  bullets: string[];
-  meta?: string;
+  bullets: AuditDetailLine[];
+  links: AuditLink[];
+  actorLabel: string | null;
 };
 
 function stepLabel(action: string | undefined): string {
   if (!action) return '未知步骤';
   return STEP_ACTION_LABELS[action] ?? action.replace('automation.', '').replace('tool.', '');
+}
+
+function pageLabel(path: string): string {
+  const name = path.split('/').pop()?.replace(/\.md$/, '') ?? path;
+  return decodeURIComponent(name.replace(/_/g, ' '));
 }
 
 function formatStepResult(result: Record<string, unknown> | undefined): string | null {
@@ -57,7 +114,14 @@ function formatStepResult(result: Record<string, unknown> | undefined): string |
     return `复盘 ${result.sessions_recapped} 个会话`;
   }
   if (typeof result.resolved === 'number') {
-    return `解析 ${result.resolved} 条（批准 ${result.approved ?? 0}，冲突 ${result.conflict ?? 0}）`;
+    const approved = Number(result.approved ?? 0);
+    const conflict = Number(result.conflict ?? 0);
+    const pending = Math.max(0, result.resolved - approved - conflict);
+    const parts: string[] = [`处理 ${result.resolved} 条候选`];
+    if (approved > 0) parts.push(`${approved} 条可写入 Wiki`);
+    if (conflict > 0) parts.push(`${conflict} 条存在冲突`);
+    if (pending > 0) parts.push(`${pending} 条待人工审核`);
+    return parts.join('，');
   }
   if (typeof result.merged === 'number') {
     return `写入 Wiki ${result.merged} 条`;
@@ -74,9 +138,43 @@ function formatStepResult(result: Record<string, unknown> | undefined): string |
   return null;
 }
 
+function formatLintIssue(issue: LintIssue): AuditDetailLine {
+  const kind = LINT_ISSUE_LABELS[issue.type ?? ''] ?? issue.type ?? '问题';
+  const severity = issue.severity ? LINT_SEVERITY_LABELS[issue.severity] ?? issue.severity : '';
+  const page = issue.page ?? '';
+  const pageName = page ? pageLabel(page) : '';
+  const href = page && page.includes('/') ? wikiHref(page) : undefined;
+
+  let text = severity ? `${kind}（${severity}）` : kind;
+  if (pageName) text += ` · ${pageName}`;
+  if (issue.type === 'ai_review' && issue.feedback) {
+    const snippet = issue.feedback.replace(/\s+/g, ' ').slice(0, 120);
+    text += `：${snippet}${issue.feedback.length > 120 ? '…' : ''}`;
+  }
+
+  return { text, href };
+}
+
+export function formatActorLabel(ev: AuditEvent): string | null {
+  const trigger = String(ev.detail?.trigger ?? '');
+  if (trigger === 'cron') return '定时任务';
+  const name = ev.user_name?.trim();
+  if (name && name.length > 1) return name;
+  if (ev.user_email) {
+    const prefix = ev.user_email.split('@')[0] ?? '';
+    if (prefix.length <= 2 || /^\d+$/.test(prefix)) {
+      return ev.user_email;
+    }
+    return prefix;
+  }
+  if (!ev.user_id) return '系统';
+  return null;
+}
+
 export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
   const d = ev.detail ?? {};
   const action = ev.action;
+  const actorLabel = formatActorLabel(ev);
 
   if (action === 'workflow.run') {
     const wfId = ev.resource_id ?? '';
@@ -93,19 +191,17 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       ? steps.filter((s) => s.status === 'skipped').length
       : Number(d.steps_skipped ?? 0);
 
-    const bullets = steps.map((s) => {
+    const bullets: AuditDetailLine[] = steps.map((s) => {
       const name = stepLabel(s.action);
       if (s.status === 'skipped') {
-        const why = s.reason?.includes('when not met')
-          ? '条件未满足，已跳过'
-          : s.reason ?? '已跳过';
-        return `○ ${name}：${why}`;
+        const why = formatSkipReason(s, steps);
+        return { text: `○ ${name}：${why}` };
       }
       const extra = formatStepResult(s.result as Record<string, unknown> | undefined);
-      return `✓ ${name}${extra ? `（${extra}）` : ''}`;
+      return { text: `✓ ${name}${extra ? `（${extra}）` : ''}` };
     });
 
-    let description =
+    const description =
       ev.summary ??
       (steps.length
         ? `${trigger}执行：${done} 步完成${skipped ? `，${skipped} 步跳过` : ''}`
@@ -115,26 +211,36 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: `工作流「${wfName}」`,
       description,
       bullets,
+      links: [{ label: '打开工作流', href: '/workflows' }],
+      actorLabel: trigger === 'cron' ? '定时任务' : actorLabel,
     };
   }
 
   if (action === 'wiki.compile') {
     const title = String(d.title ?? '');
     const path = String(d.wiki_path ?? '');
-    const fromSummary = ev.summary?.replace(/^编译进 Wiki:\s*/, '') ?? '';
+    const fromSummary = ev.summary?.replace(/^编译进 Wiki:\s*/, '').replace(/^将「.+」写入 Wiki$/, '') ?? '';
     const resolvedPath = path || fromSummary;
+    const links: AuditLink[] = [];
+    if (resolvedPath && resolvedPath.includes('/')) {
+      links.push({ label: '打开 Wiki 页面', href: wikiHref(resolvedPath) });
+    }
     return {
       title: title ? `知识写入 Wiki：${title}` : '知识写入 Wiki',
       description: resolvedPath ? `页面路径：${resolvedPath}` : (ev.summary ?? '候选知识已编译为企业 Wiki 页面'),
       bullets: [],
+      links,
+      actorLabel,
     };
   }
 
   if (action === 'wiki.lint') {
     const pages = Number(d.total_pages ?? 0);
-    const issueList = d.issues as unknown[] | undefined;
-    const issues = Number(d.issues_found ?? issueList?.length ?? 0);
+    const issueList = (d.issues as LintIssue[] | undefined) ?? [];
+    const issues = Number(d.issues_found ?? issueList.length ?? 0);
     const descFromSummary = ev.summary;
+    const bullets = issueList.map(formatLintIssue);
+
     return {
       title: 'Wiki 质量巡检',
       description:
@@ -142,7 +248,9 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
         (issues === 0
           ? `已检查 ${pages} 篇页面，未发现明显问题`
           : `已检查 ${pages} 篇页面，发现 ${issues} 处提示（无严重问题）`),
-      bullets: [],
+      bullets,
+      links: [{ label: '打开 Wiki', href: '/knowledge-base/wiki' }],
+      actorLabel,
     };
   }
 
@@ -150,7 +258,9 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
     return {
       title: '人工批准 Wiki 候选',
       description: ev.summary || '管理员批准了一条待晋升 Wiki 的候选知识',
-      bullets: ev.resource_id ? [`候选 #${ev.resource_id}`] : [],
+      bullets: ev.resource_id ? [{ text: `候选 #${ev.resource_id}` }] : [],
+      links: [{ label: '查看候选池', href: '/knowledge-base/overview' }],
+      actorLabel,
     };
   }
 
@@ -158,7 +268,9 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
     return {
       title: '人工驳回 Wiki 候选',
       description: ev.summary || '管理员驳回了一条 Wiki 候选',
-      bullets: ev.resource_id ? [`候选 #${ev.resource_id}`] : [],
+      bullets: ev.resource_id ? [{ text: `候选 #${ev.resource_id}` }] : [],
+      links: [{ label: '查看候选池', href: '/knowledge-base/overview' }],
+      actorLabel,
     };
   }
 
@@ -167,7 +279,9 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
     return {
       title: '发送企微消息',
       description: to ? `收件人：${to}` : '已向企微成员发送消息',
-      bullets: typeof d.chars === 'number' ? [`${d.chars} 字`] : [],
+      bullets: typeof d.chars === 'number' ? [{ text: `${d.chars} 字` }] : [],
+      links: [{ label: '企微集成设置', href: '/integrations/wechat-work' }],
+      actorLabel,
     };
   }
 
@@ -177,6 +291,8 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: `自主任务步骤：${stepLabel(`automation.${taskAction}`) || taskAction}`,
       description: ev.summary ?? '',
       bullets: [],
+      links: [],
+      actorLabel,
     };
   }
 
@@ -184,5 +300,7 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
     title: ACTION_TITLES[action] ?? ev.summary ?? action,
     description: ev.summary && ACTION_TITLES[action] ? ev.summary : '',
     bullets: [],
+    links: [],
+    actorLabel,
   };
 }

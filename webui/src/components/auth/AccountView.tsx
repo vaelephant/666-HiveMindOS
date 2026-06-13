@@ -44,9 +44,7 @@ export function AccountView({ user }: { user: AccountUser }) {
               <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-shell-text md:text-[24px]">
                 个人中心
               </h1>
-              <p className="mt-1 max-w-xl text-[13px] text-shell-muted">
-                管理登录身份、模型偏好与大模型 Token 使用统计。
-              </p>
+              
             </div>
           </div>
           {active === 'profile' ? (

@@ -1,14 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
+  ExternalLink,
   Loader2,
   RefreshCw,
   ScrollText,
   Shield,
+  User,
 } from 'lucide-react';
 import { useOrgReady } from '@/components/auth/OrgProvider';
 import { formatAuditEvent } from '@/lib/audit-labels';
@@ -70,8 +73,10 @@ function StatCard({ label, value }: { label: string; value: number }) {
 }
 
 function AuditEventRow({ ev }: { ev: AuditEvent }) {
-  const [open, setOpen] = useState(false);
   const display = formatAuditEvent(ev);
+  const autoExpand =
+    (ev.action === 'wiki.lint' || ev.action === 'workflow.run') && display.bullets.length > 0;
+  const [open, setOpen] = useState(autoExpand);
   const hasDetails = display.bullets.length > 0;
 
   return (
@@ -84,6 +89,12 @@ function AuditEventRow({ ev }: { ev: AuditEvent }) {
               {CATEGORY_LABEL[ev.category] ?? ev.category}
             </span>
             <span className="text-[11px] text-shell-muted">{formatTime(ev.created_at)}</span>
+            {display.actorLabel && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-shell-muted">
+                <User className="h-3 w-3 opacity-60" aria-hidden />
+                操作人 · {display.actorLabel}
+              </span>
+            )}
             {ev.status === 'error' && (
               <span className="rounded-md bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600">
                 失败
@@ -93,6 +104,20 @@ function AuditEventRow({ ev }: { ev: AuditEvent }) {
           <p className="mt-1.5 text-[14px] font-medium leading-snug text-shell-text">{display.title}</p>
           {display.description && (
             <p className="mt-0.5 text-[13px] text-shell-muted">{display.description}</p>
+          )}
+          {display.links.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {display.links.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="inline-flex items-center gap-1 rounded-md border border-brand-primary/25 bg-brand-primary/5 px-2.5 py-1 text-[12px] font-medium text-brand-primary hover:bg-brand-primary/10"
+                >
+                  {link.label}
+                  <ExternalLink className="h-3 w-3 opacity-70" aria-hidden />
+                </Link>
+              ))}
+            </div>
           )}
           {hasDetails && (
             <div className="mt-2">
@@ -108,10 +133,16 @@ function AuditEventRow({ ev }: { ev: AuditEvent }) {
                 {open ? '收起详情' : `查看 ${display.bullets.length} 项详情`}
               </button>
               {open && (
-                <ul className="mt-2 space-y-1 rounded-lg border border-shell-border bg-shell-bg/80 px-3 py-2">
+                <ul className="mt-2 space-y-1.5 rounded-lg border border-shell-border bg-shell-bg/80 px-3 py-2">
                   {display.bullets.map((line, i) => (
                     <li key={i} className="text-[12px] leading-relaxed text-shell-text">
-                      {line}
+                      {line.href ? (
+                        <Link href={line.href} className="text-brand-primary hover:underline">
+                          {line.text}
+                        </Link>
+                      ) : (
+                        line.text
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -174,7 +205,7 @@ export function AuditLogView() {
             <h1 className="text-xl font-semibold text-shell-text">审计日志</h1>
           </div>
           <p className="mt-1 max-w-2xl text-[13px] text-shell-muted">
-            记录工作流运行、Wiki 写入、候选审核、企微发送与质量巡检。每条记录用中文说明「做了什么、结果如何」。
+            记录工作流运行、Wiki 写入、候选审核、企微发送与质量巡检。可展开查看具体页面，并一键跳转到 Wiki 或工作流。
           </p>
         </div>
         <button

@@ -215,6 +215,23 @@ def _flatten_result(result: dict) -> dict:
     return summary
 
 
+def _human_skip_reason(when: str | None, checkpoints: dict[str, dict]) -> str:
+    if not when:
+        return "已跳过"
+    resolve = checkpoints.get("resolve") or {}
+    if when.strip() == "$resolve.approved >= 1":
+        approved = int(resolve.get("approved") or 0)
+        resolved = int(resolve.get("resolved") or 0)
+        if approved == 0 and resolved > 0:
+            return (
+                f"解析了 {resolved} 条候选，但尚无自动批准项"
+                "（需人工审核后才可写入 Wiki）"
+            )
+        if approved == 0:
+            return "没有待写入 Wiki 的已批准候选"
+    return f"前置条件未满足（{when}）"
+
+
 def dispatch_action(org_id: str, user_id: str, action: str, params: dict) -> dict:
     if action.startswith("automation."):
         job_id = action.split(".", 1)[1]
@@ -254,7 +271,7 @@ def run_workflow(
                     "step_id": step_id,
                     "action": action,
                     "status": "skipped",
-                    "reason": f"when not met: {when}" if when else "skipped",
+                    "reason": _human_skip_reason(when, checkpoints),
                 }
                 steps_log.append(entry)
                 continue
