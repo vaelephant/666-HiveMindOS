@@ -17,11 +17,11 @@
 ## Task 1: 核心数据模型
 
 **Files:**
-- Create: `memory_layer/knowledge_base/models/plan.py`
-- Create: `memory_layer/knowledge_base/models/reflection.py`
-- Modify: `memory_layer/knowledge_base/models/task.py`
-- Modify: `memory_layer/knowledge_base/core/registry/task_registry.py`
-- Test: `memory_layer/knowledge_base/tests/test_task_models.py`
+- Create: `knowledge_base/models/plan.py`
+- Create: `knowledge_base/models/reflection.py`
+- Modify: `knowledge_base/models/task.py`
+- Modify: `knowledge_base/core/registry/task_registry.py`
+- Test: `knowledge_base/tests/test_task_models.py`
 
 **Step 1: Write failing tests**
 
@@ -54,7 +54,7 @@ def test_task_goal_fields():
 
 ```bash
 cd /Users/yan/code/666-HiveMindOS
-python -m pytest memory_layer/knowledge_base/tests/test_task_models.py -v
+python -m pytest knowledge_base/tests/test_task_models.py -v
 ```
 
 **Step 3: Implement**
@@ -93,11 +93,11 @@ git commit -m "feat(tasks): add QueueTask, StepReflectResult, extend Goal/Task m
 ## Task 2: Rubric 配置
 
 **Files:**
-- Create: `memory_layer/knowledge_base/settings/rubrics/wiki_organize_decisions.yaml`
-- Create: `memory_layer/knowledge_base/settings/rubrics/sales_proposal.yaml`
-- Create: `memory_layer/knowledge_base/settings/rubrics/generic_goal.yaml`
-- Create: `memory_layer/knowledge_base/core/domain/rubric.py`
-- Test: `memory_layer/knowledge_base/tests/test_rubric.py`
+- Create: `knowledge_base/settings/rubrics/wiki_organize_decisions.yaml`
+- Create: `knowledge_base/settings/rubrics/sales_proposal.yaml`
+- Create: `knowledge_base/settings/rubrics/generic_goal.yaml`
+- Create: `knowledge_base/core/domain/rubric.py`
+- Test: `knowledge_base/tests/test_rubric.py`
 
 **Step 1: Write failing test**
 
@@ -128,10 +128,10 @@ def test_match_task_type():
 ## Task 3: Task Tool Registry
 
 **Files:**
-- Create: `memory_layer/knowledge_base/settings/task_tools.yaml`
-- Create: `memory_layer/knowledge_base/settings/task_gates.yaml`
-- Create: `memory_layer/knowledge_base/core/tools/task_toolkit.py`
-- Test: `memory_layer/knowledge_base/tests/test_task_toolkit.py`
+- Create: `knowledge_base/settings/task_tools.yaml`
+- Create: `knowledge_base/settings/task_gates.yaml`
+- Create: `knowledge_base/core/tools/task_toolkit.py`
+- Test: `knowledge_base/tests/test_task_toolkit.py`
 
 **Step 1: Tests + implement**（同 v1 plan：11 个 action + `llm_generate`）
 
@@ -148,9 +148,9 @@ git commit -m "feat(tasks): TaskToolRegistry with knowledge-domain actions"
 ## Task 4: Planner Agent
 
 **Files:**
-- Modify: `memory_layer/knowledge_base/prompts/prompts.yaml` — `agents.planner`
-- Create: `memory_layer/knowledge_base/core/agents/planner_agent.py`
-- Test: `memory_layer/knowledge_base/tests/test_planner_agent.py`
+- Modify: `knowledge_base/prompts/prompts.yaml` — `agents.planner`
+- Create: `knowledge_base/core/agents/planner_agent.py`
+- Test: `knowledge_base/tests/test_planner_agent.py`
 
 **Planner 输入：**
 
@@ -184,10 +184,10 @@ git commit -m "feat(tasks): TaskToolRegistry with knowledge-domain actions"
 ## Task 5: StepReflect + Replan Agents
 
 **Files:**
-- Modify: `memory_layer/knowledge_base/prompts/prompts.yaml` — `agents.step_reflect`, `agents.replan`
-- Create: `memory_layer/knowledge_base/core/agents/step_reflect_agent.py`
-- Create: `memory_layer/knowledge_base/core/agents/replan_agent.py`
-- Test: `memory_layer/knowledge_base/tests/test_step_reflect.py`
+- Modify: `knowledge_base/prompts/prompts.yaml` — `agents.step_reflect`, `agents.replan`
+- Create: `knowledge_base/core/agents/step_reflect_agent.py`
+- Create: `knowledge_base/core/agents/replan_agent.py`
+- Test: `knowledge_base/tests/test_step_reflect.py`
 
 **StepReflect 输出 status：** `pass | retry | add_task | fail`
 
@@ -208,10 +208,10 @@ class StepReflectAgent:
 ## Task 6: Executor + Orchestrator
 
 **Files:**
-- Create: `memory_layer/knowledge_base/core/execution/condition_eval.py`
-- Create: `memory_layer/knowledge_base/core/execution/executor_engine.py`
-- Create: `memory_layer/knowledge_base/core/execution/orchestrator.py`
-- Test: `memory_layer/knowledge_base/tests/test_orchestrator.py`
+- Create: `knowledge_base/core/execution/condition_eval.py`
+- Create: `knowledge_base/core/execution/executor_engine.py`
+- Create: `knowledge_base/core/execution/orchestrator.py`
+- Test: `knowledge_base/tests/test_orchestrator.py`
 
 **Orchestrator 主循环：**
 
@@ -255,11 +255,11 @@ class TaskOrchestrator:
 ## Task 7: FinalReflect + Experience + Task Service
 
 **Files:**
-- Modify: `memory_layer/knowledge_base/prompts/prompts.yaml` — `agents.final_reflect`
-- Create: `memory_layer/knowledge_base/core/agents/final_reflect_agent.py`
-- Create: `memory_layer/knowledge_base/core/registry/experience_registry.py`
-- Create: `memory_layer/knowledge_base/core/services/task_service.py`
-- Modify: `memory_layer/knowledge_base/app/routers/tasks.py`
+- Modify: `knowledge_base/prompts/prompts.yaml` — `agents.final_reflect`
+- Create: `knowledge_base/core/agents/final_reflect_agent.py`
+- Create: `knowledge_base/core/registry/experience_registry.py`
+- Create: `knowledge_base/core/services/task_service.py`
+- Modify: `knowledge_base/app/routers/tasks.py`
 - Remove/redirect: `core/agents/task_agent.py` → task_service
 
 **experience_registry.py：**
@@ -362,7 +362,7 @@ git commit -m "docs: 自主任务引擎（Plan/Execute/Reflect/Replan/Memory）"
 | 端到端 | Wiki 整理目标 curl + UI 轮询；第二次同类目标验证 experience 召回 |
 
 ```bash
-python -m pytest memory_layer/knowledge_base/tests/ -v
+python -m pytest knowledge_base/tests/ -v
 ```
 
 ---

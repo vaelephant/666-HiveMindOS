@@ -84,17 +84,17 @@ git commit -m "feat(db): add wechat work integration tables and chat channel col
 ## Task 2: ChatRegistry 会话复用
 
 **Files:**
-- Modify: `memory_layer/knowledge_base/core/registry/chat_registry.py`
-- Modify: `memory_layer/knowledge_base/models/chat.py`（可选加 `channel` 字段到 summary）
+- Modify: `knowledge_base/core/registry/chat_registry.py`
+- Modify: `knowledge_base/models/chat.py`（可选加 `channel` 字段到 summary）
 - Create: `integrations/tests/test_wechat_session.py`
-- Modify: `memory_layer/knowledge_base/core/services/chat_service.py`（`create_session` 传 channel）
+- Modify: `knowledge_base/core/services/chat_service.py`（`create_session` 传 channel）
 
 **Step 1: Write failing test**
 
 ```python
 # integrations/tests/test_wechat_session.py
 from unittest.mock import patch
-from memory_layer.knowledge_base.core.registry.chat_registry import ChatRegistry
+from knowledge_base.core.registry.chat_registry import ChatRegistry
 
 def test_find_active_wechat_session_returns_existing():
     reg = ChatRegistry()
@@ -158,8 +158,8 @@ python -m pytest integrations/tests/test_wechat_session.py -v
 **Step 5: Commit**
 
 ```bash
-git add memory_layer/knowledge_base/core/registry/chat_registry.py \
-        memory_layer/knowledge_base/core/services/chat_service.py \
+git add knowledge_base/core/registry/chat_registry.py \
+        knowledge_base/core/services/chat_service.py \
         integrations/tests/test_wechat_session.py
 git commit -m "feat(chat): support channel-scoped session lookup for wechat work"
 ```
@@ -240,7 +240,7 @@ python -m pytest integrations/tests/test_wechat_registry.py -v
 
 **Step 3: Implement**
 
-使用 `memory_layer.knowledge_base.core.db.postgres.pg_conn`，CRUD：
+使用 `knowledge_base.core.db.postgres.pg_conn`，CRUD：
 - `get_org_config(org_id) -> WeChatWorkOrgConfig | None`
 - `upsert_org_config(...)`
 - `bind_user` / `unbind_user` / `list_bindings`
@@ -381,7 +381,7 @@ def test_unbound_user_gets_guide_message():
 
 def test_reuses_active_session():
     with patch.object(adapter._registry, "find_active_session", return_value="sess-1") as find_mock:
-        with patch("memory_layer.knowledge_base.core.services.chat_service.send_message") as send_mock:
+        with patch("knowledge_base.core.services.chat_service.send_message") as send_mock:
             send_mock.return_value = {"answer": "你好！", "session_id": "sess-1"}
             reply = adapter.handle_inbound_text("org1", "wx_u1", "你好")
     find_mock.assert_called_once_with("org1", "platform_u1", channel="wechat_work", external_session_id="wx_u1")
@@ -431,9 +431,9 @@ git commit -m "feat(wechat): add adapter bridging inbound messages to ChatServic
 ## Task 8: FastAPI Webhook 路由
 
 **Files:**
-- Create: `memory_layer/knowledge_base/app/routers/webhooks/__init__.py`
-- Create: `memory_layer/knowledge_base/app/routers/webhooks/wechat_work.py`
-- Modify: `memory_layer/knowledge_base/app/main.py`
+- Create: `knowledge_base/app/routers/webhooks/__init__.py`
+- Create: `knowledge_base/app/routers/webhooks/wechat_work.py`
+- Modify: `knowledge_base/app/main.py`
 
 **Step 1: 实现 router**
 
@@ -450,7 +450,7 @@ git commit -m "feat(wechat): add adapter bridging inbound messages to ChatServic
 **Step 2: 注册到 main.py**
 
 ```python
-from memory_layer.knowledge_base.app.routers.webhooks import wechat_work as webhooks_wechat_work
+from server.routers.webhooks import wechat_work as webhooks_wechat_work
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 ```
 
@@ -473,9 +473,9 @@ git commit -m "feat(api): add wechat work webhook endpoints"
 ## Task 9: 管理 API（配置 + 绑定）
 
 **Files:**
-- Create: `memory_layer/knowledge_base/app/routers/integrations/__init__.py`
-- Create: `memory_layer/knowledge_base/app/routers/integrations/wechat_work.py`
-- Modify: `memory_layer/knowledge_base/app/main.py`
+- Create: `knowledge_base/app/routers/integrations/__init__.py`
+- Create: `knowledge_base/app/routers/integrations/wechat_work.py`
+- Modify: `knowledge_base/app/main.py`
 
 **Endpoints:**
 
@@ -554,7 +554,7 @@ git commit -m "feat(webui): add wechat work integration settings page"
 
 **不自动 commit — 手工验证**
 
-1. 启动 KB 服务：`uvicorn memory_layer.knowledge_base.app.main:app --port 8006`
+1. 启动 KB 服务：`uvicorn server.main:app --port 8006`
 2. ngrok：`ngrok http 8006` → 企微后台配置回调 URL
 3. Web UI 填写凭证并启用
 4. 添加绑定：`platform_user_id` = 当前登录用户，`wechat_userid` = 企微成员 ID
@@ -577,7 +577,7 @@ Expected: 同一 `wechat_userid` 仅一条 active 会话
 
 **Files:**
 - Modify: `.env.example`（根目录，若存在）
-- Modify: `memory_layer/knowledge_base/README.md`（加集成说明段落）
+- Modify: `knowledge_base/README.md`（加集成说明段落）
 
 ```env
 # 可选开发兜底（生产用 DB 配置）

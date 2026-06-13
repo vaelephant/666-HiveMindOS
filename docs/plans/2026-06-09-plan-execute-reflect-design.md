@@ -314,7 +314,7 @@ Phase 1：仅 PostgreSQL/SQLite 按 `task_type` 取最近高分记录；Phase 2 
 ## 七、组件架构
 
 ```
-memory_layer/knowledge_base/
+knowledge_base/
 ├── models/
 │   ├── plan.py                 # Plan, QueueTask
 │   ├── reflection.py           # StepReflectResult

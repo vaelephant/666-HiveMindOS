@@ -30,9 +30,9 @@ Model Layer          ← LLM 基础能力
 
 ## 当前开发：HiveMindOS 执行引擎
 
-> `memory_layer/knowledge_base/` — 后端服务模块（Chat、自主任务、知识沉淀）
+> `knowledge_base/` — 后端服务模块（Chat、自主任务、知识沉淀）
 
-详细文档见 → [knowledge_base/README.md](memory_layer/knowledge_base/README.md)
+详细文档见 → [knowledge_base/README.md](knowledge_base/README.md)
 
 ---
 
@@ -40,18 +40,20 @@ Model Layer          ← LLM 基础能力
 
 ```
 HiveMindOS/
+├── server/                   # FastAPI HTTP 层（:8006）
+├── agent_engine/             # 自主任务引擎
+├── knowledge_base/           # 知识沉淀（Wiki / Chat / 候选池）
+├── memory_layer/             # 记忆子系统（逐步从 KB 抽离）
+├── integrations/             # 第三方通道（企微等）
 ├── model_layer/              # LLM 统一调用层
-├── memory_layer/
-│   └── knowledge_base/       # HiveMindOS 执行引擎（Phase 1）
-├── tool_layer/               # 原子工具集合
-├── workflow_layer/           # 流程编排
-├── agent_layer/              # AI Agent
-├── execution_layer/          # 执行与权限
-├── audit_layer/              # 审计日志
-├── human_layer/              # 人类控制
+├── webui/                    # Next.js 前端
+├── tool_layer/               # 原子工具集合（预留）
+├── workflow_layer/           # 流程编排（预留）
+├── agent_layer/              # AI Agent（预留）
+├── execution_layer/          # 执行与权限（预留）
+├── audit_layer/              # 审计日志（预留）
+├── human_layer/              # 人类控制（预留）
 └── docs/                     # 架构文档
-    ├── architecture.md       # 执行引擎技术架构
-    └── hivemind_architecture.md  # 整体系统规范
 ```
 
 ---
@@ -59,9 +61,10 @@ HiveMindOS/
 ## 快速开始
 
 ```bash
+cp .env.example .env        # 根目录 .env，填入 ANTHROPIC_API_KEY
+cd backend
 pip install -r requirements.txt
-cp .env.example .env        # 填入 ANTHROPIC_API_KEY
-uvicorn memory_layer.knowledge_base.app.main:app --reload
+uvicorn main:app --reload --port 8006
 ```
 
-API 文档：http://localhost:8000/docs
+API 文档：http://localhost:8006/docs

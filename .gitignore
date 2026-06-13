@@ -32,6 +32,7 @@ out/
 .turbo/
 .vercel/
 *.tsbuildinfo
+.pnpm-store/
 
 # ── Build & test output ─────────────────────────────
 build/
@@ -51,19 +52,15 @@ yarn-error.log*
 *.swo
 
 # ── Knowledge base runtime data (keep .gitkeep) ─────
-memory_layer/knowledge_base/storage/raw/**
-!memory_layer/knowledge_base/storage/raw/.gitkeep
-memory_layer/knowledge_base/storage/wiki/**
-!memory_layer/knowledge_base/storage/wiki/.gitkeep
-memory_layer/knowledge_base/storage/graph/**
-!memory_layer/knowledge_base/storage/graph/.gitkeep
-memory_layer/knowledge_base/storage/registry.db
+backend/knowledge_base/storage/raw/**
+!backend/knowledge_base/storage/raw/.gitkeep
+backend/knowledge_base/storage/wiki/**
+!backend/knowledge_base/storage/wiki/.gitkeep
+backend/knowledge_base/storage/graph/**
+!backend/knowledge_base/storage/graph/.gitkeep
+backend/knowledge_base/storage/registry.db
 
-# Root-level storage (not knowledge_base/storage/)
+# Root-level storage (runtime data, not tracked)
 /storage/
 storage/**/*.db
 storage/tasks.db
-
-# ── memory_demo local state ─────────────────────────
-memory_demo/session.db
-memory_demo/session.json

@@ -36,7 +36,7 @@ HiveMindOS/
 │       ├── webhook_handler.py  # 验签、解密、事件分发（纯逻辑，无 FastAPI 依赖）
 │       └── registry.py         # 企微绑定 + 组织配置持久化（PostgreSQL）
 │
-├── memory_layer/knowledge_base/
+├── knowledge_base/
 │   └── app/routers/
 │       └── webhooks/
 │           └── wechat_work.py  # HTTP 入口（GET 验证 + POST 回调）
