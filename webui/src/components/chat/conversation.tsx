@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { ArrowUp, Bot, Brain, ChevronDown, Loader2, Sparkles, User, Wrench } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { TurnEvolutionHint } from '@/components/knowledge-base/chat-evolution-panel';
-import { ChatMarkdown, isChatErrorAnswer } from '@/components/knowledge-base/chat-markdown';
-import { ChatTurnActions } from '@/components/knowledge-base/chat-turn-actions';
-import { ChatUpgradeSessionBanner, ChatUpgradeTurnHint } from '@/components/knowledge-base/chat-upgrade-hint';
+import { TurnEvolutionHint } from '@/components/chat/evolution-panel';
+import { ChatMarkdown, isChatErrorAnswer } from '@/components/chat/markdown/markdown';
+import { ChatTurnActions } from '@/components/chat/turn-actions';
+import { ChatUpgradeSessionBanner, ChatUpgradeTurnHint } from '@/components/chat/upgrade-hint';
 import type { ChatSource, ChatTurn, MemoryUsed, SessionPipeline, SkillUsed } from '@/lib/kb-types';
 import type { UpgradeSuggestion } from '@/lib/chat-task-upgrade';
 import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';

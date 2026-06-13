@@ -3,10 +3,10 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { ChatEmptyState, ChatThread } from '@/components/knowledge-base/chat-conversation';
-import { ChatDeleteSessionDialog } from '@/components/knowledge-base/chat-delete-session-dialog';
-import { ChatHistorySidebar } from '@/components/knowledge-base/chat-history-sidebar';
-import { ChatUpgradeDialog } from '@/components/knowledge-base/chat-upgrade-dialog';
+import { ChatEmptyState, ChatThread } from '@/components/chat/conversation';
+import { ChatDeleteSessionDialog } from '@/components/chat/delete-session-dialog';
+import { ChatHistorySidebar } from '@/components/chat/history-sidebar';
+import { ChatUpgradeDialog } from '@/components/chat/upgrade-dialog';
 import { useOrgReady } from '@/components/auth/OrgProvider';
 import {
   createTask,

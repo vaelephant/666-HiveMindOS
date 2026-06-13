@@ -1,7 +1,7 @@
 'use client';
 
 import { History, Plus, Trash2 } from 'lucide-react';
-import { ChatEvolutionPanel } from '@/components/knowledge-base/chat-evolution-panel';
+import { ChatEvolutionPanel } from '@/components/chat/evolution-panel';
 import type { ChatSessionSummary } from '@/lib/kb-types';
 
 type Props = {
