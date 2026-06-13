@@ -353,7 +353,7 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: taskName ? `任务交付物：${taskName}` : '保存任务交付物',
       description: path ? `已写入 Wiki：${path}` : (ev.summary ?? '任务产出已保存'),
       bullets: [],
-      links,
+      links: withChatLinks(links, d),
       actorLabel,
     };
   }
@@ -373,7 +373,7 @@ export function formatAuditEvent(ev: AuditEvent): AuditDisplay {
       title: `自主任务 · ${label}`,
       description: ev.summary?.replace(/^[^·]+ · /, '') ?? ev.summary ?? '',
       bullets: [],
-      links,
+      links: withChatLinks(links, d),
       actorLabel,
     };
   }

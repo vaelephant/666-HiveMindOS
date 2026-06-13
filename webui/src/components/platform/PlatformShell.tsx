@@ -192,15 +192,6 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             const prev = PRIMARY_NAV[idx - 1];
             const prefix: React.ReactNode[] = [];
 
-            // Section label above first HiveMind item
-            if (!navCollapsed && item.factory === 'hivemind' && prev?.factory !== 'hivemind') {
-              prefix.push(
-                <p key="label-hivemind" className="mb-1.5 mt-3 px-3 text-[10px] font-medium text-shell-muted">
-                  HiveMind
-                </p>
-              );
-            }
-            // Spacer between factory groups
             if (prev && prev.factory !== item.factory) {
               prefix.push(
                 <div key={`div-${item.navKey}`} className="my-2.5 mx-3 border-t border-shell-border-dim" />

@@ -14,7 +14,7 @@ export async function GET(
   const { orgId } = await params;
   const url = new URL(req.url);
   const searchParams = new URLSearchParams();
-  for (const key of ['days', 'category', 'action', 'limit', 'offset', 'q']) {
+  for (const key of ['days', 'category', 'action', 'limit', 'offset', 'q', 'status']) {
     const value = url.searchParams.get(key);
     if (value != null) searchParams.set(key, value);
   }

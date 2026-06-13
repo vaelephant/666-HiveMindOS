@@ -39,6 +39,14 @@ const CATEGORY_FILTERS = [
   { key: 'automation', label: '自动化' },
 ] as const;
 
+const STATUS_FILTERS = [
+  { key: '', label: '全部状态' },
+  { key: 'success', label: '成功' },
+  { key: 'error', label: '失败' },
+] as const;
+
+const PAGE_SIZE = 80;
+
 const CATEGORY_LABEL: Record<string, string> = {
   task: '任务',
   wiki: 'Wiki',
@@ -195,11 +203,14 @@ export function AuditLogView() {
   const { orgId, ready } = useOrgReady();
   const [days, setDays] = useState<number>(7);
   const [category, setCategory] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [stats, setStats] = useState<AuditStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [runModalId, setRunModalId] = useState<string | null>(null);
 
@@ -208,26 +219,47 @@ export function AuditLogView() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+  const queryOptions = useMemo(
+    () => ({
+      orgId,
+      days,
+      category: category || undefined,
+      status: statusFilter || undefined,
+      q: searchQuery || undefined,
+      limit: PAGE_SIZE,
+    }),
+    [orgId, days, category, statusFilter, searchQuery],
+  );
+
   const load = useCallback(async () => {
     if (!ready || !orgId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await getAuditEvents({
-        orgId,
-        days,
-        category: category || undefined,
-        q: searchQuery || undefined,
-        limit: 200,
-      });
+      const data = await getAuditEvents({ ...queryOptions, offset: 0 });
       setEvents(data.events);
       setStats(data.stats);
+      setHasMore(data.events.length >= PAGE_SIZE);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
     } finally {
       setLoading(false);
     }
-  }, [ready, orgId, days, category, searchQuery]);
+  }, [ready, queryOptions]);
+
+  const loadMore = useCallback(async () => {
+    if (!ready || !orgId || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const data = await getAuditEvents({ ...queryOptions, offset: events.length });
+      setEvents((prev) => [...prev, ...data.events]);
+      setHasMore(data.events.length >= PAGE_SIZE);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载更多失败');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [ready, orgId, loadingMore, hasMore, queryOptions, events.length]);
 
   useEffect(() => {
     void load();
@@ -241,6 +273,10 @@ export function AuditLogView() {
     return map;
   }, [stats]);
 
+  const errorCount = useMemo(() => {
+    return (stats?.by_status ?? []).find((r) => r.status === 'error')?.count ?? 0;
+  }, [stats]);
+
   const periodLabel = PERIOD_OPTIONS.find((o) => o.days === days)?.label ?? `${days} 天`;
 
   function handleExport(format: 'csv' | 'json') {
@@ -249,6 +285,7 @@ export function AuditLogView() {
       orgId,
       days,
       category: category || undefined,
+      status: statusFilter || undefined,
       q: searchQuery || undefined,
       format,
     });
@@ -269,7 +306,7 @@ export function AuditLogView() {
                 审计日志
               </h1>
               <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-shell-muted">
-                记录工作流运行、Wiki 写入、候选审核、企微发送与质量巡检。可展开查看具体页面，并一键跳转到 Wiki 或工作流。
+                记录工作流、Wiki、候选审核与企微发送。支持搜索、导出，并可从候选/任务事件跳回来源对话。
               </p>
             </div>
           </div>
@@ -342,7 +379,13 @@ export function AuditLogView() {
             hint={`近 ${periodLabel}`}
             accent
           />
-          {stats.by_category.slice(0, 3).map((row) => (
+          <StatCard
+            label="失败事件"
+            value={errorCount}
+            hint={stats.total > 0 ? `占 ${Math.round((errorCount / stats.total) * 100)}%` : undefined}
+            accent={errorCount > 0}
+          />
+          {stats.by_category.slice(0, 2).map((row) => (
             <StatCard
               key={row.category}
               label={CATEGORY_LABEL[row.category] ?? row.category}
@@ -356,6 +399,27 @@ export function AuditLogView() {
           ))}
         </div>
       )}
+
+      <div className="flex flex-wrap gap-2">
+        {STATUS_FILTERS.map((f) => (
+          <button
+            key={f.key || 'all-status'}
+            type="button"
+            onClick={() => setStatusFilter(f.key)}
+            className={cn(
+              'rounded-full px-3 py-1 text-[12px] font-medium transition-colors',
+              statusFilter === f.key
+                ? f.key === 'error'
+                  ? 'bg-red-500/12 text-red-600 ring-1 ring-red-500/25'
+                  : 'bg-brand-primary/15 text-brand-primary ring-1 ring-brand-primary/30'
+                : 'border border-shell-border bg-shell-panel text-shell-muted hover:text-shell-text',
+            )}
+          >
+            {f.label}
+            {f.key === 'error' && errorCount > 0 ? ` (${errorCount})` : ''}
+          </button>
+        ))}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {CATEGORY_FILTERS.map((f) => (
@@ -397,13 +461,33 @@ export function AuditLogView() {
             <p className="text-[12px]">运行工作流、写入 Wiki 或发送企微消息后将自动记录</p>
           </div>
         ) : (
-          <ul className="divide-y divide-shell-border">
-            {events.map((ev) => (
-              <AuditEventRow key={ev.id} ev={ev} onOpenRun={setRunModalId} />
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y divide-shell-border">
+              {events.map((ev) => (
+                <AuditEventRow key={ev.id} ev={ev} onOpenRun={setRunModalId} />
+              ))}
+            </ul>
+            {hasMore && (
+              <div className="border-t border-shell-border px-4 py-3 text-center">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-shell-border bg-shell-bg px-4 py-2 text-[13px] font-medium text-shell-text hover:border-brand-primary/30 hover:text-brand-primary disabled:opacity-50"
+                >
+                  {loadingMore ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  加载更多
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
+      {events.length > 0 && (
+        <p className="text-center text-[12px] text-shell-muted">
+          已显示 {events.length} 条{hasMore ? '，还有更多记录' : ''}
+        </p>
+      )}
       <WorkflowRunDetailModal runId={runModalId} onClose={() => setRunModalId(null)} />
     </div>
   );

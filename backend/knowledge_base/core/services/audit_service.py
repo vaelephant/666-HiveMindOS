@@ -74,6 +74,7 @@ def list_events(
     user_id: str | None = None,
     category: str | None = None,
     action: str | None = None,
+    status: str | None = None,
     q: str | None = None,
     days: int = 30,
     limit: int = 100,
@@ -95,6 +96,9 @@ def list_events(
     if action:
         clauses.append("action = %s")
         params.append(action)
+    if status and status in _STATUSES:
+        clauses.append("status = %s")
+        params.append(status)
     if q and q.strip():
         pattern = f"%{q.strip()}%"
         clauses.append(
@@ -128,6 +132,7 @@ def export_events(
     user_id: str | None = None,
     category: str | None = None,
     action: str | None = None,
+    status: str | None = None,
     q: str | None = None,
     days: int = 30,
     limit: int = 5000,
@@ -137,6 +142,7 @@ def export_events(
         user_id=user_id,
         category=category,
         action=action,
+        status=status,
         q=q,
         days=days,
         limit=min(limit, 5000),

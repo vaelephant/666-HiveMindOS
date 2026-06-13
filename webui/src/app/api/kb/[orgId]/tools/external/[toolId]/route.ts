@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const BACKEND = process.env.KB_API_BASE_URL ?? 'http://localhost:8006';
+import { kbBackendUrl } from '@/lib/kb-backend';
 
 export async function PATCH(
   req: Request,
@@ -8,7 +7,8 @@ export async function PATCH(
 ) {
   const { orgId, toolId } = await params;
   const body = await req.json().catch(() => ({}));
-  const res = await fetch(`${BACKEND}/api/v1/orgs/${orgId}/tools/external/${toolId}`, {
+  const backend = await kbBackendUrl(orgId, `/tools/external/${toolId}`);
+  const res = await fetch(backend, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

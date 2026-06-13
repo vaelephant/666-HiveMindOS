@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
+  ChevronDown,
   Circle,
   Loader2,
   Plug,
   RefreshCw,
+  Search,
   Server,
   Wrench,
 } from 'lucide-react';
@@ -107,6 +109,8 @@ export function ToolRegistryView() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [showAllBuiltin, setShowAllBuiltin] = useState(false);
 
   const load = useCallback(async () => {
     if (!ready || !orgId) return;
@@ -167,6 +171,34 @@ export function ToolRegistryView() {
       setBusyId(null);
     }
   }
+
+  const needle = search.trim().toLowerCase();
+  const matches = (label: string, id: string, desc?: string | null) => {
+    if (!needle) return true;
+    return (
+      label.toLowerCase().includes(needle) ||
+      id.toLowerCase().includes(needle) ||
+      (desc ?? '').toLowerCase().includes(needle)
+    );
+  };
+
+  const filteredBuiltin = useMemo(
+    () =>
+      (catalog?.builtin ?? []).filter((t) =>
+        matches(t.label, t.tool_id, t.description),
+      ),
+    [catalog?.builtin, needle],
+  );
+
+  const filteredExternal = useMemo(
+    () =>
+      (catalog?.external ?? []).filter((t) =>
+        matches(t.label, t.tool_id, t.description),
+      ),
+    [catalog?.external, needle],
+  );
+
+  const visibleBuiltin = showAllBuiltin ? filteredBuiltin : filteredBuiltin.slice(0, 12);
 
   return (
     <div className="w-full space-y-4 pb-8 md:space-y-5">
@@ -229,6 +261,17 @@ export function ToolRegistryView() {
         </p>
       )}
 
+      <div className="relative max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-shell-muted" aria-hidden />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="搜索工具名称、ID…"
+          className="w-full rounded-lg border border-shell-border bg-shell-panel py-2 pl-9 pr-3 text-[13px] text-shell-text outline-none focus:border-brand-primary/40"
+        />
+      </div>
+
       {error && (
         <div className="rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3 text-[13px] text-red-600">
           {error}
@@ -246,30 +289,51 @@ export function ToolRegistryView() {
             <Loader2 className="size-4 animate-spin" />
             加载目录…
           </div>
+        ) : filteredBuiltin.length === 0 ? (
+          <p className="px-4 py-8 text-center text-[13px] text-shell-muted">无匹配的内置 Action</p>
         ) : (
-          <ul className="divide-y divide-shell-border">
-            {(catalog?.builtin ?? []).map((tool) => (
-              <li key={tool.tool_id} className="flex items-start justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-shell-text">{tool.label}</span>
-                    <code className="rounded bg-shell-bg px-1.5 py-0.5 text-[11px] text-shell-muted">
-                      {tool.tool_id}
-                    </code>
-                    {tool.domain && (
-                      <span className="text-[11px] text-shell-muted">{tool.domain}</span>
+          <>
+            <ul className="divide-y divide-shell-border">
+              {visibleBuiltin.map((tool) => (
+                <li key={tool.tool_id} className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] font-medium text-shell-text">{tool.label}</span>
+                      <code className="rounded bg-shell-bg px-1.5 py-0.5 text-[11px] text-shell-muted">
+                        {tool.tool_id}
+                      </code>
+                      {tool.domain && (
+                        <span className="text-[11px] text-shell-muted">{tool.domain}</span>
+                      )}
+                    </div>
+                    {tool.description && (
+                      <p className="mt-0.5 text-[12px] text-shell-muted">{tool.description}</p>
                     )}
                   </div>
-                  {tool.description && (
-                    <p className="mt-0.5 text-[12px] text-shell-muted">{tool.description}</p>
-                  )}
-                </div>
-                <span className="shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                  始终可用
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <span className="shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                    始终可用
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {filteredBuiltin.length > 12 && (
+              <div className="border-t border-shell-border px-4 py-2.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowAllBuiltin((v) => !v)}
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-brand-primary hover:underline"
+                >
+                  <ChevronDown
+                    className={cn('size-3.5 transition-transform', showAllBuiltin && 'rotate-180')}
+                    aria-hidden
+                  />
+                  {showAllBuiltin
+                    ? '收起'
+                    : `展开全部 ${filteredBuiltin.length} 个内置 Action`}
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
 
@@ -283,13 +347,13 @@ export function ToolRegistryView() {
           <div className="flex items-center justify-center gap-2 py-12 text-shell-muted">
             <Loader2 className="size-4 animate-spin" />
           </div>
-        ) : (catalog?.external.length ?? 0) === 0 ? (
+        ) : filteredExternal.length === 0 ? (
           <p className="px-4 py-10 text-center text-[13px] text-shell-muted">
-            暂无外部工具模板。请确认数据库迁移 013_external_tools 已执行。
+            {needle ? '无匹配的外部工具' : '暂无外部工具模板。请确认数据库迁移 013_external_tools 已执行。'}
           </p>
         ) : (
           <ul className="divide-y divide-shell-border">
-            {catalog!.external.map((tool) => (
+            {filteredExternal.map((tool) => (
               <ExternalToolRow
                 key={tool.tool_id}
                 tool={tool}

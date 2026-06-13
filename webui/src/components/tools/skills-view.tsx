@@ -209,15 +209,23 @@ export function SkillsView() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            disabled={!orgReady || loading}
-            onClick={() => setShowCreate(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-[12px] font-medium text-white disabled:opacity-50"
-          >
-            <Plus className="size-3.5" />
-            新建 Skill
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/tools/registry"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-shell-border bg-shell-bg px-4 py-2 text-[12px] font-medium text-shell-muted hover:text-brand-primary"
+            >
+              工具注册表 →
+            </Link>
+            <button
+              type="button"
+              disabled={!orgReady || loading}
+              onClick={() => setShowCreate(true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-primary px-4 py-2 text-[12px] font-medium text-white disabled:opacity-50"
+            >
+              <Plus className="size-3.5" />
+              新建 Skill
+            </button>
+          </div>
         </div>
       </header>
 

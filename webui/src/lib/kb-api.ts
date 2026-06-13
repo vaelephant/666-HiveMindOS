@@ -818,6 +818,7 @@ export async function getAuditEvents(
   options: {
     days?: number;
     category?: string;
+    status?: string;
     q?: string;
     limit?: number;
     offset?: number;
@@ -828,6 +829,7 @@ export async function getAuditEvents(
   const params = new URLSearchParams();
   if (options.days != null) params.set('days', String(options.days));
   if (options.category) params.set('category', options.category);
+  if (options.status) params.set('status', options.status);
   if (options.q) params.set('q', options.q);
   if (options.limit != null) params.set('limit', String(options.limit));
   if (options.offset != null) params.set('offset', String(options.offset));
@@ -839,6 +841,7 @@ export function auditExportUrl(
   options: {
     days?: number;
     category?: string;
+    status?: string;
     q?: string;
     format?: 'csv' | 'json';
     orgId?: string;
@@ -848,6 +851,7 @@ export function auditExportUrl(
   const params = new URLSearchParams();
   if (options.days != null) params.set('days', String(options.days));
   if (options.category) params.set('category', options.category);
+  if (options.status) params.set('status', options.status);
   if (options.q) params.set('q', options.q);
   params.set('format', options.format ?? 'csv');
   return `${base(orgId)}/audit/export?${params.toString()}`;

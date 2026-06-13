@@ -228,9 +228,20 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
   // ── 固定入口 ────────────────────────────────────────────────────────────
   { navKey: 'home', label: '首页', href: PLATFORM_HOME_PATH, icon: Home, factory: 'platform' },
 
-  // ── HiveMind 核心模块 ────────────────────────────────────────────────────
-  { navKey: 'chat',         label: 'Chat',       href: HIVEMIND_HOME_PATH,      icon: MessageSquare, factory: 'hivemind' },
+  // ── HiveMind：对话与记忆 ───────────────────────────────────────────────────
+  { navKey: 'chat', label: 'Chat', href: HIVEMIND_HOME_PATH, icon: MessageSquare, factory: 'hivemind' },
   { navKey: 'memories', label: '智慧进化', href: HIVEMIND_MEMORIES_PATH, icon: Brain, factory: 'hivemind' },
+
+  // ── HiveMind：知识与资料 ───────────────────────────────────────────────────
+  {
+    navKey: 'knowledge_base',
+    label: '知识管理',
+    icon: Library,
+    factory: 'hivemind',
+    children: KNOWLEDGE_BASE_CHILDREN,
+  },
+
+  // ── HiveMind：自动化与能力 ─────────────────────────────────────────────────
   {
     navKey: 'task_center',
     label: '任务中心',
@@ -239,25 +250,18 @@ export const PRIMARY_NAV: PrimaryNavItem[] = [
     children: TASK_CENTER_CHILDREN,
   },
   { navKey: 'workflows', label: '工作流', href: '/workflows', icon: GitBranch, factory: 'hivemind' },
-  { navKey: 'tools',        label: '工具箱',     href: '/tools',                icon: Wrench,     factory: 'hivemind' },
+  { navKey: 'tools', label: '工具箱', href: '/tools', icon: Wrench, factory: 'hivemind' },
+
+  // ── HiveMind：集成与治理 ───────────────────────────────────────────────────
   {
     navKey: 'integrations',
-    label: '集成',
+    label: '外部集成',
     icon: Plug,
     factory: 'hivemind',
     children: INTEGRATIONS_CHILDREN,
   },
-  { navKey: 'audit',        label: '审计日志',   href: '/audit',                icon: ScrollText, factory: 'hivemind' },
-  { navKey: 'human_review', label: '人工审核',   href: '/human-review',         icon: UserCheck,  factory: 'hivemind' },
-
-  // ── 知识管理（Chat / Agent 的 grounding 层）────────────────────────────────
-  {
-    navKey: 'knowledge_base',
-    label: '知识管理',
-    icon: Library,
-    factory: 'hivemind',
-    children: KNOWLEDGE_BASE_CHILDREN,
-  },
+  { navKey: 'human_review', label: '人工审核', href: '/human-review', icon: UserCheck, factory: 'hivemind' },
+  { navKey: 'audit', label: '审计日志', href: '/audit', icon: ScrollText, factory: 'hivemind' },
 
   // ── 原有模块 ─────────────────────────────────────────────────────────────
   { navKey: 'data_workshop', label: '数据工坊', href: '/data/workshop', icon: FileSearch,     factory: 'data' },
@@ -374,7 +378,7 @@ export function getTitleFromSegments(segments: string[] | undefined): string {
   if (path === '/tools') return 'Agent Skills';
   if (path.startsWith('/integrations/playbook')) return 'Playbook';
   if (path.startsWith('/integrations/wechat-work')) return '企业微信';
-  if (path.startsWith('/integrations/')) return '集成';
+  if (path.startsWith('/integrations/')) return '外部集成';
   if (path.startsWith('/audit/')) return '审计日志';
   if (path.startsWith('/human-review/')) return '人工审核';
   if (path.startsWith('/knowledge-base/tasks')) return '自主任务';

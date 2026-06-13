@@ -21,6 +21,7 @@ def _audit_task_action(
     summary: dict,
     *,
     status: str,
+    params: dict | None = None,
 ) -> None:
     category = "communicate" if task.action == "wechat_work_send" else "task"
     if task.action == "save_deliverable":
@@ -40,6 +41,16 @@ def _audit_task_action(
     if summary.get("error"):
         parts.append(str(summary["error"])[:120])
 
+    detail = {
+        "task_name": task.name,
+        "action": task.action,
+        "gate": task.gate,
+        **{k: v for k, v in summary.items() if k != "text"},
+    }
+    session_id = (params or {}).get("session_id") or summary.get("session_id")
+    if session_id:
+        detail["session_id"] = str(session_id)
+
     audit_service.log_event(
         org_id,
         user_id=user_id,
@@ -49,12 +60,7 @@ def _audit_task_action(
         resource_id=task.id,
         status=status,
         summary=" · ".join(parts),
-        detail={
-            "task_name": task.name,
-            "action": task.action,
-            "gate": task.gate,
-            **{k: v for k, v in summary.items() if k != "text"},
-        },
+        detail=detail,
     )
 
 
@@ -141,13 +147,13 @@ class ExecutorEngine:
             result = self._tools.execute(task.action, params)
             summary = _summarize(result)
             _audit_task_action(
-                self._org_id, self._user_id, task, summary, status="success",
+                self._org_id, self._user_id, task, summary, status="success", params=params,
             )
             return result, summary
         except Exception as exc:
             _audit_task_action(
                 self._org_id, self._user_id, task,
-                {"error": str(exc)}, status="error",
+                {"error": str(exc)}, status="error", params=params,
             )
             raise
 
