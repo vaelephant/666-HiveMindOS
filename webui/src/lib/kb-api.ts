@@ -540,6 +540,18 @@ export async function getSessionPipeline(
   return data.pipeline;
 }
 
+export async function extractChatTurn(
+  sessionId: string,
+  turnIndex: number,
+  orgId = resolveOrgId(),
+): Promise<{ ok: boolean; memory_count: number; memory_ids: number[] }> {
+  return req(`${base(orgId)}/chat/sessions/${sessionId}/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ turn_index: turnIndex }),
+  });
+}
+
 export async function deleteChatSession(
   sessionId: string,
   options?: { recap?: boolean },

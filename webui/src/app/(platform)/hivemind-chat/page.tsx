@@ -7,8 +7,10 @@ import { ChatEmptyState, ChatThread } from '@/components/knowledge-base/chat-con
 import { ChatDeleteSessionDialog } from '@/components/knowledge-base/chat-delete-session-dialog';
 import { ChatHistorySidebar } from '@/components/knowledge-base/chat-history-sidebar';
 import { ChatUpgradeDialog } from '@/components/knowledge-base/chat-upgrade-dialog';
+import { useOrgReady } from '@/components/auth/OrgProvider';
 import {
   createTask,
+  extractChatTurn,
   getChatSession,
   getSessionPipeline,
   listChatSessions,
@@ -18,7 +20,7 @@ import { detectUpgradeSuggestion, manualUpgradeSuggestion } from '@/lib/chat-tas
 import type { ChatStreamPhase } from '@/lib/kb-api';
 import { readCachedSessions, writeCachedSessions } from '@/lib/chat-session-cache';
 import { HIVEMIND_HOME_PATH } from '@/config/navigation';
-import type { ChatSessionSummary, ChatTurn, SessionPipeline } from '@/lib/kb-types';
+import type { ChatSessionSummary, ChatSource, ChatTurn, SessionPipeline } from '@/lib/kb-types';
 
 function ThreadLoading() {
   return (
@@ -33,6 +35,7 @@ function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionIdFromUrl = searchParams.get('id');
+  const { ready: orgReady, orgId } = useOrgReady();
 
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -48,11 +51,15 @@ function ChatPageContent() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [streamText, setStreamText] = useState('');
   const [streamPhase, setStreamPhase] = useState<ChatStreamPhase | null>(null);
+  const [streamSources, setStreamSources] = useState<ChatSource[]>([]);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeTurnIndex, setUpgradeTurnIndex] = useState<number | null>(null);
   const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const eventBaselineRef = useRef(0);
   const streamAbortRef = useRef<AbortController | null>(null);
+  /** 本页主动 syncUrl 时跳过 URL effect 触发的整页重载 */
+  const ownedUrlSessionRef = useRef<string | null>(null);
 
   function abortActiveStream() {
     streamAbortRef.current?.abort();
@@ -85,18 +92,34 @@ function ChatPageContent() {
   }, []);
 
   useEffect(() => {
+    if (sessionIdFromUrl && ownedUrlSessionRef.current === sessionIdFromUrl) {
+      return;
+    }
     abortActiveStream();
     setPending(null);
     setStreamText('');
     setStreamPhase(null);
+    setStreamSources([]);
   }, [sessionIdFromUrl]);
 
-  // 并行加载：侧栏列表 + 当前对话（若有 id）
+  // 并行加载：侧栏列表 + 当前对话（若有 id）；须等 session/org 就绪，避免用 demo org 请求导致 403
   useEffect(() => {
+    if (!orgReady) return;
+
     let cancelled = false;
     setError(null);
 
-    const cached = readCachedSessions();
+    // 新建对话首条消息返回后仅同步 URL，不重载线程（避免「刷新」与侧栏突变）
+    if (sessionIdFromUrl && ownedUrlSessionRef.current === sessionIdFromUrl) {
+      ownedUrlSessionRef.current = null;
+      setActiveId(sessionIdFromUrl);
+      void refreshSessions(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const cached = readCachedSessions(orgId);
     if (cached.length > 0) setSessions(cached);
 
     setSessionsLoading(true);
@@ -138,11 +161,7 @@ function ChatPageContent() {
       });
 
     return () => { cancelled = true; };
-  }, [sessionIdFromUrl]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turns, pending, streamText]);
+  }, [sessionIdFromUrl, refreshSessions, orgReady, orgId]);
 
   function handleNew() {
     abortActiveStream();
@@ -203,6 +222,7 @@ function ChatPageContent() {
     setError(null);
     setStreamText('');
     setStreamPhase('gathering');
+    setStreamSources([]);
 
     try {
       const res = await sendChatMessageStream(
@@ -211,12 +231,14 @@ function ChatPageContent() {
         {
           onStatus: (phase) => setStreamPhase(phase),
           onToken: (text) => setStreamText((prev) => prev + text),
+          onSources: (sources) => setStreamSources(sources),
         },
         undefined,
         abort.signal,
       );
       const sessionId = res.session_id;
       if (!activeId) {
+        ownedUrlSessionRef.current = sessionId;
         setActiveId(sessionId);
         syncUrl(sessionId);
       }
@@ -245,10 +267,16 @@ function ChatPageContent() {
       setPending(null);
       setStreamText('');
       setStreamPhase(null);
+      setStreamSources([]);
     }
   }
 
-  const showEmpty = !threadLoading && turns.length === 0 && pending === null;
+  const showEmpty = orgReady && !threadLoading && turns.length === 0 && pending === null;
+
+  const upgradeDialogTurns = useMemo(() => {
+    if (upgradeTurnIndex == null) return turns;
+    return turns.slice(0, upgradeTurnIndex + 1);
+  }, [turns, upgradeTurnIndex]);
 
   const upgradeSuggestion = useMemo(
     () => (pending ? null : detectUpgradeSuggestion(turns)),
@@ -256,9 +284,35 @@ function ChatPageContent() {
   );
 
   const upgradeDialogSuggestion = useMemo(() => {
+    const slice = upgradeDialogTurns;
+    if (upgradeTurnIndex != null && slice.length > 0) {
+      return manualUpgradeSuggestion(slice);
+    }
     if (upgradeSuggestion?.recommended) return upgradeSuggestion;
     return manualUpgradeSuggestion(turns);
-  }, [upgradeSuggestion, turns]);
+  }, [upgradeSuggestion, turns, upgradeDialogTurns, upgradeTurnIndex]);
+
+  function openUpgradeFromTurn(turnIndex: number) {
+    setUpgradeTurnIndex(turnIndex);
+    setUpgradeOpen(true);
+  }
+
+  function openUpgradeFromSession() {
+    setUpgradeTurnIndex(null);
+    setUpgradeOpen(true);
+  }
+
+  async function handleEnqueueTurn(turnIndex: number) {
+    if (!activeId) return;
+    await extractChatTurn(activeId, turnIndex);
+    void watchExtraction(activeId);
+    try {
+      const p = await getSessionPipeline(activeId);
+      setPipeline(p);
+    } catch {
+      /* pipeline refresh optional */
+    }
+  }
 
   async function handleUpgradeConfirm(goal: string, constraints: Record<string, unknown>) {
     setUpgradeSubmitting(true);
@@ -278,7 +332,7 @@ function ChatPageContent() {
       <ChatHistorySidebar
         sessions={sessions}
         activeId={activeId}
-        loading={mounted && sessionsLoading}
+        loading={mounted && (!orgReady || sessionsLoading)}
         extracting={extracting}
         onNew={handleNew}
         onSelect={handleSelect}
@@ -295,10 +349,13 @@ function ChatPageContent() {
       <ChatUpgradeDialog
         open={upgradeOpen}
         suggestion={upgradeDialogSuggestion}
-        turns={turns}
+        turns={upgradeDialogTurns}
         sessionId={activeId}
         submitting={upgradeSubmitting}
-        onClose={() => setUpgradeOpen(false)}
+        onClose={() => {
+          setUpgradeOpen(false);
+          setUpgradeTurnIndex(null);
+        }}
         onConfirm={handleUpgradeConfirm}
       />
 
@@ -309,7 +366,7 @@ function ChatPageContent() {
           </div>
         )}
 
-        {threadLoading ? (
+        {threadLoading || !orgReady ? (
           <ThreadLoading />
         ) : showEmpty ? (
           <ChatEmptyState
@@ -326,12 +383,16 @@ function ChatPageContent() {
             onInputChange={setInput}
             onSend={handleSend}
             bottomRef={bottomRef}
+            sessionId={activeId}
             extracting={extracting}
             pipeline={pipeline}
             streamText={streamText}
             streamPhase={streamPhase}
+            streamSources={streamSources}
             upgradeSuggestion={upgradeSuggestion}
-            onUpgrade={turns.length > 0 ? () => setUpgradeOpen(true) : undefined}
+            onUpgrade={turns.length > 0 ? openUpgradeFromSession : undefined}
+            onCreateTaskFromTurn={turns.length > 0 ? openUpgradeFromTurn : undefined}
+            onEnqueueTurn={activeId ? handleEnqueueTurn : undefined}
           />
         )}
       </div>

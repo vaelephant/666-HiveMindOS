@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Brain, Loader2 } from 'lucide-react';
+import { ArrowRight, Brain, ChevronDown, Loader2 } from 'lucide-react';
 import { HIVEMIND_MEMORIES_PATH } from '@/config/navigation';
 import { getSessionPipeline } from '@/lib/kb-api';
 import type { SessionPipeline } from '@/lib/kb-types';
@@ -15,11 +15,17 @@ const POLL_MS = 2500;
 type Props = {
   sessionId: string | null;
   extracting?: boolean;
+  defaultExpanded?: boolean;
 };
 
-export function ChatEvolutionPanel({ sessionId, extracting = false }: Props) {
+export function ChatEvolutionPanel({
+  sessionId,
+  extracting = false,
+  defaultExpanded = false,
+}: Props) {
   const [pipeline, setPipeline] = useState<SessionPipeline | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   useEffect(() => {
     if (!sessionId) {
@@ -48,79 +54,104 @@ export function ChatEvolutionPanel({ sessionId, extracting = false }: Props) {
     };
   }, [sessionId]);
 
-  if (!sessionId) {
-    return (
-      <div className="border-t border-shell-border px-3 py-4">
-        <p className="text-[11px] text-shell-muted">开始对话后，可在此看到知识提炼过程</p>
-      </div>
-    );
-  }
+  const pendingCount = pipeline?.stats.candidate_pending ?? 0;
+  const statusHint = !sessionId
+    ? '开始对话后可见'
+    : extracting
+      ? '提炼中…'
+      : pendingCount > 0
+        ? `${pendingCount} 条待审候选`
+        : null;
 
   return (
-    <div className="border-t border-shell-border">
-      <div className="flex items-center gap-1.5 px-3 py-2.5">
-        <Brain className="size-3.5 text-brand-primary" strokeWidth={1.75} />
+    <div className="shrink-0 border-t border-shell-border">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="flex w-full items-center gap-1.5 px-3 py-2.5 text-left transition-colors hover:bg-shell-bg/80"
+        aria-expanded={expanded}
+      >
+        <Brain className="size-3.5 shrink-0 text-brand-primary" strokeWidth={1.75} />
         <span className="text-[11px] font-medium tracking-wide text-shell-muted">知识管线</span>
+        {statusHint && !expanded && (
+          <span className="truncate text-[10px] text-shell-subtext">{statusHint}</span>
+        )}
         {(loading || extracting) && (
-          <Loader2 className="ml-auto size-3 animate-spin text-brand-primary" />
+          <Loader2 className="ml-auto size-3 shrink-0 animate-spin text-brand-primary" />
         )}
-      </div>
-
-      <div className="space-y-3 px-3 pb-3">
-        {pipeline ? (
-          <>
-            {extracting ? (
-              <p className="rounded-lg bg-brand-primary/8 px-2.5 py-2 text-[11px] text-brand-primary">
-                正在从本轮对话提炼智慧…
-              </p>
-            ) : (
-              <KnowledgePipelineSteps stages={pipeline.stages} compact />
-            )}
-
-            {pipeline.recent.length > 0 ? (
-              <ul className="max-h-36 space-y-1 overflow-y-auto custom-scrollbar">
-                {pipeline.recent.slice(0, 6).map((item, index) => (
-                  <li
-                    key={`${item.kind}-${item.id}-${item.created_at}-${index}`}
-                    className="rounded-lg bg-shell-bg px-2 py-1.5 text-[11px]"
-                  >
-                    <span className="text-shell-text">{item.title}</span>
-                    <span className="text-shell-muted"> · {item.detail}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[10px] leading-relaxed text-shell-muted">
-                回答返回后，后台自动 L1 提炼；重要内容会进入 Wiki 候选池
-              </p>
-            )}
-
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              <Link
-                href={HIVEMIND_MEMORIES_PATH}
-                className="text-[10px] font-medium text-brand-primary hover:underline"
-              >
-                智慧进化
-              </Link>
-              <span className="text-shell-muted">·</span>
-              <Link
-                href="/knowledge-base/overview"
-                className="inline-flex items-center gap-0.5 text-[10px] font-medium text-brand-primary hover:underline"
-              >
-                候选池
-                {pipeline.stats.candidate_pending > 0 && (
-                  <span className="rounded-full bg-brand-primary/15 px-1.5 text-[9px]">
-                    {pipeline.stats.candidate_pending}
-                  </span>
-                )}
-                <ArrowRight className="size-2.5" />
-              </Link>
-            </div>
-          </>
-        ) : (
-          <p className="py-2 text-[11px] text-shell-muted">加载管线状态…</p>
+        {!loading && !extracting && pendingCount > 0 && !expanded && (
+          <span className="ml-auto rounded-full bg-brand-primary/15 px-1.5 text-[9px] font-medium text-brand-primary">
+            {pendingCount}
+          </span>
         )}
-      </div>
+        <ChevronDown
+          className={cn(
+            'size-3.5 shrink-0 text-shell-muted transition-transform',
+            expanded && 'rotate-180',
+            !loading && !extracting && pendingCount === 0 && 'ml-auto',
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="space-y-3 border-t border-shell-border/60 px-3 pb-3 pt-2">
+          {!sessionId ? (
+            <p className="text-[11px] text-shell-muted">开始对话后，可在此看到知识提炼过程</p>
+          ) : pipeline ? (
+            <>
+              {extracting ? (
+                <p className="rounded-lg bg-brand-primary/8 px-2.5 py-2 text-[11px] text-brand-primary">
+                  正在从本轮对话提炼智慧…
+                </p>
+              ) : (
+                <KnowledgePipelineSteps stages={pipeline.stages} compact />
+              )}
+
+              {pipeline.recent.length > 0 ? (
+                <ul className="max-h-36 space-y-1 overflow-y-auto custom-scrollbar">
+                  {pipeline.recent.slice(0, 6).map((item, index) => (
+                    <li
+                      key={`${item.kind}-${item.id}-${item.created_at}-${index}`}
+                      className="rounded-lg bg-shell-bg px-2 py-1.5 text-[11px]"
+                    >
+                      <span className="text-shell-text">{item.title}</span>
+                      <span className="text-shell-muted"> · {item.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[10px] leading-relaxed text-shell-muted">
+                  回答返回后，后台自动 L1 提炼；重要内容会进入 Wiki 候选池
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2 pt-0.5">
+                <Link
+                  href={HIVEMIND_MEMORIES_PATH}
+                  className="text-[10px] font-medium text-brand-primary hover:underline"
+                >
+                  智慧进化
+                </Link>
+                <span className="text-shell-muted">·</span>
+                <Link
+                  href="/knowledge-base/overview"
+                  className="inline-flex items-center gap-0.5 text-[10px] font-medium text-brand-primary hover:underline"
+                >
+                  候选池
+                  {pendingCount > 0 && (
+                    <span className="rounded-full bg-brand-primary/15 px-1.5 text-[9px]">
+                      {pendingCount}
+                    </span>
+                  )}
+                  <ArrowRight className="size-2.5" />
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="py-1 text-[11px] text-shell-muted">加载管线状态…</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

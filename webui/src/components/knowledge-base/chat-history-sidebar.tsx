@@ -8,10 +8,10 @@ type Props = {
   sessions: ChatSessionSummary[];
   activeId: string | null;
   loading?: boolean;
+  extracting?: boolean;
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  extracting?: boolean;
 };
 
 function HistorySkeleton() {
@@ -32,10 +32,10 @@ export function ChatHistorySidebar({
   sessions,
   activeId,
   loading = false,
+  extracting = false,
   onNew,
   onSelect,
   onDelete,
-  extracting = false,
 }: Props) {
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r border-shell-border bg-shell-panel/50 lg:w-60">

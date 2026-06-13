@@ -21,6 +21,44 @@ class SendMessageRequest(BaseModel):
     user_id: str = "demo"
 
 
+class ExtractTurnRequest(BaseModel):
+    user_id: str = "demo"
+    turn_index: int | None = None
+
+
+@router.post("/orgs/{org_id}/chat/sessions/{session_id}/extract")
+def extract_session_turn(org_id: str, session_id: str, req: ExtractTurnRequest):
+    """手动触发某轮对话的智慧提炼（含写入 Wiki 候选池）。"""
+    try:
+        session = chat_service.get_session(org_id, session_id)
+    except Exception as exc:
+        log.error("[chat] extract get session failed: %s", exc)
+        raise HTTPException(status_code=503, detail=f"数据库不可用: {exc}") from exc
+    if not session:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    turns = session.get("turns") or []
+    if not turns:
+        raise HTTPException(status_code=400, detail="对话尚无内容可提炼")
+    idx = req.turn_index if req.turn_index is not None else len(turns) - 1
+    if idx < 0 or idx >= len(turns):
+        raise HTTPException(status_code=400, detail="turn_index 无效")
+    turn = turns[idx]
+    memory_ids = extract_from_turn(
+        org_id,
+        req.user_id,
+        session_id,
+        turn["question"],
+        turn["answer"],
+    )
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "turn_index": idx,
+        "memory_ids": memory_ids,
+        "memory_count": len(memory_ids),
+    }
+
+
 @router.get("/orgs/{org_id}/chat/sessions")
 def list_sessions(org_id: str, user_id: str = "demo"):
     try:
