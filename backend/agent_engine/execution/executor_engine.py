@@ -11,6 +11,51 @@ from knowledge_base.core.services.candidate_service import get_candidate_stats
 from agent_engine.tools.task_toolkit import TaskToolExecutor
 from agent_engine.models.plan import QueueTask
 from agent_engine.settings import load
+from knowledge_base.core.services import audit_service
+
+
+def _audit_task_action(
+    org_id: str,
+    user_id: str,
+    task: QueueTask,
+    summary: dict,
+    *,
+    status: str,
+) -> None:
+    category = "communicate" if task.action == "wechat_work_send" else "task"
+    if task.action == "save_deliverable":
+        category = "deliverable"
+    elif task.action in ("compile_candidates", "resolve_candidates", "enqueue_candidates"):
+        category = "candidate"
+    elif task.action in ("search_wiki", "read_page"):
+        category = "wiki"
+
+    parts = [task.name or task.action]
+    if summary.get("merged"):
+        parts.append(f"merged={summary['merged']}")
+    if summary.get("wiki_path"):
+        parts.append(summary["wiki_path"])
+    if summary.get("to_user"):
+        parts.append(f"→ {summary['to_user']}")
+    if summary.get("error"):
+        parts.append(str(summary["error"])[:120])
+
+    audit_service.log_event(
+        org_id,
+        user_id=user_id,
+        category=category,
+        action=f"task.{task.action}",
+        resource_type="task_step",
+        resource_id=task.id,
+        status=status,
+        summary=" · ".join(parts),
+        detail={
+            "task_name": task.name,
+            "action": task.action,
+            "gate": task.gate,
+            **{k: v for k, v in summary.items() if k != "text"},
+        },
+    )
 
 
 def _gates_cfg() -> dict:
@@ -53,7 +98,11 @@ def resolve_params(params: dict, checkpoints: dict) -> dict:
 
 
 def check_gate(task: QueueTask, org_id: str, user_id: str) -> None:
+    cfg = _gates_cfg()
     gate = task.gate or "auto"
+    forced = (cfg.get("action_gates") or {}).get(task.action)
+    if forced:
+        gate = forced
     if gate in ("auto", "step_human"):
         if gate == "step_human":
             raise ApprovalRequired(task.id, "步骤需人工批准")
@@ -63,7 +112,6 @@ def check_gate(task: QueueTask, org_id: str, user_id: str) -> None:
         raise ApprovalRequired(task.id, "任务需人工批准")
 
     if gate == "auto_if_low_risk" and task.action == "compile_candidates":
-        cfg = _gates_cfg()
         stats = get_candidate_stats(org_id, user_id)
         if int(stats.get("conflict") or 0) > 0:
             raise ApprovalRequired(task.id, "存在冲突候选，需人工审核")
@@ -89,9 +137,19 @@ class ExecutorEngine:
 
         check_gate(task, self._org_id, self._user_id)
         params = resolve_params(task.params, checkpoints)
-        result = self._tools.execute(task.action, params)
-        summary = _summarize(result)
-        return result, summary
+        try:
+            result = self._tools.execute(task.action, params)
+            summary = _summarize(result)
+            _audit_task_action(
+                self._org_id, self._user_id, task, summary, status="success",
+            )
+            return result, summary
+        except Exception as exc:
+            _audit_task_action(
+                self._org_id, self._user_id, task,
+                {"error": str(exc)}, status="error",
+            )
+            raise
 
 
 def _summarize(result: dict) -> dict:
@@ -100,6 +158,7 @@ def _summarize(result: dict) -> dict:
     keys = (
         "count", "created", "skipped", "approved", "conflict", "merged",
         "compiled", "resolved", "facts", "first_url", "provider", "ok", "chars",
+        "wiki_path", "to_user", "msg_type",
     )
     summary = {k: result[k] for k in keys if k in result}
     if "text" in result and result["text"]:

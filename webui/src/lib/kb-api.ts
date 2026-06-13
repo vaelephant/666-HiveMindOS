@@ -7,6 +7,9 @@ import type {
   AutomationJob,
   AutomationJobUpdate,
   AutomationRun,
+  WorkflowDefinition,
+  WorkflowRun,
+  WorkflowTemplate,
   CandidateStats,
   ChatSendResponse,
   ChatSession,
@@ -23,6 +26,7 @@ import type {
   OverviewData,
   CustomModelCreate,
   LlmUsageStats,
+  AuditEventsResponse,
   ModelSettingsCatalog,
   OrgPlaybook,
   OrgPlaybookPreview,
@@ -267,6 +271,117 @@ export async function restoreAutomation(jobId: string, orgId = resolveOrgId()): 
 
 export async function deleteAutomationRun(runId: string, orgId = resolveOrgId()): Promise<void> {
   await req(`${base(orgId)}/automations/runs/${runId}`, { method: 'DELETE' });
+}
+
+// ── Workflows (YAML 编排) ─────────────────────────────────────────────────────
+
+export async function listWorkflows(orgId = resolveOrgId()): Promise<WorkflowDefinition[]> {
+  const data = await req<{ workflows: WorkflowDefinition[] }>(`${base(orgId)}/workflows`);
+  return data.workflows;
+}
+
+export async function listWorkflowTemplates(orgId = resolveOrgId()): Promise<WorkflowTemplate[]> {
+  const data = await req<{ templates: WorkflowTemplate[] }>(`${base(orgId)}/workflows/templates`);
+  return data.templates;
+}
+
+export async function getWorkflow(
+  workflowId: string,
+  orgId = resolveOrgId(),
+): Promise<{ workflow: WorkflowDefinition; yaml: string }> {
+  return req(`${base(orgId)}/workflows/${workflowId}`);
+}
+
+export async function createWorkflowFromYaml(
+  yaml: string,
+  orgId = resolveOrgId(),
+): Promise<WorkflowDefinition> {
+  const data = await req<{ workflow: WorkflowDefinition }>(`${base(orgId)}/workflows`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ yaml }),
+  });
+  return data.workflow;
+}
+
+export async function createWorkflowFromTemplate(
+  templateId: string,
+  orgId = resolveOrgId(),
+): Promise<WorkflowDefinition> {
+  const data = await req<{ workflow: WorkflowDefinition }>(
+    `${base(orgId)}/workflows/from-template/${templateId}`,
+    { method: 'POST' },
+  );
+  return data.workflow;
+}
+
+export async function updateWorkflowYaml(
+  workflowId: string,
+  yaml: string,
+  orgId = resolveOrgId(),
+): Promise<WorkflowDefinition> {
+  const data = await req<{ workflow: WorkflowDefinition }>(`${base(orgId)}/workflows/${workflowId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ yaml }),
+  });
+  return data.workflow;
+}
+
+export async function deleteWorkflow(workflowId: string, orgId = resolveOrgId()): Promise<void> {
+  await req(`${base(orgId)}/workflows/${workflowId}`, { method: 'DELETE' });
+}
+
+export async function restoreWorkflow(workflowId: string, orgId = resolveOrgId()): Promise<WorkflowDefinition> {
+  const data = await req<{ workflow: WorkflowDefinition }>(
+    `${base(orgId)}/workflows/${workflowId}/restore`,
+    { method: 'POST' },
+  );
+  return data.workflow;
+}
+
+export async function runWorkflow(
+  workflowId: string,
+  params?: Record<string, unknown>,
+  orgId = resolveOrgId(),
+): Promise<{ ok: boolean; run: WorkflowRun }> {
+  return req(`${base(orgId)}/workflows/${workflowId}/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ params: params ?? {} }),
+  });
+}
+
+export async function setWorkflowSchedule(
+  workflowId: string,
+  enabled: boolean,
+  orgId = resolveOrgId(),
+): Promise<WorkflowDefinition> {
+  const data = await req<{ workflow: WorkflowDefinition }>(
+    `${base(orgId)}/workflows/${workflowId}/schedule`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    },
+  );
+  return data.workflow;
+}
+
+export async function listWorkflowRuns(
+  workflowId?: string,
+  orgId = resolveOrgId(),
+  limit = 50,
+): Promise<WorkflowRun[]> {
+  const url = new URL(`${base(orgId)}/workflows/runs`, window.location.origin);
+  if (workflowId) url.searchParams.set('workflow_id', workflowId);
+  url.searchParams.set('limit', String(limit));
+  const data = await req<{ runs: WorkflowRun[] }>(url.toString());
+  return data.runs;
+}
+
+export async function deleteWorkflowRun(runId: string, orgId = resolveOrgId()): Promise<void> {
+  await req(`${base(orgId)}/workflows/runs/${runId}`, { method: 'DELETE' });
 }
 
 export async function getOverviewData(orgId = resolveOrgId()): Promise<OverviewData> {
@@ -678,6 +793,27 @@ export async function getLlmUsageStats(
 ): Promise<LlmUsageStats> {
   const params = new URLSearchParams({ days: String(days) });
   return req(`${base(orgId)}/usage/stats?${params}`);
+}
+
+// ── Audit log ──────────────────────────────────────────────────────────────────
+
+export async function getAuditEvents(
+  options: {
+    days?: number;
+    category?: string;
+    limit?: number;
+    offset?: number;
+    orgId?: string;
+  } = {},
+): Promise<AuditEventsResponse> {
+  const orgId = resolveOrgId(options.orgId);
+  const params = new URLSearchParams();
+  if (options.days != null) params.set('days', String(options.days));
+  if (options.category) params.set('category', options.category);
+  if (options.limit != null) params.set('limit', String(options.limit));
+  if (options.offset != null) params.set('offset', String(options.offset));
+  const qs = params.toString();
+  return req(`${base(orgId)}/audit/events${qs ? `?${qs}` : ''}`);
 }
 
 // ── Model settings ─────────────────────────────────────────────────────────────

@@ -4,6 +4,11 @@ high_risk_categories:
   - decision
   - rule
   - entity
+# 特定 action 强制 gate（覆盖 Planner 下发的 task.gate）
+action_gates:
+  wechat_work_send: human
+  compile_candidates: auto_if_low_risk
+  save_deliverable: auto
 experience_min_score: 80
 max_retries: 2
 max_add_tasks: 3

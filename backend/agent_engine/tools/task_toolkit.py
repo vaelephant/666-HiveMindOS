@@ -18,6 +18,7 @@ from knowledge_base.core.services.candidate_service import (
     resolve_pending_candidates,
 )
 from knowledge_base.core.tools.kb_toolkit import WikiToolExecutor, tool_runtime
+from knowledge_base.core.compiler.wiki_merger import upsert_digest_page
 from agent_engine.tools.web_tools import read_url, web_search
 from agent_engine.tools.wechat_work import send_wechat_work_message
 from knowledge_base.core.wiki.wiki_manager import WikiManager
@@ -300,3 +301,25 @@ class TaskToolExecutor:
             params.get("content") or "",
             msg_type=(params.get("msg_type") or "text").strip(),
         )
+
+    def _action_save_deliverable(self, params: dict) -> dict:
+        title = (params.get("title") or "交付物").strip()
+        content = (params.get("content") or "").strip()
+        if not content:
+            raise ValueError("content 不能为空")
+        source_label = (params.get("source_label") or "自主任务").strip()
+        wiki_path = upsert_digest_page(
+            self._wiki.root,
+            self._org_id,
+            category="deliverable",
+            title=title,
+            content=content,
+            source_label=source_label,
+        )
+        self._wiki.update_index(self._org_id)
+        return {
+            "ok": True,
+            "wiki_path": wiki_path,
+            "title": title,
+            "chars": len(content),
+        }

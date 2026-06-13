@@ -150,6 +150,58 @@ export type AutomationJobUpdate = {
   defaults?: Record<string, number | boolean | string>;
 };
 
+export type WorkflowStep = {
+  id: string;
+  action: string;
+  params?: Record<string, unknown>;
+  when?: string;
+};
+
+export type WorkflowRun = {
+  id: string;
+  org_id: string;
+  workflow_id: string;
+  status: string;
+  trigger: string;
+  summary: Record<string, unknown> | null;
+  error?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+};
+
+export type WorkflowDefinition = {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+  category_label?: string;
+  cron_hint: string;
+  enabled: boolean;
+  schedule_enabled?: boolean;
+  schedule_user_id?: string;
+  last_cron_at?: string | null;
+  next_run_at?: string | null;
+  steps: WorkflowStep[];
+  yaml_source?: string;
+  builtin?: boolean;
+  step_count?: number;
+  updated_at?: string | null;
+  last_run: WorkflowRun | null;
+};
+
+export type WorkflowTemplate = {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+  category_label?: string;
+  cron_hint: string;
+  enabled: boolean;
+  steps: WorkflowStep[];
+  step_count?: number;
+  yaml: string;
+};
+
 export type AgentSkillSummary = {
   name: string;
   path: string;
@@ -720,13 +772,44 @@ export type LlmUsageStats = {
   /** 费用估算货币，如 USD */
   currency?: string;
   summary: LlmUsageSummary;
+  /** 今日汇总（北京时间自然日），含预估费用 */
+  today_summary?: LlmUsageSummary;
   by_day: LlmUsageDayBucket[];
   by_hour: LlmUsageHourBucket[];
   by_source: LlmUsageSourceBucket[];
   by_model: LlmUsageModelBucket[];
+  /** 今日按模型拆分（含预估费用） */
+  today_by_model?: LlmUsageModelBucket[];
   by_operation: LlmUsageOperationBucket[];
   by_profile: LlmUsageProfileBucket[];
   by_provider: LlmUsageProviderBucket[];
+};
+
+export type AuditEvent = {
+  id: number;
+  org_id: string;
+  user_id: string | null;
+  category: string;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  status: string;
+  summary: string | null;
+  detail: Record<string, unknown>;
+  created_at: string;
+};
+
+export type AuditStats = {
+  period_days: number;
+  total: number;
+  by_category: { category: string; count: number }[];
+  by_status: { status: string; count: number }[];
+  top_actions: { action: string; count: number }[];
+};
+
+export type AuditEventsResponse = {
+  events: AuditEvent[];
+  stats: AuditStats;
 };
 
 export type ModelProfileSpec = {

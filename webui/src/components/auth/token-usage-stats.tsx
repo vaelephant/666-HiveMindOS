@@ -8,6 +8,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -15,7 +18,7 @@ import {
 } from 'recharts';
 import { useOrgReady } from '@/components/auth/OrgProvider';
 import { getLlmUsageStats } from '@/lib/kb-api';
-import type { LlmUsageStats } from '@/lib/kb-types';
+import type { LlmUsageModelBucket, LlmUsageStats } from '@/lib/kb-types';
 import { themeVars } from '@/lib/theme-vars';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +33,71 @@ type PeriodDays = (typeof PERIOD_OPTIONS)[number]['days'];
 
 function periodHint(days: number): string {
   return days === 1 ? '今日' : `近 ${days} 天`;
+}
+
+type BrandColors = {
+  bright: string;
+  primary: string;
+  dim: string;
+};
+
+const MODEL_GRADIENT_SPECS = [
+  { stops: ['bright', 'primary', 'dim'] as const, focal: { cx: '32%', cy: '30%' } },
+  { stops: ['primary', 'dim', 'bright'] as const, focal: { cx: '68%', cy: '30%' } },
+  { stops: ['dim', 'primary', 'bright'] as const, focal: { cx: '68%', cy: '68%' } },
+  { stops: ['bright', 'dim', 'primary'] as const, focal: { cx: '32%', cy: '68%' } },
+  { stops: ['primary', 'bright', 'dim'] as const, focal: { cx: '50%', cy: '24%' } },
+  { stops: ['dim', 'bright', 'primary'] as const, focal: { cx: '50%', cy: '76%' } },
+] as const;
+
+const DEFAULT_BRAND_COLORS: BrandColors = {
+  bright: '#a78bfa',
+  primary: '#8b5cf6',
+  dim: '#7c3aed',
+};
+
+function readBrandColors(): BrandColors {
+  if (typeof document === 'undefined') return DEFAULT_BRAND_COLORS;
+  const style = getComputedStyle(document.documentElement);
+  const get = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
+  return {
+    bright: get('--color-brand-bright', DEFAULT_BRAND_COLORS.bright),
+    primary: get('--color-brand-primary', DEFAULT_BRAND_COLORS.primary),
+    dim: get('--color-brand-dim', DEFAULT_BRAND_COLORS.dim),
+  };
+}
+
+function useBrandColors(): BrandColors {
+  const [colors, setColors] = useState<BrandColors>(DEFAULT_BRAND_COLORS);
+
+  useEffect(() => {
+    const sync = () => setColors(readBrandColors());
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'style'],
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  return colors;
+}
+
+function resolveModelGradient(index: number, colors: BrandColors) {
+  const spec = MODEL_GRADIENT_SPECS[index % MODEL_GRADIENT_SPECS.length];
+  const gradIndex = index % MODEL_GRADIENT_SPECS.length;
+  const id = `model-usage-grad-${gradIndex}`;
+  const [from, mid, to] = spec.stops.map((key) => colors[key]);
+  return {
+    id,
+    from,
+    mid,
+    to,
+    focal: spec.focal,
+    fill: `url(#${id})`,
+    dotBackground: `linear-gradient(135deg, ${from} 0%, ${mid} 52%, ${to} 100%)`,
+  };
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -240,6 +308,236 @@ function StatCard({
   );
 }
 
+type ModelPiePoint = {
+  name: string;
+  model: string;
+  tokens: number;
+  cost: number;
+  requests: number;
+};
+
+type ModelPieTooltipProps = {
+  active?: boolean;
+  payload?: readonly { payload?: ModelPiePoint; value?: number }[];
+};
+
+function ModelPieTooltip({ active, payload }: ModelPieTooltipProps) {
+  if (!active || !payload?.length) return null;
+  const row = payload[0]?.payload as ModelPiePoint | undefined;
+  if (!row) return null;
+  return (
+    <div className="rounded-lg border border-shell-border bg-shell-panel px-3 py-2 text-[12px] shadow-lg">
+      <p className="font-medium text-shell-text">{row.model}</p>
+      <p className="mt-1 tabular-nums text-shell-muted">
+        Token <span className="font-semibold text-brand-primary">{formatTokens(row.tokens)}</span>
+      </p>
+      {row.cost > 0 ? (
+        <p className="tabular-nums text-shell-subtext">费用 {formatCost(row.cost)}</p>
+      ) : null}
+      {row.requests > 0 ? (
+        <p className="tabular-nums text-shell-subtext">{row.requests} 次调用</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ModelUsagePieChart({
+  rows,
+  totalTokens,
+  brandColors,
+}: {
+  rows: LlmUsageModelBucket[];
+  totalTokens: number;
+  brandColors: BrandColors;
+}) {
+  const pieData = useMemo<ModelPiePoint[]>(
+    () =>
+      rows
+        .filter((row) => row.total_tokens > 0)
+        .map((row) => ({
+          name: row.model,
+          model: row.model,
+          tokens: row.total_tokens,
+          cost: row.estimated_cost_usd ?? 0,
+          requests: row.request_count,
+        })),
+    [rows],
+  );
+
+  if (pieData.length === 0) {
+    return (
+      <div className="flex h-[240px] items-center justify-center rounded-xl border border-dashed border-shell-border bg-shell-bg/40">
+        <p className="text-[13px] text-shell-muted">暂无模型用量</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-[240px] w-full">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <PieChart>
+          <defs>
+            {MODEL_GRADIENT_SPECS.map((spec, index) => {
+              const [from, mid, to] = spec.stops.map((key) => brandColors[key]);
+              return (
+                <radialGradient
+                  key={`model-usage-grad-${index}`}
+                  id={`model-usage-grad-${index}`}
+                  cx={spec.focal.cx}
+                  cy={spec.focal.cy}
+                  r="88%"
+                  fx={spec.focal.cx}
+                  fy={spec.focal.cy}
+                >
+                  <stop offset="0%" stopColor={from} />
+                  <stop offset="48%" stopColor={mid} />
+                  <stop offset="100%" stopColor={to} />
+                </radialGradient>
+              );
+            })}
+          </defs>
+          <Pie
+            data={pieData}
+            cx="50%"
+            cy="50%"
+            innerRadius="52%"
+            outerRadius="78%"
+            paddingAngle={pieData.length > 1 ? 3 : 0}
+            dataKey="tokens"
+            stroke={themeVars.chartTooltipBg}
+            strokeWidth={2}
+          >
+            {pieData.map((entry, index) => (
+              <Cell key={entry.name} fill={resolveModelGradient(index, brandColors).fill} />
+            ))}
+          </Pie>
+          <Tooltip content={<ModelPieTooltip />} />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[18px] font-semibold tabular-nums text-shell-text">
+          {formatTokens(totalTokens)}
+        </span>
+        <span className="text-[10px] text-shell-muted">总 Token</span>
+      </div>
+    </div>
+  );
+}
+
+function ModelCostList({
+  rows,
+  totalTokens,
+  brandColors,
+  emptyHint = '暂无模型调用',
+}: {
+  rows: LlmUsageModelBucket[];
+  totalTokens: number;
+  brandColors: BrandColors;
+  emptyHint?: string;
+}) {
+  if (rows.length === 0) {
+    return <p className="text-[13px] text-shell-muted">{emptyHint}</p>;
+  }
+
+  const totalCost = rows.reduce((sum, r) => sum + (r.estimated_cost_usd ?? 0), 0);
+
+  return (
+    <ul className="space-y-2.5">
+      {rows.map((row, index) => {
+        const pct = totalTokens > 0 ? Math.round((row.total_tokens / totalTokens) * 100) : 0;
+        const costShare =
+          totalCost > 0 && row.estimated_cost_usd != null
+            ? Math.round((row.estimated_cost_usd / totalCost) * 100)
+            : null;
+
+        return (
+          <li
+            key={`${row.provider}-${row.model}`}
+            className="flex items-center justify-between gap-3 rounded-lg border border-shell-border bg-shell-bg/50 px-3 py-2.5"
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span
+                className="size-2.5 shrink-0 rounded-full"
+                style={{ background: resolveModelGradient(index, brandColors).dotBackground }}
+              />
+              <div className="min-w-0">
+                <p className="truncate font-mono text-[12px] font-medium text-shell-text">{row.model}</p>
+                <p className="text-[11px] text-shell-muted">
+                  {row.provider}
+                  {row.request_count > 0 ? ` · ${row.request_count} 次` : ''}
+                </p>
+              </div>
+            </div>
+            <div className="shrink-0 text-right">
+              {row.estimated_cost_usd != null && row.estimated_cost_usd > 0 ? (
+                <p className="tabular-nums text-[13px] font-medium text-shell-text">
+                  {formatCost(row.estimated_cost_usd)}
+                  {costShare != null ? (
+                    <span className="ml-1.5 text-[11px] font-normal text-shell-subtext">({costShare}%)</span>
+                  ) : null}
+                </p>
+              ) : (
+                <p className="tabular-nums text-[13px] text-shell-muted">—</p>
+              )}
+              <p className="text-[11px] tabular-nums text-shell-subtext">
+                {formatTokens(row.total_tokens)} tokens
+                {pct > 0 ? ` (${pct}%)` : ''}
+              </p>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ModelUsagePanel({
+  title,
+  subtitle,
+  rows,
+  totalTokens,
+  totalCost,
+  emptyHint,
+}: {
+  title: string;
+  subtitle: string;
+  rows: LlmUsageModelBucket[];
+  totalTokens: number;
+  totalCost: number;
+  emptyHint: string;
+}) {
+  const brandColors = useBrandColors();
+  const hasData = rows.some((row) => row.total_tokens > 0);
+
+  return (
+    <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Coins className="size-4 text-brand-primary" />
+          <div>
+            <p className="text-[14px] font-semibold text-shell-text">{title}</p>
+            <p className="text-[12px] text-shell-muted">{subtitle}</p>
+          </div>
+        </div>
+        {totalCost > 0 ? (
+          <span className="rounded-full bg-brand-primary/8 px-3 py-1 text-[11px] font-medium text-brand-primary">
+            合计 {formatCost(totalCost)}
+          </span>
+        ) : null}
+      </div>
+
+      {!hasData ? (
+        <p className="mt-6 text-[13px] text-shell-muted">{emptyHint}</p>
+      ) : (
+        <div className="mt-4 grid items-start gap-6 lg:grid-cols-[minmax(220px,280px)_1fr]">
+          <ModelUsagePieChart rows={rows} totalTokens={totalTokens} brandColors={brandColors} />
+          <ModelCostList rows={rows} totalTokens={totalTokens} brandColors={brandColors} emptyHint={emptyHint} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function TokenUsageStats() {
   const { ready, orgId } = useOrgReady();
   const [days, setDays] = useState<PeriodDays>(7);
@@ -292,6 +590,9 @@ export function TokenUsageStats() {
     const buckets = stats?.by_day ?? [];
     return buckets.length ? buckets[buckets.length - 1] : null;
   }, [stats?.by_day]);
+
+  const todayCost = stats?.today_summary?.estimated_cost_usd ?? 0;
+  const periodCost = stats?.summary.estimated_cost_usd ?? 0;
 
   const peakHour = useMemo(() => {
     const buckets = stats?.by_hour ?? [];
@@ -373,6 +674,13 @@ export function TokenUsageStats() {
             />
             {!isTodayView ? (
               <StatCard
+                label="今日预估费用"
+                value={formatCost(todayCost)}
+                hint={`${stats.currency ?? 'USD'} · 按模型单价估算`}
+              />
+            ) : null}
+            {!isTodayView ? (
+              <StatCard
                 label="今日 Token"
                 value={formatTokens(todayUsage?.total_tokens ?? 0)}
                 hint={
@@ -400,6 +708,19 @@ export function TokenUsageStats() {
               hint="Anthropic cache_creation"
             />
           </section>
+
+          <ModelUsagePanel
+            title={`${periodHint(stats.period_days)}费用（按模型）`}
+            subtitle={
+              isTodayView
+                ? `北京时间自然日 · ${stats.currency ?? 'USD'} 预估`
+                : `${periodHint(stats.period_days)}统计 · ${stats.currency ?? 'USD'} 预估`
+            }
+            rows={stats.by_model}
+            totalTokens={stats.summary.total_tokens}
+            totalCost={periodCost}
+            emptyHint={isTodayView ? '今日暂无模型调用' : '该周期暂无模型调用'}
+          />
 
           <section className="mt-4 rounded-2xl border border-shell-border bg-shell-panel p-5">
             <div className="mb-1 flex flex-wrap items-start justify-between gap-3">
@@ -541,38 +862,6 @@ export function TokenUsageStats() {
                       </li>
                     );
                   })}
-                </ul>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-shell-border bg-shell-panel p-5">
-              <p className="text-[14px] font-semibold text-shell-text">按模型</p>
-              <p className="mt-0.5 text-[12px] text-shell-muted">各模型与提供商的消耗占比</p>
-              {stats.by_model.length === 0 ? (
-                <p className="mt-6 text-[13px] text-shell-muted">暂无数据</p>
-              ) : (
-                <ul className="mt-4 space-y-2.5">
-                  {stats.by_model.map((row) => (
-                    <li
-                      key={`${row.provider}-${row.model}`}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-shell-border bg-shell-bg/50 px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-[12px] font-medium text-shell-text">{row.model}</p>
-                        <p className="text-[11px] text-shell-muted">{row.provider}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <span className="tabular-nums text-[13px] text-shell-muted">
-                          {formatTokens(row.total_tokens)}
-                        </span>
-                        {row.estimated_cost_usd != null && row.estimated_cost_usd > 0 ? (
-                          <p className="text-[11px] tabular-nums text-shell-subtext">
-                            {formatCost(row.estimated_cost_usd)}
-                          </p>
-                        ) : null}
-                      </div>
-                    </li>
-                  ))}
                 </ul>
               )}
             </div>

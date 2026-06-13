@@ -27,6 +27,7 @@ from knowledge_base.core.domain.taxonomy import (
 )
 from knowledge_base.models.memory import MemoryCandidate, WikiSuggestion
 from knowledge_base.settings import load
+from knowledge_base.core.services import audit_service
 
 log = get_logger("hivemind.candidate.service")
 
@@ -235,21 +236,39 @@ def get_candidate_stats(org_id: str, user_id: str | None = None) -> dict:
     return asdict(_registry.get_stats(org_id, user_id))
 
 
-def reject_candidate(candidate_id: int, org_id: str, reason: str = "") -> None:
+def reject_candidate(candidate_id: int, org_id: str, reason: str = "", user_id: str | None = None) -> None:
     _registry.update_resolver(
         candidate_id, org_id,
         status="rejected",
         resolver_action="noop",
         resolver_note=reason or "人工驳回",
     )
+    audit_service.log_event(
+        org_id,
+        user_id=user_id,
+        category="candidate",
+        action="candidate.reject",
+        resource_type="candidate",
+        resource_id=str(candidate_id),
+        summary=reason or "人工驳回",
+    )
 
 
-def approve_candidate(candidate_id: int, org_id: str, note: str = "") -> None:
+def approve_candidate(candidate_id: int, org_id: str, note: str = "", user_id: str | None = None) -> None:
     _registry.update_resolver(
         candidate_id, org_id,
         status="approved",
         resolver_action="create",
         resolver_note=note or "人工批准",
+    )
+    audit_service.log_event(
+        org_id,
+        user_id=user_id,
+        category="candidate",
+        action="candidate.approve",
+        resource_type="candidate",
+        resource_id=str(candidate_id),
+        summary=note or "人工批准",
     )
 
 
@@ -282,6 +301,16 @@ def compile_approved_candidates(
                 "wiki_path": wiki_path,
                 "status": "merged",
             })
+            audit_service.log_event(
+                org_id,
+                user_id=user_id,
+                category="wiki",
+                action="wiki.compile",
+                resource_type="candidate",
+                resource_id=str(cand.id),
+                summary=f"将「{cand.title}」写入 Wiki",
+                detail={"title": cand.title, "wiki_path": wiki_path, "category": cand.category},
+            )
         except Exception as exc:
             log.error("[candidate] compile failed  id=%d  err=%s", cand.id, exc)
             results.append({

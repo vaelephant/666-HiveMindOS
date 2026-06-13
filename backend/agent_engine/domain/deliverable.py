@@ -43,6 +43,21 @@ def _wiki_deliverable_markdown(goal: str, steps: list[dict]) -> str | None:
     return "\n".join(lines) if found else None
 
 
+def _save_deliverable_markdown(goal: str, steps: list[dict], checkpoints: dict | None) -> str | None:
+    if checkpoints and checkpoints.get("_deliverable_wiki"):
+        path = checkpoints["_deliverable_wiki"]
+        title = checkpoints.get("_deliverable_title") or goal
+        return f"# {title}\n\n已保存至 Wiki：`{path}`"
+    for step in reversed(steps):
+        if step.get("action") != "save_deliverable":
+            continue
+        summary = step.get("result_summary") or {}
+        if summary.get("wiki_path"):
+            title = summary.get("title") or goal
+            return f"# {title}\n\n已保存至 Wiki：`{summary['wiki_path']}`"
+    return None
+
+
 def extract_deliverable(
     goal: str,
     steps: list[dict],
@@ -51,8 +66,12 @@ def extract_deliverable(
 ) -> str | None:
     """
     优先取最后一次 llm_generate 的正文作为交付物。
-    Wiki 整理类任务则生成变更摘要。
+    Wiki 整理类任务则生成变更摘要；save_deliverable 返回 Wiki 路径说明。
     """
+    saved = _save_deliverable_markdown(goal, steps, checkpoints)
+    if saved:
+        return saved
+
     if checkpoints and checkpoints.get("_deliverable"):
         text = str(checkpoints["_deliverable"]).strip()
         if len(text) > 80:

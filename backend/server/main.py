@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from server.logging_config import setup_logging, get_logger
 from server.health_checks import run_startup_checks, cached_checks, log_results, _flag
 from server.routers import (
+    audit,
     automations,
     candidates,
     chat,
@@ -19,6 +20,7 @@ from server.routers import (
     tasks,
     usage,
     wiki,
+    workflows,
 )
 from knowledge_base.core.services.model_settings_service import init_user_profile_resolver
 from knowledge_base.core.services.usage_service import init_usage_tracking
@@ -70,7 +72,19 @@ async def lifespan(_app: FastAPI):
     except Exception as exc:
         log.warning("serial sequence repair skipped: %s", exc)
 
+    scheduler_task = None
+    if _flag("WORKFLOW_SCHEDULER_ENABLED", default=False):
+        from knowledge_base.core.services.workflow_scheduler import start_scheduler
+
+        scheduler_task = start_scheduler()
+        log.info("工作流 cron 调度已启用 (WORKFLOW_SCHEDULER_ENABLED=true)")
+
     yield
+
+    if scheduler_task is not None:
+        from knowledge_base.core.services.workflow_scheduler import stop_scheduler
+
+        await stop_scheduler()
 
     close_pool()
     log.info("HiveMindOS server shutting down.")
@@ -97,6 +111,8 @@ app.include_router(wiki.router,         prefix="/api/v1", tags=["wiki"])
 app.include_router(skills.router,       prefix="/api/v1", tags=["skills"])
 app.include_router(playbook.router,     prefix="/api/v1", tags=["playbook"])
 app.include_router(usage.router,        prefix="/api/v1", tags=["usage"])
+app.include_router(audit.router,        prefix="/api/v1", tags=["audit"])
+app.include_router(workflows.router,    prefix="/api/v1", tags=["workflows"])
 app.include_router(settings.router,     prefix="/api/v1", tags=["settings"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])

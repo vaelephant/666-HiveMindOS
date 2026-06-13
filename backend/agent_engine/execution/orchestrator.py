@@ -101,6 +101,10 @@ class TaskOrchestrator:
                 checkpoints[task.id] = summary
                 if task.action == "llm_generate" and summary.get("text"):
                     checkpoints["_deliverable"] = summary["text"]
+                if task.action == "save_deliverable" and summary.get("wiki_path"):
+                    checkpoints["_deliverable_wiki"] = summary["wiki_path"]
+                    if summary.get("title"):
+                        checkpoints["_deliverable_title"] = summary["title"]
                 reflection = self._reflect.run(
                     goal=goal_text,
                     task=task,

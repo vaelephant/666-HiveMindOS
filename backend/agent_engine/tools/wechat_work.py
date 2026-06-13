@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from integrations.wechat_work.client import WeChatWorkClient
 from integrations.wechat_work.registry import WeChatWorkRegistry
+from knowledge_base.core.services import audit_service
 
 
 def send_wechat_work_message(
@@ -31,6 +32,16 @@ def send_wechat_work_message(
         client.send_markdown(cfg.agent_id, to_user, content)
     else:
         client.send_text(cfg.agent_id, to_user, content)
+
+    audit_service.log_event(
+        org_id,
+        category="communicate",
+        action="wechat.send",
+        resource_type="wechat_user",
+        resource_id=to_user,
+        summary=f"企微消息 → {to_user}（{len(content)} 字）",
+        detail={"msg_type": msg_type, "chars": len(content)},
+    )
 
     return {
         "ok": True,

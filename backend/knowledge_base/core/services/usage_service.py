@@ -116,9 +116,66 @@ def _fill_daily_buckets(start: date, end: date, rows: list) -> list[dict]:
     return out
 
 
+_BY_MODEL_SQL = """
+    SELECT
+        model,
+        provider,
+        COALESCE(SUM(total_tokens), 0),
+        COALESCE(SUM(prompt_tokens), 0),
+        COALESCE(SUM(completion_tokens), 0),
+        COUNT(*),
+        COALESCE(SUM(cached_prompt_tokens), 0),
+        COALESCE(SUM(cache_creation_tokens), 0)
+    FROM llm_usage_events
+    WHERE org_id = %s AND user_id = %s AND created_at >= %s
+    GROUP BY model, provider
+    ORDER BY COALESCE(SUM(total_tokens), 0) DESC
+"""
+
+
+def _build_model_buckets(rows: list) -> list[dict]:
+    return [
+        {
+            "model": row[0],
+            "provider": row[1],
+            "total_tokens": int(row[2]),
+            "prompt_tokens": int(row[3]),
+            "completion_tokens": int(row[4]),
+            "request_count": int(row[5]),
+            "cached_prompt_tokens": int(row[6]),
+            "cache_creation_tokens": int(row[7]),
+            "estimated_cost_usd": estimate_cost_usd(
+                model=row[0],
+                prompt_tokens=int(row[3]),
+                completion_tokens=int(row[4]),
+                cached_prompt_tokens=int(row[6]),
+                cache_creation_tokens=int(row[7]),
+            ),
+        }
+        for row in rows
+    ]
+
+
+def _summarize_model_buckets(buckets: list[dict]) -> dict:
+    prompt = sum(b["prompt_tokens"] for b in buckets)
+    cached = sum(b["cached_prompt_tokens"] for b in buckets)
+    cache_hit_rate = round(cached / prompt, 4) if prompt > 0 else None
+    return {
+        "total_tokens": sum(b["total_tokens"] for b in buckets),
+        "prompt_tokens": prompt,
+        "completion_tokens": sum(b["completion_tokens"] for b in buckets),
+        "request_count": sum(b["request_count"] for b in buckets),
+        "cached_prompt_tokens": cached,
+        "cache_creation_tokens": sum(b["cache_creation_tokens"] for b in buckets),
+        "cache_hit_rate": cache_hit_rate,
+        "estimated_cost_usd": estimate_buckets_cost(buckets) if buckets else 0.0,
+    }
+
+
 def get_user_usage_stats(org_id: str, user_id: str, days: int = 30) -> dict:
     days = max(1, min(days, 365))
     since, start_date, end_date = _period_start_utc(days)
+    today_since, _, _ = _period_start_utc(1)
 
     with pg_conn() as conn:
         summary_row = conn.execute(
@@ -169,23 +226,17 @@ def get_user_usage_stats(org_id: str, user_id: str, days: int = 30) -> dict:
         ).fetchall()
 
         by_model = conn.execute(
-            """
-            SELECT
-                model,
-                provider,
-                COALESCE(SUM(total_tokens), 0),
-                COALESCE(SUM(prompt_tokens), 0),
-                COALESCE(SUM(completion_tokens), 0),
-                COUNT(*),
-                COALESCE(SUM(cached_prompt_tokens), 0),
-                COALESCE(SUM(cache_creation_tokens), 0)
-            FROM llm_usage_events
-            WHERE org_id = %s AND user_id = %s AND created_at >= %s
-            GROUP BY model, provider
-            ORDER BY COALESCE(SUM(total_tokens), 0) DESC
-            """,
+            _BY_MODEL_SQL,
             (org_id, user_id, since),
         ).fetchall()
+
+        if days == 1:
+            today_by_model = by_model
+        else:
+            today_by_model = conn.execute(
+                _BY_MODEL_SQL,
+                (org_id, user_id, today_since),
+            ).fetchall()
 
         by_operation = conn.execute(
             """
@@ -256,27 +307,10 @@ def get_user_usage_stats(org_id: str, user_id: str, days: int = 30) -> dict:
     cached_i = int(cached)
     cache_hit_rate = round(cached_i / prompt_i, 4) if prompt_i > 0 else None
 
-    by_model_list = [
-        {
-            "model": row[0],
-            "provider": row[1],
-            "total_tokens": int(row[2]),
-            "prompt_tokens": int(row[3]),
-            "completion_tokens": int(row[4]),
-            "request_count": int(row[5]),
-            "cached_prompt_tokens": int(row[6]),
-            "cache_creation_tokens": int(row[7]),
-            "estimated_cost_usd": estimate_cost_usd(
-                model=row[0],
-                prompt_tokens=int(row[3]),
-                completion_tokens=int(row[4]),
-                cached_prompt_tokens=int(row[6]),
-                cache_creation_tokens=int(row[7]),
-            ),
-        }
-        for row in by_model
-    ]
+    by_model_list = _build_model_buckets(by_model)
+    today_by_model_list = _build_model_buckets(today_by_model)
     estimated_cost_usd = estimate_buckets_cost(by_model_list) if by_model_list else 0.0
+    today_summary = _summarize_model_buckets(today_by_model_list)
 
     return {
         "period_days": days,
@@ -292,6 +326,7 @@ def get_user_usage_stats(org_id: str, user_id: str, days: int = 30) -> dict:
             "cache_hit_rate": cache_hit_rate,
             "estimated_cost_usd": estimated_cost_usd,
         },
+        "today_summary": today_summary,
         "by_day": _fill_daily_buckets(start_date, end_date, by_day),
         "by_hour": _fill_hourly_buckets(by_hour),
         "by_source": [
@@ -305,6 +340,7 @@ def get_user_usage_stats(org_id: str, user_id: str, days: int = 30) -> dict:
             for row in by_source
         ],
         "by_model": by_model_list,
+        "today_by_model": today_by_model_list,
         "by_operation": [
             {
                 "operation": row[0],

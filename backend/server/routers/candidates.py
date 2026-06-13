@@ -62,12 +62,13 @@ def resolve_candidates(org_id: str, req: ResolveRequest):
 
 class ReviewRequest(BaseModel):
     reason: str = ""
+    user_id: str = "demo"
 
 
 @router.post("/orgs/{org_id}/candidates/{candidate_id}/approve")
 def approve(org_id: str, candidate_id: int, req: ReviewRequest):
     try:
-        approve_candidate(candidate_id, org_id, note=req.reason)
+        approve_candidate(candidate_id, org_id, note=req.reason, user_id=req.user_id)
         return {"ok": True, "candidate_id": candidate_id, "status": "approved"}
     except Exception as exc:
         log.error("[candidate] approve failed: %s", exc)
@@ -96,7 +97,7 @@ def compile_candidates(org_id: str, req: CompileRequest):
 @router.post("/orgs/{org_id}/candidates/{candidate_id}/reject")
 def reject(org_id: str, candidate_id: int, req: ReviewRequest):
     try:
-        reject_candidate(candidate_id, org_id, reason=req.reason)
+        reject_candidate(candidate_id, org_id, reason=req.reason, user_id=req.user_id)
         return {"ok": True, "candidate_id": candidate_id, "status": "rejected"}
     except Exception as exc:
         log.error("[candidate] reject failed: %s", exc)

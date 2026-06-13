@@ -44,6 +44,13 @@ jobs:
       deliver_wechat: false
       wechat_userid: ""
 
+  - id: lint_wiki
+    label: Wiki 质量巡检
+    description: 检测空页、孤立页与 AI 质量建议，结果写入审计日志
+    category: wiki
+    cron_hint: "0 4 * * *"
+    defaults: {}
+
 category_labels:
   memory: 智慧进化
   wiki: 知识晋升

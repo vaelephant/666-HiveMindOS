@@ -98,3 +98,11 @@ actions:
       to_user: { type: string, required: true, description: 企微成员 userid }
       content: { type: string, required: true }
       msg_type: { type: string, optional: true, default: text, enum: [text, markdown] }
+
+  - name: save_deliverable
+    domain: deliverable
+    description: 将任务交付物保存为 Wiki Markdown 页面（deliverables/ 目录）
+    params:
+      title: { type: string, required: true }
+      content: { type: string, required: true }
+      source_label: { type: string, optional: true, default: 自主任务 }

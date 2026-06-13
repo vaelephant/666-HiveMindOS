@@ -9,13 +9,18 @@ from __future__ import annotations
 from pathlib import Path
 
 from server.logging_config import get_logger
+from knowledge_base import config
+from knowledge_base.core.compiler.entity_resolver import EntityResolver
 from knowledge_base.core.compiler.wiki_merger import (
     supplement_wiki_page,
     upsert_digest_page,
+    upsert_entity_page,
     upsert_rule_page,
     upsert_workflow_page,
 )
+from knowledge_base.core.graph.memory_graph import MemoryGraph
 from knowledge_base.core.wiki import wiki_meta
+from knowledge_base.models.entity import Entity
 from knowledge_base.models.knowledge_candidate import KnowledgeCandidateRecord
 
 log = get_logger("hivemind.compiler.chat_digest")
@@ -31,6 +36,65 @@ def _source_label(cand: KnowledgeCandidateRecord) -> str:
     return cand.source_type
 
 
+def _compile_entity_candidate(
+    wiki_root: Path,
+    org_id: str,
+    cand: KnowledgeCandidateRecord,
+    source: str,
+) -> str:
+    """entity 类候选：经 EntityResolver 合并后写入 entities/ 并同步图谱。"""
+    meta = cand.metadata or {}
+    entity_type = meta.get("entity_type") or "其他"
+    raw_attrs = meta.get("attributes") if isinstance(meta.get("attributes"), dict) else {}
+    raw_entity = {
+        "name": cand.title,
+        "type": entity_type,
+        "description": cand.content,
+        "attributes": raw_attrs,
+    }
+
+    graph = MemoryGraph(config.GRAPH_ROOT / org_id / "graph.db")
+    resolver = EntityResolver(graph)
+    resolved = resolver.resolve_all(org_id, [raw_entity], source)[0]
+    wiki_path = upsert_entity_page(wiki_root, org_id, resolved, source)
+
+    conflict_rows = [
+        {
+            "field": c.field,
+            "existing_value": c.existing_value,
+            "new_value": c.new_value,
+            "source": c.new_source,
+        }
+        for c in resolved.conflicts
+    ]
+    wiki_meta.record_entity_compile(
+        wiki_root,
+        org_id,
+        wiki_path,
+        source_id=cand.source_id,
+        source_filename=source,
+        source_type=cand.source_type,
+        entity_type=resolved.entity_type,
+        description=resolved.description,
+        attributes=resolved.all_attributes,
+        attribute_provenance=raw_attrs,
+        relations=resolved.relations,
+        conflicts=conflict_rows,
+        is_new=resolved.is_new,
+        new_attributes=resolved.new_attributes,
+    )
+    graph.upsert_entity(Entity(
+        id=resolved.entity_id,
+        org_id=org_id,
+        name=resolved.name,
+        entity_type=resolved.entity_type,
+        wiki_path=wiki_path,
+        attributes=resolved.all_attributes,
+    ))
+    log.info("[digest] entity compiled  id=%d  path=%s  new=%s", cand.id, wiki_path, resolved.is_new)
+    return wiki_path
+
+
 def compile_candidate(
     wiki_root: Path,
     org_id: str,
@@ -42,6 +106,19 @@ def compile_candidate(
     """
     source = _source_label(cand)
     action = cand.resolver_action or cand.proposed_action
+
+    if cand.category == "entity" and action != "supplement":
+        path = _compile_entity_candidate(wiki_root, org_id, cand, source)
+        wiki_meta.record_digest_compile(
+            wiki_root, org_id, path,
+            source_id=cand.source_id,
+            source_label=source,
+            source_type=cand.source_type,
+            category=cand.category,
+            title=cand.title,
+            candidate_id=cand.id,
+        )
+        return path
 
     if action == "supplement" and cand.target_wiki_path:
         return supplement_wiki_page(

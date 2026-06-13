@@ -1,0 +1,69 @@
+# 内置工作流模板 — 首次访问 /workflows 时按 org 种子化
+
+category_labels:
+  memory: 智慧进化
+  wiki: 知识晋升
+  mixed: 综合管线
+
+templates:
+  - id: nightly_knowledge_pipeline
+    label: 夜间知识管线
+    description: 会话复盘 → 解析候选 → 编译 Wiki → 质量巡检
+    category: wiki
+    cron_hint: "0 2 * * *"
+    enabled: true
+    schedule_enabled: false
+    steps:
+      - id: recap
+        action: automation.recap_sessions
+        params:
+          idle_hours: 24
+          limit: 10
+      - id: resolve
+        action: automation.resolve_candidates
+        params:
+          limit: 30
+      - id: compile
+        action: automation.compile_candidates
+        when: "$resolve.approved >= 1"
+        params:
+          limit: 20
+      - id: lint
+        action: automation.lint_wiki
+
+  - id: morning_digest
+    label: 晨间智慧摘要
+    description: 生成每日摘要，可选企微推送（需在步骤 params 配置 userid）
+    category: memory
+    cron_hint: "0 9 * * *"
+    enabled: true
+    schedule_enabled: false
+    steps:
+      - id: digest
+        action: automation.daily_digest
+        params:
+          days: 1
+          deliver_wechat: false
+          wechat_userid: ""
+
+  - id: wiki_sync_pipeline
+    label: Wiki 同步管线
+    description: 向量同步后批量解析并编译候选
+    category: mixed
+    cron_hint: "30 2 * * *"
+    enabled: true
+    schedule_enabled: false
+    steps:
+      - id: vectors
+        action: automation.sync_vectors
+        params:
+          limit: 200
+      - id: resolve
+        action: automation.resolve_candidates
+        params:
+          limit: 30
+      - id: compile
+        action: automation.compile_candidates
+        when: "$resolve.approved >= 1"
+        params:
+          limit: 20

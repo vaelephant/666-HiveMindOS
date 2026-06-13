@@ -31,6 +31,7 @@ def test_get_user_usage_stats_shapes_response():
     ]
     by_source = [("chat", 1200, 700, 500, 10), ("memory", 300, 200, 100, 2)]
     by_model = [("gpt-4o", "openai", 1500, 900, 600, 12, 450, 80)]
+    today_by_model = [("gpt-4o", "openai", 500, 300, 200, 4, 150, 20)]
     by_operation = [("chat", 1200, 700, 500, 10)]
     by_profile = [("default", 1500, 900, 600, 12)]
     by_provider = [("openai", 1500, 900, 600, 12)]
@@ -42,6 +43,7 @@ def test_get_user_usage_stats_shapes_response():
         MagicMock(fetchall=MagicMock(return_value=by_day)),
         MagicMock(fetchall=MagicMock(return_value=by_source)),
         MagicMock(fetchall=MagicMock(return_value=by_model)),
+        MagicMock(fetchall=MagicMock(return_value=today_by_model)),
         MagicMock(fetchall=MagicMock(return_value=by_operation)),
         MagicMock(fetchall=MagicMock(return_value=by_profile)),
         MagicMock(fetchall=MagicMock(return_value=by_provider)),
@@ -70,6 +72,40 @@ def test_get_user_usage_stats_shapes_response():
     assert result["currency"] == "USD"
     assert result["summary"]["estimated_cost_usd"] > 0
     assert result["by_model"][0]["estimated_cost_usd"] > 0
+    assert result["today_by_model"][0]["model"] == "gpt-4o"
+    assert result["today_summary"]["total_tokens"] == 500
+    assert result["today_summary"]["estimated_cost_usd"] > 0
+
+
+def test_get_user_usage_stats_today_skips_extra_model_query():
+    summary = (500, 300, 200, 4, 150, 20)
+    by_day = [(datetime(2026, 6, 13).date(), 500, 300, 200, 4)]
+    by_source = [("chat", 500, 300, 200, 4)]
+    by_model = [("gpt-4o", "openai", 500, 300, 200, 4, 150, 20)]
+    by_operation = [("chat", 500, 300, 200, 4)]
+    by_profile = [("default", 500, 300, 200, 4)]
+    by_provider = [("openai", 500, 300, 200, 4)]
+    by_hour = [(14, 500, 300, 200, 4)]
+
+    mock_conn = MagicMock()
+    mock_conn.execute.side_effect = [
+        MagicMock(fetchone=MagicMock(return_value=summary)),
+        MagicMock(fetchall=MagicMock(return_value=by_day)),
+        MagicMock(fetchall=MagicMock(return_value=by_source)),
+        MagicMock(fetchall=MagicMock(return_value=by_model)),
+        MagicMock(fetchall=MagicMock(return_value=by_operation)),
+        MagicMock(fetchall=MagicMock(return_value=by_profile)),
+        MagicMock(fetchall=MagicMock(return_value=by_provider)),
+        MagicMock(fetchall=MagicMock(return_value=by_hour)),
+    ]
+
+    with patch("knowledge_base.core.services.usage_service.pg_conn") as pg:
+        pg.return_value.__enter__.return_value = mock_conn
+        result = usage_service.get_user_usage_stats("org-1", "user-1", days=1)
+
+    assert result["period_days"] == 1
+    assert result["today_by_model"] == result["by_model"]
+    assert mock_conn.execute.call_count == 8
 
 
 def test_persist_usage_skips_unknown_org():

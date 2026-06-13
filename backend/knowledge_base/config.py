@@ -28,6 +28,7 @@ GRAPH_ROOT: Path = STORAGE_ROOT / "graph"
 REGISTRY_DB: Path = STORAGE_ROOT / "registry.db"
 TASK_DB:        Path = STORAGE_ROOT / "tasks.db"
 AUTOMATION_DB:  Path = STORAGE_ROOT / "automation_runs.db"
+WORKFLOW_DB:    Path = STORAGE_ROOT / "workflows.db"
 LOG_DIR: Path = STORAGE_ROOT / "logs"
 
 # PostgreSQL — Memory Layer（Raw Chat + Structured Memory）

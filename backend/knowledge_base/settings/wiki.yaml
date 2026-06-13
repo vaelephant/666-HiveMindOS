@@ -12,9 +12,15 @@ category_folders:
   workflow: workflows
   rule: glossary
   other: digests
+  deliverable: deliverables
 
 # 已知 Wiki 子目录（编译产出 + UI 侧栏）
 folders:
+  deliverables:
+    label: 任务交付物
+    description: 自主任务生成的报告与方案
+    order: 0
+    kind: deliverable
   entities:
     label: 实体档案
     description: 客户、产品、合同、人员
@@ -57,6 +63,7 @@ folders:
     kind: other
 
 kind_labels:
+  deliverable: 任务交付物
   entity: 实体档案
   workflow: 业务流程
   rule: 术语规则

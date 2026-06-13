@@ -1,4 +1,5 @@
-import PlatformPagePlaceholder from '@/components/platform/PlatformPagePlaceholder';
-export default function Page() {
-  return <PlatformPagePlaceholder title="审计日志" path="/audit" segments={['audit']} />;
+import { AuditLogView } from '@/components/audit/audit-log-view';
+
+export default function AuditPage() {
+  return <AuditLogView />;
 }
