@@ -1,7 +1,8 @@
-"""OpenAI 原生 SDK — chat / stream / tools / embed。"""
+"""OpenAI 原生 SDK — chat / stream / tools / embed / vision。"""
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 from collections.abc import Iterator
@@ -61,6 +62,37 @@ def complete(
         max_tokens=max_tokens,
     )
     return text
+
+
+def _vision_content(prompt: str, images: list[bytes]) -> list[dict]:
+    parts: list[dict] = [{"type": "text", "text": prompt}]
+    for img in images:
+        b64 = base64.standard_b64encode(img).decode("ascii")
+        parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{b64}"},
+        })
+    return parts
+
+
+def complete_vision_with_usage(
+    *,
+    images: list[bytes],
+    prompt: str,
+    system: str | None,
+    model: str,
+    max_tokens: int,
+) -> tuple[str, dict | None]:
+    messages: list[dict] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": _vision_content(prompt, images)})
+    response = _get_client().chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        messages=messages,
+    )
+    return response.choices[0].message.content or "", _usage_from_openai(response.usage)
 
 
 def complete_with_usage(

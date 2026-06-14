@@ -39,9 +39,62 @@ schemas:
 runtime:
   search_preview_chars: 150
   search_max_matches: 8
-  gather_max_iterations: 6
+  gather_max_iterations: 8
   history_turns: 6
   synthesis_source_chars: 800
+  synthesis_health_chars: 4000
   task_search_preview_chars: 200
   query_max_pages: 30
   query_page_chars: 2000
+
+health_schemas:
+  - type: function
+    function:
+      name: list_health_reports
+      description: 列出用户最近的检查报告（含检验/影像等），返回摘要与 report_id
+      parameters:
+        type: object
+        properties:
+          limit:
+            type: integer
+            description: 最多返回条数，默认 10
+
+  - type: function
+    function:
+      name: get_health_report
+      description: 读取单份检查报告详情；检验类含指标列表，其他类型含摘要与原文节选
+      parameters:
+        type: object
+        properties:
+          report_id:
+            type: string
+            description: 报告 UUID
+        required: [report_id]
+
+  - type: function
+    function:
+      name: query_lab_observations
+      description: 按指标名称或代码查询历史检验数值（如白细胞、血红蛋白、WBC）
+      parameters:
+        type: object
+        properties:
+          display_name:
+            type: string
+            description: 指标中文名，如「白细胞计数」
+          code:
+            type: string
+            description: 指标代码，如 WBC
+          limit:
+            type: integer
+            description: 最多返回条数，默认 20
+
+  - type: function
+    function:
+      name: list_abnormal_observations
+      description: 列出用户历史检验报告中标记为异常的指标
+      parameters:
+        type: object
+        properties:
+          limit:
+            type: integer
+            description: 最多返回条数，默认 30

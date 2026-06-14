@@ -35,6 +35,7 @@ import type {
   SourceCollection,
   SourceCollectionsResponse,
   SourceRecord,
+  HealthReport,
   WikiCategory,
   WikiPage,
   WikiPageDetail,
@@ -108,6 +109,38 @@ export async function uploadSource(
     form.append('collection', options.collection.trim());
   }
   return req(`${base(orgId)}/sources`, { method: 'POST', body: form });
+}
+
+/** 上传检查报告 PDF/图片，后台异步 OCR 与结构化解析 */
+export async function uploadHealthReport(
+  file: File,
+  orgId = resolveOrgId(),
+): Promise<HealthReport> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('user_id', resolveUserId());
+  return req(`${base(orgId)}/health/reports`, { method: 'POST', body: form });
+}
+
+export async function getHealthReport(
+  reportId: string,
+  orgId = resolveOrgId(),
+): Promise<HealthReport> {
+  return req(`${base(orgId)}/health/reports/${reportId}`);
+}
+
+export async function listHealthReports(
+  orgId = resolveOrgId(),
+  options?: { limit?: number; offset?: number },
+): Promise<HealthReport[]> {
+  const params = new URLSearchParams();
+  if (options?.limit != null) params.set('limit', String(options.limit));
+  if (options?.offset != null) params.set('offset', String(options.offset));
+  const qs = params.toString();
+  const data = await req<{ reports: HealthReport[] }>(
+    `${base(orgId)}/health/reports${qs ? `?${qs}` : ''}`,
+  );
+  return data.reports;
 }
 
 export async function listSources(orgId = resolveOrgId()): Promise<SourceRecord[]> {

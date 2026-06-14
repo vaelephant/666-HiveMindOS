@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUp, Bot, Brain, ChevronDown, Loader2, Sparkles, User, Wrench } from 'lucide-react';
+import { ArrowUp, Bot, Brain, ChevronDown, FileText, Loader2, Paperclip, Sparkles, User, Wrench, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TurnEvolutionHint } from '@/components/chat/evolution-panel';
 import { ChatMarkdown, isChatErrorAnswer } from '@/components/chat/markdown/markdown';
@@ -415,6 +415,64 @@ function TurnPair({
   );
 }
 
+export type ChatAttachment = {
+  id: string;
+  filename: string;
+  status: 'uploading' | 'processing' | 'ready' | 'failed';
+  reportId?: string;
+  error?: string;
+};
+
+const HEALTH_UPLOAD_ACCEPT =
+  '.pdf,.png,.jpg,.jpeg,.webp,.tif,.tiff,.bmp,.gif,application/pdf,image/*';
+
+function AttachmentChip({
+  attachment,
+  onRemove,
+  disabled,
+}: {
+  attachment: ChatAttachment;
+  onRemove?: () => void;
+  disabled?: boolean;
+}) {
+  const statusLabel =
+    attachment.status === 'uploading'
+      ? '上传中'
+      : attachment.status === 'processing'
+        ? '解析中'
+        : attachment.status === 'failed'
+          ? '失败'
+          : '已就绪';
+
+  return (
+    <div
+      className={cn(
+        'flex max-w-full items-center gap-1.5 rounded-xl border px-2.5 py-1.5 text-[12px]',
+        attachment.status === 'failed'
+          ? 'border-status-error/40 bg-status-error/5 text-status-error'
+          : 'border-shell-border bg-shell-bg text-shell-subtext',
+      )}
+    >
+      <FileText className="size-3.5 shrink-0" />
+      <span className="truncate">{attachment.filename}</span>
+      {(attachment.status === 'uploading' || attachment.status === 'processing') && (
+        <Loader2 className="size-3 shrink-0 animate-spin text-brand-primary" />
+      )}
+      <span className="shrink-0 text-[11px] text-shell-muted">{statusLabel}</span>
+      {onRemove && !disabled && attachment.status !== 'uploading' && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded p-0.5 text-shell-muted hover:bg-shell-border/60 hover:text-shell-text"
+          aria-label="移除附件"
+        >
+          <X className="size-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function ChatInputBar({
   value,
   onChange,
@@ -422,6 +480,10 @@ export function ChatInputBar({
   disabled,
   placeholder,
   large,
+  attachments = [],
+  onAttach,
+  onRemoveAttachment,
+  attachDisabled,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -429,44 +491,95 @@ export function ChatInputBar({
   disabled: boolean;
   placeholder: string;
   large?: boolean;
+  attachments?: ChatAttachment[];
+  onAttach?: (files: FileList) => void;
+  onRemoveAttachment?: (id: string) => void;
+  attachDisabled?: boolean;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasReadyAttachment = attachments.some(
+    (a) => a.status === 'ready' || a.status === 'processing',
+  );
+  const isBusy = attachments.some((a) => a.status === 'uploading');
+  const canSend = (value.trim() || hasReadyAttachment) && !disabled && !isBusy;
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      if (canSend) onSend();
     }
   }
 
   return (
     <div
       className={cn(
-        'flex items-end gap-2 rounded-[26px] border border-shell-border bg-shell-panel shadow-lg shadow-black/5 transition-colors focus-within:border-brand-primary/40 focus-within:ring-2 focus-within:ring-brand-primary/10',
-        large ? 'px-5 py-3.5' : 'px-4 py-2.5',
+        'rounded-[26px] border border-shell-border bg-shell-panel shadow-lg shadow-black/5 transition-colors focus-within:border-brand-primary/40 focus-within:ring-2 focus-within:ring-brand-primary/10',
+        large ? 'px-4 py-3.5' : 'px-3 py-2.5',
       )}
     >
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={large ? 2 : 1}
-        autoFocus={large}
-        className={cn(
-          'custom-scrollbar max-h-36 flex-1 resize-none bg-transparent text-shell-text outline-none placeholder:text-shell-muted',
-          large ? 'text-[15px]' : 'text-[14px]',
-        )}
-      />
-      <button
-        type="button"
-        onClick={onSend}
-        disabled={!value.trim() || disabled}
-        className={cn(
-          'flex shrink-0 items-center justify-center rounded-full bg-brand-primary text-brand-on-primary transition-opacity disabled:opacity-40 hover:opacity-90',
-          large ? 'size-9' : 'size-8',
-        )}
-      >
-        <ArrowUp className="size-4" />
-      </button>
+      {attachments.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2 px-1">
+          {attachments.map((a) => (
+            <AttachmentChip
+              key={a.id}
+              attachment={a}
+              disabled={disabled}
+              onRemove={onRemoveAttachment ? () => onRemoveAttachment(a.id) : undefined}
+            />
+          ))}
+        </div>
+      )}
+      <div className="flex items-end gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={HEALTH_UPLOAD_ACCEPT}
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files?.length && onAttach) {
+              onAttach(e.target.files);
+              e.target.value = '';
+            }
+          }}
+        />
+        <button
+          type="button"
+          disabled={disabled || attachDisabled}
+          onClick={() => fileInputRef.current?.click()}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-full text-shell-muted transition-colors hover:bg-shell-bg hover:text-shell-text disabled:opacity-40',
+            large ? 'size-9' : 'size-8',
+          )}
+          title="上传检查报告（PDF 或图片）"
+          aria-label="上传检查报告"
+        >
+          <Paperclip className="size-4" />
+        </button>
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          rows={large ? 2 : 1}
+          autoFocus={large}
+          className={cn(
+            'custom-scrollbar max-h-36 flex-1 resize-none bg-transparent text-shell-text outline-none placeholder:text-shell-muted',
+            large ? 'text-[15px]' : 'text-[14px]',
+          )}
+        />
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={!canSend}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-full bg-brand-primary text-brand-on-primary transition-opacity disabled:opacity-40 hover:opacity-90',
+            large ? 'size-9' : 'size-8',
+          )}
+        >
+          <ArrowUp className="size-4" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -477,12 +590,18 @@ export function ChatEmptyState({
   onSend,
   disabled,
   suggestions = [],
+  attachments = [],
+  onAttach,
+  onRemoveAttachment,
 }: {
   input: string;
   onInputChange: (v: string) => void;
   onSend: (text?: string) => void;
   disabled: boolean;
   suggestions?: string[];
+  attachments?: ChatAttachment[];
+  onAttach?: (files: FileList) => void;
+  onRemoveAttachment?: (id: string) => void;
 }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center px-5 pb-8">
@@ -493,7 +612,7 @@ export function ChatEmptyState({
         有什么可以帮你的？
       </h1>
       <p className="mt-2 text-[13px] text-shell-muted">
-        提问或描述目标，系统将检索 Wiki 与智慧记忆并回答
+        输入问题，或点击输入框左侧回形针上传检查报告（PDF / 图片）
       </p>
 
       <div className="mt-10 w-full max-w-5xl">
@@ -502,8 +621,11 @@ export function ChatEmptyState({
           onChange={onInputChange}
           onSend={() => onSend()}
           disabled={disabled}
-          placeholder="输入问题，按 Enter 发送"
+          placeholder="输入问题，或上传检查报告…"
           large
+          attachments={attachments}
+          onAttach={onAttach}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </div>
 
@@ -540,6 +662,9 @@ export function ChatThread({
   onUpgrade,
   onCreateTaskFromTurn,
   onEnqueueTurn,
+  attachments = [],
+  onAttach,
+  onRemoveAttachment,
 }: {
   turns: ChatTurn[];
   pending: string | null;
@@ -557,6 +682,9 @@ export function ChatThread({
   onUpgrade?: () => void;
   onCreateTaskFromTurn?: (turnIndex: number) => void;
   onEnqueueTurn?: (turnIndex: number) => Promise<void>;
+  attachments?: ChatAttachment[];
+  onAttach?: (files: FileList) => void;
+  onRemoveAttachment?: (id: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const pinToBottomRef = useRef(true);
@@ -634,10 +762,13 @@ export function ChatThread({
             onChange={onInputChange}
             onSend={() => onSend()}
             disabled={pending !== null}
-            placeholder="发送消息…"
+            placeholder="发送消息，或上传检查报告…"
+            attachments={attachments}
+            onAttach={onAttach}
+            onRemoveAttachment={onRemoveAttachment}
           />
           <p className="mt-2 text-center text-[11px] text-shell-muted">
-            回答基于 Wiki 与智慧记忆，重要决策请核实原文
+            回答基于 Wiki、检查报告与智慧记忆，重要决策请核实原文
             {onUpgrade && turns.length > 0 && !upgradeSuggestion?.recommended && (
               <>
                 {' · '}

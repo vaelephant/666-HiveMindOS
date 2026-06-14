@@ -22,6 +22,7 @@ from server.routers import (
     usage,
     wiki,
     workflows,
+    health,
 )
 from model_layer.services.model_settings_service import init_user_profile_resolver
 from model_layer.services.usage_service import init_usage_tracking
@@ -118,6 +119,7 @@ app.include_router(workflows.router,    prefix="/api/v1", tags=["workflows"])
 app.include_router(settings.router,     prefix="/api/v1", tags=["settings"])
 app.include_router(webhooks_wechat_work.router, prefix="/api/v1", tags=["webhooks"])
 app.include_router(integrations_wechat_work.router, prefix="/api/v1", tags=["integrations"])
+app.include_router(health.router,              prefix="/api/v1", tags=["health"])
 
 
 @app.get("/health")

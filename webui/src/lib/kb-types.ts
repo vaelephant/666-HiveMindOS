@@ -261,6 +261,28 @@ export type SourceRecord = {
   collection?: string | null;
 };
 
+export type HealthReportExtractStatus = 'pending' | 'processing' | 'done' | 'failed';
+
+export type HealthReport = {
+  id: string;
+  org_id: string;
+  user_id: string;
+  source_id: string | null;
+  report_category: 'lab' | 'other';
+  report_subtype: string | null;
+  report_date: string | null;
+  date_inferred: boolean;
+  institution: string | null;
+  full_text?: string;
+  summary: string | null;
+  extract_status: HealthReportExtractStatus;
+  extract_version: string;
+  classification_confidence: number | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type SourceCollection = {
   name: string;
   count: number;

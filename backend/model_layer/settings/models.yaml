@@ -31,6 +31,12 @@ profiles:
     model: gpt-4o
     max_tokens: 8192
 
+  health-vision:
+    kind: chat
+    provider: openai
+    model: gpt-4o
+    max_tokens: 8192
+
   embedding:
     kind: embed
     provider: openai

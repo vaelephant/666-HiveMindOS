@@ -138,6 +138,30 @@ def embed_batch(
     return mod.embed_batch(texts=texts, model=resolved.model)
 
 
+def complete_vision(
+    images: list[bytes],
+    prompt: str,
+    system: str | None = None,
+    profile: str | None = None,
+    max_tokens: int | None = None,
+) -> str:
+    resolved = _resolve_chat(profile)
+    mod = registry.get_chat_module(resolved.provider)
+    fn = getattr(mod, "complete_vision_with_usage", None)
+    max_tok = max_tokens or resolved.max_tokens
+    if fn:
+        text, raw = fn(
+            images=images,
+            prompt=prompt,
+            system=system,
+            model=resolved.model,
+            max_tokens=max_tok,
+        )
+        _record_chat(resolved, "vision", raw)
+        return text
+    raise NotImplementedError(f"vision not supported for provider {resolved.provider}")
+
+
 def complete(
     prompt: str,
     system: str | None = None,

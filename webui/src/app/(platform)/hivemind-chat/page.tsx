@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
-import { ChatEmptyState, ChatThread } from '@/components/chat/conversation';
+import { ChatEmptyState, ChatThread, type ChatAttachment } from '@/components/chat/conversation';
 import { ChatDeleteSessionDialog } from '@/components/chat/delete-session-dialog';
 import { ChatHistorySidebar } from '@/components/chat/history-sidebar';
 import { ChatUpgradeDialog } from '@/components/chat/upgrade-dialog';
@@ -13,9 +13,11 @@ import {
   extractChatTurn,
   getChatSession,
   getChatStarters,
+  getHealthReport,
   getSessionPipeline,
   listChatSessions,
   sendChatMessageStream,
+  uploadHealthReport,
 } from '@/lib/kb-api';
 import { detectUpgradeSuggestion, manualUpgradeSuggestion } from '@/lib/chat-task-upgrade';
 import type { ChatStreamPhase } from '@/lib/kb-api';
@@ -57,6 +59,7 @@ function ChatPageContent() {
   const [upgradeTurnIndex, setUpgradeTurnIndex] = useState<number | null>(null);
   const [upgradeSubmitting, setUpgradeSubmitting] = useState(false);
   const [chatStarters, setChatStarters] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const eventBaselineRef = useRef(0);
   const streamAbortRef = useRef<AbortController | null>(null);
@@ -186,6 +189,7 @@ function ChatPageContent() {
     setTurns([]);
     setPending(null);
     setInput('');
+    setAttachments([]);
     setThreadLoading(false);
     syncUrl(null);
   }
@@ -227,14 +231,88 @@ function ChatPageContent() {
     setExtracting(false);
   }
 
+  const pollHealthReport = useCallback(async (reportId: string, attachmentId: string) => {
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const report = await getHealthReport(reportId);
+        if (report.extract_status === 'done') {
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === attachmentId ? { ...a, status: 'ready' } : a)),
+          );
+          return;
+        }
+        if (report.extract_status === 'failed') {
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === attachmentId
+                ? { ...a, status: 'failed', error: report.error_message || '解析失败' }
+                : a,
+            ),
+          );
+          return;
+        }
+      } catch {
+        break;
+      }
+    }
+  }, []);
+
+  const handleAttach = useCallback(
+    async (files: FileList) => {
+      for (const file of Array.from(files)) {
+        const id = crypto.randomUUID();
+        setAttachments((prev) => [
+          ...prev,
+          { id, filename: file.name, status: 'uploading' },
+        ]);
+        try {
+          const report = await uploadHealthReport(file);
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === id
+                ? { ...a, status: 'processing', reportId: report.id }
+                : a,
+            ),
+          );
+          void pollHealthReport(report.id, id);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '上传失败';
+          setAttachments((prev) =>
+            prev.map((a) => (a.id === id ? { ...a, status: 'failed', error: msg } : a)),
+          );
+        }
+      }
+    },
+    [pollHealthReport],
+  );
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
   async function handleSend(text?: string) {
-    const q = (text ?? input).trim();
-    if (!q || pending !== null) return;
+    if (attachments.some((a) => a.status === 'uploading')) return;
+
+    const usable = attachments.filter(
+      (a) => a.status === 'ready' || a.status === 'processing',
+    );
+    let q = (text ?? input).trim();
+    if (!q && usable.length === 0) return;
+    if (!q && usable.length > 0) {
+      q =
+        usable.length === 1
+          ? `请帮我解读这份检查报告（${usable[0].filename}）`
+          : `请帮我解读这 ${usable.length} 份检查报告`;
+    }
+    if (pending !== null) return;
     abortActiveStream();
     const abort = new AbortController();
     streamAbortRef.current = abort;
 
     setInput('');
+    setAttachments([]);
     setPending(q);
     setError(null);
     setStreamText('');
@@ -392,6 +470,9 @@ function ChatPageContent() {
             onSend={handleSend}
             disabled={pending !== null}
             suggestions={chatStarters}
+            attachments={attachments}
+            onAttach={handleAttach}
+            onRemoveAttachment={handleRemoveAttachment}
           />
         ) : (
           <ChatThread
@@ -411,6 +492,9 @@ function ChatPageContent() {
             onUpgrade={turns.length > 0 ? openUpgradeFromSession : undefined}
             onCreateTaskFromTurn={turns.length > 0 ? openUpgradeFromTurn : undefined}
             onEnqueueTurn={activeId ? handleEnqueueTurn : undefined}
+            attachments={attachments}
+            onAttach={handleAttach}
+            onRemoveAttachment={handleRemoveAttachment}
           />
         )}
       </div>

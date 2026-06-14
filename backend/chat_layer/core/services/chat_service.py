@@ -101,6 +101,7 @@ def send_message(
     with track_usage(org_id, user_id, "chat", session_id):
         result = ChatAgent(wiki, graph).run(
             message, prior, org_id, memory_context=memory_block, chat_profile=chat_profile,
+            user_id=user_id,
         )
 
     _registry.add_message(
@@ -191,6 +192,7 @@ def send_message_stream(
         with track_usage(org_id, user_id, "chat", session_id):
             yield from agent.run_stream(
                 message, prior, org_id, memory_context=memory_block, chat_profile=chat_profile,
+                user_id=user_id,
             )
 
     for event in _tracked_stream():

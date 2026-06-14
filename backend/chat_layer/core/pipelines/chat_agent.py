@@ -10,6 +10,7 @@ from knowledge_base.core.wiki.wiki_manager import WikiManager
 from shared import config
 from knowledge_base.core.parsers.llm_json import parse_json
 from knowledge_base.core.tools.kb_toolkit import WikiToolExecutor, tool_runtime, tool_schemas
+from health_layer.core.tools.health_toolkit import HealthToolExecutor, health_tool_schemas
 from prompts import get, render
 from model_layer import client as llm
 
@@ -20,6 +21,17 @@ _CHAT_SYNTHESIS = get("chat.synthesis")
 _CHAT_SYNTHESIS_STREAM = get("chat.synthesis_stream")
 _CHAT_FOLLOW_UPS = get("chat.follow_ups")
 _RT = tool_runtime()
+
+_HEALTH_TOOLS = frozenset({
+    "list_health_reports",
+    "get_health_report",
+    "query_lab_observations",
+    "list_abnormal_observations",
+})
+_HEALTH_INTENT_HINTS = (
+    "报告", "上传", "检查", "检验", "指标", "化验", "血常规", "解读", "看到", "附件",
+)
+_CHART_INTENT_HINTS = ("图表", "做图", "制作图", "折线", "柱状", "可视化", "画图")
 
 
 class ChatAgent:
@@ -34,6 +46,7 @@ class ChatAgent:
         org_id: str,
         memory_context: str = "",
         chat_profile: str | None = None,
+        user_id: str = "demo",
     ) -> dict:
         """
         Returns:
@@ -45,8 +58,14 @@ class ChatAgent:
         """
         log.info("[chat] turn  org=%s  msg=%s…", org_id, message[:50])
 
-        read_pages, steps = self._gather_pages(message, history, org_id)
-        answer, follow_ups = self._synthesize(message, read_pages, memory_context, chat_profile=chat_profile)
+        read_pages, health_snippets, steps = self._gather_context(
+            message, history, org_id, user_id=user_id,
+        )
+        answer, follow_ups = self._synthesize(
+            message, read_pages, memory_context,
+            health_snippets=health_snippets,
+            chat_profile=chat_profile,
+        )
         sources = self._pages_to_sources(read_pages)
 
         log.info("[chat] done  steps=%d  sources=%d  ans_len=%d", len(steps), len(sources), len(answer))
@@ -59,6 +78,7 @@ class ChatAgent:
         org_id: str,
         memory_context: str = "",
         chat_profile: str | None = None,
+        user_id: str = "demo",
     ):
         """
         流式版本：Phase 1 检索 → Phase 2 逐 token 输出回答。
@@ -67,13 +87,19 @@ class ChatAgent:
         log.info("[chat] stream  org=%s  msg=%s…", org_id, message[:50])
         yield {"type": "status", "phase": "gathering"}
 
-        read_pages, steps = self._gather_pages(message, history, org_id)
+        read_pages, health_snippets, steps = self._gather_context(
+            message, history, org_id, user_id=user_id,
+        )
         sources = self._pages_to_sources(read_pages)
 
         yield {"type": "status", "phase": "writing"}
         yield {"type": "sources", "sources": sources}
 
-        prompt = self._build_synthesis_prompt(message, read_pages, memory_context, stream=True)
+        prompt = self._build_synthesis_prompt(
+            message, read_pages, memory_context,
+            health_snippets=health_snippets,
+            stream=True,
+        )
         chunks: list[str] = []
         synthesis_profile = chat_profile or _CHAT_SYNTHESIS_STREAM.resolve_profile()
         for delta in llm.complete_stream(
@@ -97,32 +123,120 @@ class ChatAgent:
             "follow_ups": follow_ups,
         }
 
-    def _gather_pages(
+    def _gather_context(
         self,
         message: str,
         history: list[dict],
         org_id: str,
-    ) -> tuple[list[tuple[str, str]], list[dict]]:
+        user_id: str = "demo",
+    ) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[dict]]:
         read_pages: list[tuple[str, str]] = []
-        tools = WikiToolExecutor(self._wiki, self._graph, org_id)
+        health_snippets: list[tuple[str, str]] = []
+        wiki_tools = WikiToolExecutor(self._wiki, self._graph, org_id)
+        health_tools = HealthToolExecutor(org_id, user_id)
+        schemas = tool_schemas() + health_tool_schemas()
+        health_intent = self._should_prefetch_health(message, history)
+
+        if health_intent:
+            health_snippets.extend(self._prefetch_health_reports(health_tools))
 
         def track_executor(name: str, args: dict) -> str:
-            result = tools(name, args)
+            if name in ("search_wiki", "read_page", "list_entities"):
+                result = wiki_tools(name, args)
+            else:
+                result = health_tools(name, args)
+                if self._is_useful_health_result(result):
+                    health_snippets.append((f"health:{name}", result))
             if name == "read_page":
                 path = args.get("path", "")
                 if path and result and not result.startswith("页面不存在") and not any(p == path for p, _ in read_pages):
                     read_pages.append((path, result))
             return result
 
+        gather_system = _CHAT_GATHER.system
+        if health_intent:
+            gather_system = (
+                f"{gather_system}\n\n"
+                "【本轮优先】用户在问检查报告/上传资料。必须先调用 list_health_reports 与 get_health_report，"
+                "不要用 search_wiki 回答此类问题。"
+            )
+
         _, steps = llm.agentic_loop(
-            system=_CHAT_GATHER.system,
+            system=gather_system,
             user_message=self._build_user_message(message, history),
-            tools_schema=tool_schemas(),
+            tools_schema=schemas,
             tool_executor=track_executor,
             profile=_CHAT_GATHER.resolve_profile(),
-            max_iterations=_RT.get("gather_max_iterations", 6),
+            max_iterations=_RT.get("gather_max_iterations", 8),
         )
-        return read_pages, steps
+        return read_pages, self._dedupe_snippets(health_snippets), steps
+
+    @staticmethod
+    def _has_health_intent(message: str, history: list[dict]) -> bool:
+        parts = [message]
+        for h in history[-6:]:
+            parts.append(h.get("content") or "")
+        blob = " ".join(parts)
+        return any(hint in blob for hint in _HEALTH_INTENT_HINTS)
+
+    @staticmethod
+    def _has_chart_intent(message: str) -> bool:
+        return any(hint in message for hint in _CHART_INTENT_HINTS)
+
+    @staticmethod
+    def _should_prefetch_health(message: str, history: list[dict]) -> bool:
+        if ChatAgent._has_health_intent(message, history):
+            return True
+        if ChatAgent._has_chart_intent(message) and history:
+            blob = " ".join(h.get("content") or "" for h in history[-8:])
+            extra = ("PSA", "T-PSA", "F-PSA", "observations", "检验", "报告")
+            hints = _HEALTH_INTENT_HINTS + extra
+            return any(h in blob for h in hints)
+        return False
+
+    @staticmethod
+    def _prefetch_health_reports(health_tools: HealthToolExecutor) -> list[tuple[str, str]]:
+        snippets: list[tuple[str, str]] = []
+        listing = health_tools.list_health_reports(5)
+        if not ChatAgent._is_useful_health_result(listing):
+            return snippets
+        snippets.append(("用户最近检查报告", listing))
+        try:
+            reports = json.loads(listing)
+        except json.JSONDecodeError:
+            return snippets
+        if not isinstance(reports, list):
+            return snippets
+        for report in reports[:2]:
+            if not isinstance(report, dict):
+                continue
+            report_id = report.get("id")
+            if not report_id:
+                continue
+            detail = health_tools.get_health_report(report_id)
+            if ChatAgent._is_useful_health_result(detail):
+                label = report.get("report_subtype") or report.get("summary") or report_id[:8]
+                snippets.append((f"检查报告详情（{label}）", detail))
+        return snippets
+
+    @staticmethod
+    def _is_useful_health_result(result: str) -> bool:
+        if not result or not result.strip():
+            return False
+        empty_markers = ("暂无", "未找到", "请提供", "未知健康工具")
+        return not any(result.startswith(m) for m in empty_markers)
+
+    @staticmethod
+    def _dedupe_snippets(snippets: list[tuple[str, str]]) -> list[tuple[str, str]]:
+        seen: set[str] = set()
+        out: list[tuple[str, str]] = []
+        for label, content in snippets:
+            key = content[:200]
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((label, content))
+        return out
 
     def _pages_to_sources(self, read_pages: list[tuple[str, str]]) -> list[dict]:
         return [
@@ -140,27 +254,45 @@ class ChatAgent:
         read_pages: list[tuple[str, str]],
         memory_context: str,
         *,
+        health_snippets: list[tuple[str, str]] | None = None,
         stream: bool = False,
     ) -> str:
+        health_snippets = health_snippets or []
         parts = [f"用户问题：{question}"]
         if memory_context:
             parts.append(memory_context)
+        if health_snippets:
+            health_block = "\n\n".join(
+                f"--- {label} ---\n{content[:_RT.get('synthesis_health_chars', 4000)]}"
+                for label, content in health_snippets
+            )
+            parts.append(
+                "以下是用户上传并已解析的检查报告数据（结构化，回答医疗/检验问题时必须优先使用，"
+                "可明确告知用户「已收到并读取您的报告」）：\n\n"
+                f"{health_block}"
+            )
         if read_pages:
             sources_block = "\n\n".join(
                 f"[{i+1}] 来源文件：{path}\n{content[:_RT.get('synthesis_source_chars', 800)]}"
                 for i, (path, content) in enumerate(read_pages)
             )
             parts.append(f"以下是检索到的 Wiki 内容：\n\n{sources_block}")
+        has_context = bool(memory_context or read_pages or health_snippets)
+        if self._has_chart_intent(question):
+            parts.append(
+                "【本轮必须】用户要求图表可视化。在回答中加入 ```chart 代码块（JSON），"
+                "用上文检查报告或 Wiki 中的真实数值渲染，禁止回答「无法制作图表」。"
+            )
         if stream:
-            if memory_context or read_pages:
+            if has_context:
                 parts.append("请根据以上内容回答。")
             else:
-                parts.append("Wiki 与用户长期智慧中均无相关内容，请直接说明。")
-        elif memory_context or read_pages:
+                parts.append("Wiki、检查报告与用户长期智慧中均无相关内容，请直接说明。")
+        elif has_context:
             parts.append("请根据以上内容回答，并返回 JSON。")
         else:
             parts.append(
-                "Wiki 与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
+                "Wiki、检查报告与用户长期智慧中均无相关内容，请直接说明并给出 3 条追问建议。\n"
                 '返回 JSON：{"answer": "...", "follow_ups": ["...", "...", "..."]}'
             )
         return "\n\n".join(parts)
@@ -193,9 +325,14 @@ class ChatAgent:
         read_pages: list[tuple[str, str]],
         memory_context: str = "",
         *,
+        health_snippets: list[tuple[str, str]] | None = None,
         chat_profile: str | None = None,
     ) -> tuple[str, list[str]]:
-        prompt = self._build_synthesis_prompt(question, read_pages, memory_context, stream=False)
+        prompt = self._build_synthesis_prompt(
+            question, read_pages, memory_context,
+            health_snippets=health_snippets,
+            stream=False,
+        )
         synthesis_profile = chat_profile or _CHAT_SYNTHESIS.resolve_profile()
         raw = llm.complete(
             prompt=prompt,
